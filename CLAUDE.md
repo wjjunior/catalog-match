@@ -81,11 +81,21 @@ Web:
 - No network calls, no environment variables, no `.env` file, no dependence on the wall
   clock in results. Recency is measured from the latest date in the history file.
 
+## Comments
+
+Code speaks for itself. A comment earns its place only where the code cannot say the
+thing: a trap, a constraint that is not visible in the signature, or a decision whose
+opposite looks equally correct. Two lines at most, and none where a better name would do.
+
+No JSDoc that restates a signature or a field name, no file banners, no section headers,
+no comment describing what the next line does.
+
 ## Documentation
 
-- Record every assumption in `docs/ASSUMPTIONS.md` with the card key. When a decision is
-  ambiguous, write the assumption and continue; ask only when the answer changes the
-  architecture.
+- Record an assumption in `docs/ASSUMPTIONS.md` only when a later card would otherwise
+  undo it. When a decision is ambiguous, take it and continue; ask only when the answer
+  changes the architecture. A long assumptions list is a sign the cards are unclear, not
+  a sign of care.
 - Never commit planning artifacts, `.superpowers/` or `*.plan.md`.
 - English only in code, comments, docs and commit messages.
 
