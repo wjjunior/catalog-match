@@ -73,7 +73,15 @@ const restrictCoreImports = (allowTypeImports, message) => [
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/coverage/**', '**/dist/**', '**/*.d.ts'],
+    ignores: [
+      '**/node_modules/**',
+      // Nested git worktrees belong to other sessions.
+      '**/.claude/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '**/dist/**',
+      '**/*.d.ts',
+    ],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
