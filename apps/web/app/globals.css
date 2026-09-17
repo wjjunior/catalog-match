@@ -1,0 +1,48 @@
+:root {
+  color-scheme: light dark;
+  --background: #ffffff;
+  --foreground: #16181d;
+  --muted: #5b6472;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #16181d;
+    --foreground: #f2f4f7;
+    --muted: #9aa4b2;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 3rem 1rem;
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  line-height: 1.5;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 44rem;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+}
