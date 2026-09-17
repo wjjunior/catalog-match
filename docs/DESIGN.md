@@ -145,7 +145,7 @@ Hexagonal core and FSD-lite web, both enforced by lint rules rather than by fold
 | Layer | May import |
 |---|---|
 | core inner ring (domain, parsing, matching, personalization) | inner ring only |
-| core ports | inner ring |
+| core ports | domain only |
 | core application | inner ring, ports; createCore is the only module that imports adapters |
 | core adapters | ports, inner ring; never application |
 | core eval | application, ports, inner ring; never adapters (it receives a Matcher) |

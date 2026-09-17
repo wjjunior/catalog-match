@@ -44,7 +44,9 @@ const ALLOWED_DEPENDENCIES = {
   'core-parsing': CORE_INNER_RING,
   'core-matching': CORE_INNER_RING,
   'core-personalization': CORE_INNER_RING,
-  'core-ports': [...CORE_INNER_RING, 'core-ports'],
+  // A port is an interface stated in domain language: narrower than the rest of the ring,
+  // so a contract can never reach a tuning parameter in matching/config.ts.
+  'core-ports': ['core-domain', 'core-ports'],
   'core-application': [...CORE_INNER_RING, 'core-ports', 'core-application'],
   'core-adapters': [...CORE_INNER_RING, 'core-ports', 'core-adapters'],
   // The eval harness receives a Matcher; it never wires adapters itself.

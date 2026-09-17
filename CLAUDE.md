@@ -40,7 +40,7 @@ Core inner ring = `domain/` (types, contracts, config), `parsing/`, `matching/`,
 `personalization/`.
 
 - inner ring imports inner ring only;
-- `ports/` imports the inner ring;
+- `ports/` imports `domain/` only;
 - `application/` imports the inner ring and `ports/`; `application/createCore.ts` is the
   only module allowed to import `adapters/`;
 - `adapters/**` imports `ports/` and the inner ring; never `application/`;
