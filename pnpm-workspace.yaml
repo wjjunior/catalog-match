@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+  - apps/*
+
+allowBuilds:
+  # vitest and tsx both run on esbuild, whose install script links the platform binary.
+  esbuild: true
+  # eslint-import-resolver-typescript resolves through a native binary.
+  unrs-resolver: true

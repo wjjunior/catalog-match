@@ -1,0 +1,9 @@
+node_modules/
+.next/
+coverage/
+dist/
+pnpm-lock.yaml
+data/*.csv
+docs/DESIGN.md
+docs/BRIEF.md
+apps/web/next-env.d.ts
