@@ -55,7 +55,7 @@ export interface MatchQueryDeps {
   /** Both are absent for a matcher wired without a customer to speak of, which is what
    * the eval harness and the base tests use. */
   readonly history?: OrderHistoryRepository;
-  readonly profile?: (customerId: string) => CustomerProfile;
+  readonly profile?: (customerId: string) => CustomerProfile | undefined;
 }
 
 /** The response minus what every branch answers the same way. */
@@ -366,8 +366,13 @@ function answerFor(
     return attributeAnswer(request.query, spec, deps, config, limit, profile, []);
   }
 
+  const lines =
+    request.customerId === undefined ? undefined : deps.history?.byCustomer(request.customerId);
+
+  // A customer with no line at all is no more able to resolve a reference than no
+  // customer is, so both reach the prompt. docs/DESIGN.md 7.5.
   const reference = resolveReference(
-    request.customerId === undefined ? undefined : deps.history?.byCustomer(request.customerId),
+    lines === undefined || lines.length === 0 ? undefined : lines,
     spec,
     config,
   );

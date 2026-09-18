@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { createCoreFromRepositories } from '../../src/application/createCore';
 import { matchQuery } from '../../src/application/matchQuery';
 import type { Match, MatchResponse } from '../../src/domain/match';
 import { buildIndex } from '../../src/matching/lexicalFallback';
@@ -235,5 +236,61 @@ describe('a history reference with an override', () => {
     expect(response.status).toBe('ambiguous');
     expect(allBrass(response)).toBe(true);
     expect(codes(response)).toContain('customerRequired');
+  });
+});
+
+describe('a customer the history does not know', () => {
+  const UNKNOWN = 'CUST-999';
+
+  const comparable = (response: MatchResponse): Omit<MatchResponse, 'timingsMs'> => ({
+    query: response.query,
+    parsed: response.parsed,
+    status: response.status,
+    compatibleCount: response.compatibleCount,
+    results: response.results,
+    alternatives: response.alternatives,
+    notes: response.notes,
+  });
+
+  it.each(['M8 flat washer', 'brass hex nut 1/2-13', 'M16 hex nut', 'nylon insert thing'])(
+    'answers %s exactly as no customer at all does',
+    (query) => {
+      expect(comparable(ask(query, UNKNOWN))).toEqual(comparable(ask(query)));
+    },
+  );
+
+  it('claims no preference it has no history for', () => {
+    expect(top(ask('M8 flat washer', UNKNOWN)).explanation.personalization).toBeUndefined();
+  });
+
+  it('still asks for a customer when the query references an order', () => {
+    expect(codes(ask('the same washers as last time', UNKNOWN))).toContain('customerRequired');
+  });
+
+  it('builds no profile for it, so an arbitrary id cannot fill the cache', () => {
+    let builds = 0;
+    const counted = createCoreFromRepositories({
+      catalog: core.catalog,
+      history: {
+        // buildProfile is the only reader of the whole file; everything else is indexed.
+        all: () => {
+          builds++;
+
+          return core.history.all();
+        },
+        byCustomer: (customerId) => core.history.byCustomer(customerId),
+        customers: () => core.history.customers(),
+        latestOrderDate: () => core.history.latestOrderDate(),
+      },
+    });
+
+    for (const customerId of [UNKNOWN, 'nobody', '']) {
+      counted.matchQuery({ query: 'M8 flat washer', customerId });
+    }
+    expect(builds).toBe(0);
+
+    counted.matchQuery({ query: 'M8 flat washer', customerId: 'CUST-002' });
+    counted.matchQuery({ query: 'M16 hex nut', customerId: 'CUST-002' });
+    expect(builds).toBe(1);
   });
 });

@@ -45,9 +45,16 @@ export function createCoreFromRepositories({
   // One profile per customer per catalog load: the history and the catalog it is
   // cross-checked against both change only when this core is built again.
   const profiles = new Map<string, CustomerProfile>();
-  const profile = (customerId: string): CustomerProfile => {
-    const known = profiles.get(customerId);
-    if (known !== undefined) return known;
+  // An id the history has never seen is not a customer. It gets no profile, so it is
+  // answered exactly as no customer is, and the cache stays the size of the customer
+  // list however many ids arrive.
+  const known = new Set(history.customers().map((customer) => customer.customerId));
+
+  const profile = (customerId: string): CustomerProfile | undefined => {
+    if (!known.has(customerId)) return undefined;
+
+    const cached = profiles.get(customerId);
+    if (cached !== undefined) return cached;
 
     const built = buildProfile(customerId, history.all(), catalog.all(), config);
     profiles.set(customerId, built);
