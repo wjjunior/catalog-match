@@ -45,15 +45,15 @@ Accuracy 0.962.
 
 ### Constraint preservation (78 cases)
 
-0 returned matches contradict an attribute the query stated explicitly.
+0 of the matches returned, with and without a customer, contradict an attribute the query asked for.
 
 ### Personalization (21 cases)
 
-| metric | value |
-|---|---|
-| Hit@1 with the customer | 0.952 |
-| Hit@1 without the customer | 0.143 |
-| Mean top-1 to top-2 margin | 0.359 |
+| metric | value | cases |
+|---|---|---|
+| Hit@1 with the customer | 0.952 | 21 |
+| Hit@1 without the customer | 0.143 | 21 |
+| Mean top-1 to top-2 margin | 0.359 | 18 |
 
 ### Calibration (29 cases)
 
@@ -77,4 +77,4 @@ Measured at the limit the API serves, and the one number here that moves between
 | percentile | ms |
 |---|---|
 | p50 | 0.1 |
-| p95 | 0.4 |
+| p95 | 0.5 |

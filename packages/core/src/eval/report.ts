@@ -83,7 +83,7 @@ function section({ name, report }: EvalSection): string {
     '',
     `### Constraint preservation (${plural(constraints.cases)})`,
     '',
-    `${String(constraints.violations)} returned matches contradict an attribute the query stated explicitly.`,
+    `${String(constraints.violations)} of the matches returned, with and without a customer, contradict an attribute the query asked for.`,
     ...(constraints.offenders.length === 0
       ? []
       : [
@@ -101,11 +101,21 @@ function section({ name, report }: EvalSection): string {
     `### Personalization (${plural(personalization.cases)})`,
     '',
     table(
-      ['metric', 'value'],
+      ['metric', 'value', 'cases'],
       [
-        ['Hit@1 with the customer', rate(personalization.hit1)],
-        ['Hit@1 without the customer', rate(personalization.hit1WithoutCustomer)],
-        ['Mean top-1 to top-2 margin', rate(personalization.margin)],
+        ['Hit@1 with the customer', rate(personalization.hit1), String(personalization.cases)],
+        [
+          'Hit@1 without the customer',
+          rate(personalization.hit1WithoutCustomer),
+          String(personalization.cases),
+        ],
+        // Its own denominator: a case answered with one result has no second to measure
+        // against, so this mean covers fewer cases than the heading.
+        [
+          'Mean top-1 to top-2 margin',
+          rate(personalization.margin),
+          String(personalization.marginCases),
+        ],
       ],
     ),
     '',
@@ -145,6 +155,7 @@ export interface JsonSection {
     hit1: number;
     hit1WithoutCustomer: number;
     margin: number;
+    marginCases: number;
   };
   calibration: { cases: number; bins: CalibrationBin[] };
 }
@@ -184,6 +195,7 @@ export function toJson(sections: readonly EvalSection[]): JsonSummary {
         hit1: round(report.personalization.hit1),
         hit1WithoutCustomer: round(report.personalization.hit1WithoutCustomer),
         margin: round(report.personalization.margin),
+        marginCases: report.personalization.marginCases,
       },
       calibration: {
         cases: report.calibration.cases,

@@ -60,6 +60,11 @@ describe('the markdown report', () => {
     expect(markdown).toContain('Calibration (1 case)');
   });
 
+  it('gives the margin its own denominator, since it is averaged over fewer cases', () => {
+    expect(markdown).toContain('| Mean top-1 to top-2 margin |');
+    expect(markdown).toMatch(/\| Mean top-1 to top-2 margin \| [0-9.]+ \| 0 \|/);
+  });
+
   it('renders the confusion matrix over all five statuses, zeros included', () => {
     expect(markdown).toContain(
       '| expected \\ actual | unique | ambiguous | none | history | unparsed |',
@@ -98,5 +103,41 @@ describe('the JSON summary', () => {
 
   it('rounds every rate, so the same inputs serialize to the same bytes', () => {
     expect(JSON.stringify(summary)).not.toMatch(/\d\.\d{6,}/);
+  });
+});
+
+describe('the personalization table', () => {
+  const personalized = toMarkdown([
+    {
+      name: 'Golden set',
+      report: run({
+        matcher: stubMatcher(ANSWERS).matcher,
+        catalog,
+        cases: [
+          caseOf({
+            id: 'p-1',
+            customerId: 'CUST-001',
+            expected: ['SS', 'BO', 'BR'],
+            expectedTop1: 'SS',
+          }),
+          caseOf({
+            id: 'p-2',
+            customerId: 'CUST-002',
+            query: 'M16 hex nut',
+            expectedStatus: 'unique',
+            expected: ['NUT'],
+          }),
+        ],
+      }),
+    },
+  ]);
+
+  it('counts every personalized case behind Hit@1', () => {
+    expect(personalized).toMatch(/\| Hit@1 with the customer \| [0-9.]+ \| 2 \|/);
+  });
+
+  // The second case is answered with one result, so it has no top-2 to measure against.
+  it('counts only the cases the margin could be measured on', () => {
+    expect(personalized).toMatch(/\| Mean top-1 to top-2 margin \| [0-9.]+ \| 1 \|/);
   });
 });

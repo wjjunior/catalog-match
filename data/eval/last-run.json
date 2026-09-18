@@ -64,7 +64,8 @@
         "cases": 21,
         "hit1": 0.9524,
         "hit1WithoutCustomer": 0.1429,
-        "margin": 0.3587
+        "margin": 0.3587,
+        "marginCases": 18
       },
       "calibration": {
         "cases": 29,
