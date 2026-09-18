@@ -4,7 +4,7 @@ import type { JsonSummary } from '../packages/core/src/eval/report';
 import type { EvalCase as SchemaRow } from '../data/eval/schema';
 import type { EvalCase as HarnessCase } from '../packages/core/src/eval/loader';
 import type { GateFloor } from './eval';
-import { evaluate, gateFailures, parseArgs } from './eval';
+import { DEFAULT_FLOOR, evaluate, gateFailures, parseArgs } from './eval';
 
 describe('the case type the harness consumes', () => {
   // packages/core declares the shape it needs instead of importing a file outside its
@@ -17,16 +17,30 @@ describe('the case type the harness consumes', () => {
 
 describe('the flags', () => {
   it('keep the held-out set out unless it is asked for', () => {
-    expect(parseArgs([])).toEqual({ heldout: false, baseline: false, gate: false });
-    expect(parseArgs(['--heldout'])).toEqual({ heldout: true, baseline: false, gate: false });
+    expect(parseArgs([])).toEqual({
+      heldout: false,
+      baseline: false,
+      gate: false,
+      floor: DEFAULT_FLOOR,
+    });
+    expect(parseArgs(['--heldout']).heldout).toBe(true);
   });
 
   it('keep the baseline out unless it is asked for', () => {
-    expect(parseArgs(['--baseline'])).toEqual({ heldout: false, baseline: true, gate: false });
+    expect(parseArgs(['--baseline']).baseline).toBe(true);
   });
 
   it('gate only when asked', () => {
-    expect(parseArgs(['--gate'])).toEqual({ heldout: false, baseline: false, gate: true });
+    expect(parseArgs(['--gate']).gate).toBe(true);
+  });
+
+  it('read the floor from the path given, so CI can point at the copy on main', () => {
+    expect(parseArgs(['--gate', '--floor', '/tmp/floor.json']).floor).toBe('/tmp/floor.json');
+  });
+
+  it('refuse a --floor with no path rather than falling back to the branch copy', () => {
+    expect(() => parseArgs(['--gate', '--floor'])).toThrow(/needs a path/);
+    expect(() => parseArgs(['--gate', '--floor', '--heldout'])).toThrow(/needs a path/);
   });
 });
 
