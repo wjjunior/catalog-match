@@ -48,7 +48,7 @@ started outside the repository, or `data/` is missing. Both CSVs are committed; 
 **The first request is slow, later ones are fast.** Expected: the core is built on the first
 request and kept for the life of the process.
 
-**Port 3000 is taken.** `pnpm --filter @catalog-match/web dev -- -p 3001`.
+**Port 3000 is taken.** `pnpm --filter @catalog-match/web dev -p 3001`.
 
 ## Checks
 
