@@ -1,11 +1,14 @@
 import type { MatchStatus } from '../domain/match';
 import { MATCH_STATUSES } from '../domain/match';
+import type { BaselineComparison } from './baseline';
 import type { CalibrationBin, StatusMatrix } from './metrics';
 import type { EvalReport } from './run';
 
 export interface EvalSection {
   readonly name: string;
   readonly report: EvalReport;
+  /** Present only when `--baseline` ran: the same cases through the lexical fallback alone. */
+  readonly baseline?: BaselineComparison;
 }
 
 /** What the reader is owed before the first table. docs/DESIGN.md 10.3 and 10.5. */
@@ -45,7 +48,76 @@ const binRow = (bin: CalibrationBin): string[] => [
   bin.precision === undefined ? '—' : rate(bin.precision),
 ];
 
-function section({ name, report }: EvalSection): string {
+/** Statuses a score gap has no way to produce, whatever the query reads like. */
+const UNREACHABLE: readonly MatchStatus[] = ['history', 'unparsed'];
+
+const casesExpecting = (matrix: StatusMatrix, statuses: readonly MatchStatus[]): number =>
+  statuses.reduce(
+    (total, expected) =>
+      total + MATCH_STATUSES.reduce((row, actual) => row + matrix[expected][actual], 0),
+    0,
+  );
+
+/** The evidence for ADR-001, and the one table where a number is not the parser's own.
+ * docs/DESIGN.md 10.4. */
+function comparison(report: EvalReport, baseline: BaselineComparison): string[] {
+  const { retrieval, setRecovery, status } = report;
+
+  return [
+    '',
+    '### Baseline comparison',
+    '',
+    [
+      'The lexical fallback of `docs/DESIGN.md` 5.8 run alone over the same cases: token overlap',
+      'over normalized descriptions, with no parse, no compatible set and no customer. It calls a',
+      'query unique when the runner-up trails the best hit by more than the configured gap, so',
+      '`history` and `unparsed` are statuses it cannot produce at all — cases expecting one of',
+      `those two: ${String(casesExpecting(status.matrix, UNREACHABLE))} of ${String(status.cases)}.`,
+      'Its set recovery is scored on as many top hits as the labeled set holds, the size of the',
+      'answer handed to it for free, because it ranks every row a query token reaches and has no',
+      'compatible set to cut.',
+    ].join('\n'),
+    '',
+    table(
+      ['metric', 'parser', 'baseline', 'cases'],
+      [
+        ['Hit@1', rate(retrieval.hit1), rate(baseline.retrieval.hit1), String(retrieval.cases)],
+        ['Hit@3', rate(retrieval.hit3), rate(baseline.retrieval.hit3), String(retrieval.cases)],
+        ['MRR', rate(retrieval.mrr), rate(baseline.retrieval.mrr), String(retrieval.cases)],
+        [
+          'Set precision',
+          rate(setRecovery.precision),
+          rate(baseline.setRecovery.precision),
+          String(setRecovery.cases),
+        ],
+        [
+          'Set recall',
+          rate(setRecovery.recall),
+          rate(baseline.setRecovery.recall),
+          String(setRecovery.cases),
+        ],
+        [
+          'Exact-set rate',
+          rate(setRecovery.exactSetRate),
+          rate(baseline.setRecovery.exactSetRate),
+          String(setRecovery.cases),
+        ],
+        [
+          'Status accuracy',
+          rate(status.accuracy),
+          rate(baseline.status.accuracy),
+          String(status.cases),
+        ],
+      ],
+    ),
+    '',
+    'Where the baseline puts each status, against the same expectations:',
+    '',
+    table(['expected \\ actual', ...MATCH_STATUSES], matrixRows(baseline.status.matrix)),
+  ];
+}
+
+function section({ name, report, baseline }: EvalSection): string {
   const { retrieval, setRecovery, status, constraints, personalization, calibration } = report;
 
   return [
@@ -134,6 +206,7 @@ function section({ name, report }: EvalSection): string {
         ['p95', report.latency.p95.toFixed(1)],
       ],
     ),
+    ...(baseline === undefined ? [] : comparison(report, baseline)),
   ].join('\n');
 }
 
