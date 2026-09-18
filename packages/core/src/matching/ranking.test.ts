@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogItem } from '../domain/catalog';
 import type { ParsedSpec } from '../domain/spec';
 import { DEFAULT_MATCHER_CONFIG } from './config';
+import { compatibleSet } from './compatibility';
 import { attributeCredit, compatibility } from './ranking';
 
 const config = DEFAULT_MATCHER_CONFIG;
@@ -97,6 +98,16 @@ describe('attributeCredit: length', () => {
 
   it('contradicts when the item carries no length', () => {
     expect(attributeCredit('length', spec({ length: mm(45) }), item({}), config)).toBe(0);
+  });
+
+  // 1.9685 in converts to 49.9999 mm, which the filter reads as the catalog's 50 mm. The
+  // ranker once held a tighter rule of its own and threw on what the filter had admitted.
+  it('agrees with the filter on a length reached through a unit conversion', () => {
+    const query = spec({ diameter: M8, length: { value: 1.9685, unit: 'in', mm: 49.9999 } });
+    const candidate = item({ diameter: M8, length: mm(50) });
+
+    expect(compatibleSet(query, [candidate])).toEqual([candidate]);
+    expect(compatibility(query, candidate, config)).toBe(1);
   });
 });
 
