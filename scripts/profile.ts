@@ -438,3 +438,79 @@ export function historyStats(history: HistoryRow[], catalog: CatalogRow[]): Hist
     byCustomer,
   };
 }
+
+export type Anchor = {
+  label: string;
+  observed: string;
+  expected: string;
+  basis: 'raw' | 'sku' | 'history';
+  status: 'match' | 'differs';
+};
+
+function anchor(label: string, observed: string, expected: string, basis: Anchor['basis']): Anchor {
+  return { label, observed, expected, basis, status: observed === expected ? 'match' : 'differs' };
+}
+
+export function compareAnchors(catalog: CatalogStats, history: HistoryStats): Anchor[] {
+  const typeCounts = [...catalog.typePhrasesByType.values()].map((phrases) =>
+    [...phrases.values()].reduce((total, count) => total + count, 0),
+  );
+  const typeRange =
+    typeCounts.length === 0
+      ? '0'
+      : `${catalog.typePhrasesByType.size} types, ${Math.min(...typeCounts)} to ${Math.max(...typeCounts)}`;
+  const combinations = [...catalog.materialFinish.values()].reduce(
+    (total, finishes) => total + finishes.size,
+    0,
+  );
+  const perCustomer = (pick: (customer: CustomerStats) => number): string =>
+    history.byCustomer.map(pick).join(', ');
+
+  return [
+    anchor('Rows', String(catalog.rawRows), '1000', 'raw'),
+    anchor('Unique SKUs', String(catalog.uniqueSkus), '960', 'raw'),
+    anchor('Duplicate rows', String(catalog.duplicateRows), '40', 'raw'),
+    anchor('Inactive rows', String(catalog.inactiveRows), '45', 'raw'),
+    anchor('Inactive unique SKUs', String(catalog.inactiveSkus), '44', 'raw'),
+    anchor('Fully lowercase descriptions', String(catalog.lowercaseAllRaw), '74', 'raw'),
+    anchor('Product types', typeRange, '10 types, 86 to 103', 'sku'),
+    anchor('Diameters', String(catalog.diameterPitches.size), '16', 'sku'),
+    anchor('Rows without a pitch', String(catalog.rowsWithoutPitch), '1', 'sku'),
+    anchor('Materials', String(catalog.materialFinish.size), '6', 'sku'),
+    anchor('Finish surface forms', String(catalog.finishSurfaces.size), '12', 'sku'),
+    anchor('Material x finish combinations', String(combinations), '36', 'sku'),
+    anchor('Standard tokens', String(catalog.standards.size), '7', 'sku'),
+    anchor('Full tuples', String(catalog.fullTuples), '960', 'sku'),
+    anchor('Tuples without the standard', String(catalog.tuplesWithoutStandard), '950', 'sku'),
+    anchor('Length groups', String(catalog.lengthGroups), '668', 'sku'),
+    anchor('Length groups that are unique', String(catalog.lengthGroupsUnique), '654', 'sku'),
+    anchor('History lines', String(history.lines), '76', 'history'),
+    anchor('History customers', String(history.customers), '5', 'history'),
+    anchor('First order date', history.firstDate, '2025-07-20', 'history'),
+    anchor('Last order date', history.lastDate, '2026-04-25', 'history'),
+    anchor(
+      'History SKUs absent from the catalog',
+      String(history.skusMissingFromCatalog.length),
+      '0',
+      'history',
+    ),
+    anchor(
+      'Inactive SKUs purchased',
+      history.inactiveSkusPurchased.join(', '),
+      'PXNUT16888PL0901',
+      'history',
+    ),
+    anchor(
+      'Lines per customer',
+      perCustomer((customer) => customer.lines),
+      '18, 17, 17, 18, 6',
+      'history',
+    ),
+    anchor(
+      'Repeat SKUs per customer',
+      perCustomer((customer) => customer.repeatSkus),
+      '1, 4, 1, 1, 0',
+      'history',
+    ),
+  ];
+}

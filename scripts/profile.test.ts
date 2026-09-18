@@ -231,3 +231,24 @@ describe('historyStats', () => {
     expect(stats.byCustomer[1]?.metricShare).toBe(0.5);
   });
 });
+
+import { compareAnchors } from './profile';
+
+describe('compareAnchors', () => {
+  const anchors = compareAnchors(
+    catalogStats(toCatalogRows(parseCsv(catalogFixture))),
+    historyStats(toHistoryRows(parseCsv(historyFixture)), toCatalogRows(parseCsv(catalogFixture))),
+  );
+
+  it('carries a basis on every anchor', () => {
+    expect(anchors.every((anchor) => ['raw', 'sku', 'history'].includes(anchor.basis))).toBe(true);
+  });
+
+  it('marks an anchor that differs from the fixture rather than throwing', () => {
+    const rows = anchors.find((anchor) => anchor.label === 'Rows');
+
+    expect(rows?.observed).toBe('5');
+    expect(rows?.expected).toBe('1000');
+    expect(rows?.status).toBe('differs');
+  });
+});
