@@ -38,4 +38,9 @@ export interface CustomerProfile {
     threadSystem: Record<string, number>;
   };
   repeats: Record<string, number>;
+  /** Purchased SKUs the catalog no longer sells. */
+  discontinued: readonly string[];
+  /** History lines that could not be read or disagreed with the catalog; building a
+   * profile never throws. */
+  warnings: readonly string[];
 }
