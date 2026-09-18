@@ -1,6 +1,5 @@
-// The wire contract, mirrored from packages/core/src/domain/match.ts. It lives here
-// because the core barrel is still empty and PRG-27 owns the zod schema; when that card
-// merges, these declarations are replaced by the schema's inferred types.
+// The wire contract, mirrored by hand so the client stays free of core runtime code in the
+// browser bundle. `test/e2e/api.base.test.ts` guards the mirror with a compile-time check.
 
 export type Provenance = 'explicit' | 'inferred' | 'corrected' | 'approximate' | 'unrecognized';
 

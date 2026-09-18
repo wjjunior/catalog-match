@@ -22,7 +22,10 @@ The page holds a query box, a customer combobox and chips for the 33 example que
 - `M8 x 45mm SHCS` has no compatible item. The status line says
   `no M8 socket head cap screw at 45 mm` and three alternatives at nearby lengths follow.
 - `the same washers as last time` asks for a customer first.
-- Text the parser cannot read answers with the closest lexical matches, never an error.
+- Text the parser cannot read never errors: it answers unparsed. `qqq zzz nothing here`
+  reads "could not parse that query", with no cards, because no token overlaps the
+  catalog; `zinc plated shiny` reads "could not parse that query; showing the closest
+  text matches", because a token does.
 
 The first request of a process pays for loading both CSVs and indexing the catalog. Every
 request after that answers in single-digit milliseconds.
