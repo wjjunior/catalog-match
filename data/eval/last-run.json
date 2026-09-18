@@ -1,0 +1,127 @@
+{
+  "sections": [
+    {
+      "name": "Golden set",
+      "cases": 78,
+      "retrieval": {
+        "cases": 48,
+        "hit1": 0.9792,
+        "hit3": 1,
+        "mrr": 0.9896
+      },
+      "setRecovery": {
+        "cases": 30,
+        "precision": 1,
+        "recall": 0.9833,
+        "exactSetRate": 0.9667
+      },
+      "status": {
+        "cases": 78,
+        "accuracy": 0.9615,
+        "matrix": {
+          "unique": {
+            "unique": 29,
+            "ambiguous": 0,
+            "none": 0,
+            "history": 0,
+            "unparsed": 0
+          },
+          "ambiguous": {
+            "unique": 1,
+            "ambiguous": 32,
+            "none": 0,
+            "history": 0,
+            "unparsed": 1
+          },
+          "none": {
+            "unique": 0,
+            "ambiguous": 1,
+            "none": 7,
+            "history": 0,
+            "unparsed": 0
+          },
+          "history": {
+            "unique": 0,
+            "ambiguous": 0,
+            "none": 0,
+            "history": 6,
+            "unparsed": 0
+          },
+          "unparsed": {
+            "unique": 0,
+            "ambiguous": 0,
+            "none": 0,
+            "history": 0,
+            "unparsed": 1
+          }
+        }
+      },
+      "constraints": {
+        "cases": 78,
+        "violations": 0
+      },
+      "personalization": {
+        "cases": 21,
+        "hit1": 0.9524,
+        "hit1WithoutCustomer": 0.1429,
+        "margin": 0.3587
+      },
+      "calibration": {
+        "cases": 29,
+        "bins": [
+          {
+            "lower": 0,
+            "upper": 0.1,
+            "count": 0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 0
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0
+          },
+          {
+            "lower": 0.9,
+            "upper": 1,
+            "count": 29,
+            "precision": 1
+          }
+        ]
+      }
+    }
+  ]
+}
