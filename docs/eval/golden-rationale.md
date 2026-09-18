@@ -62,11 +62,12 @@ falling back to PLAIN alone where no 18-8 SS item exists. `pers-02` and `pers-07
 only 18-8 SS PLAIN item in their sets, `pers-02` backed by a literal repeat purchase.
 `pers-12` is the weakest label in the file for the opposite reason: no 18-8 SS item exists
 among the M12 nuts, so only the PLAIN finish share can act, and `PXNUT122536PL0551` is
-picked on finish alone. `pers-13` is the discontinued case: CUST-002's twice-bought
-`PXNUT16888PL0901` is inactive, so the label falls to the one active stainless item,
-`PXNUT1680A2HG0894`, under the half repeat weight `docs/DESIGN.md` 7.3 assigns to a
-compatible item sharing a discontinued item's family. `pers-15` and `pers-21` turn on the
-`standard` attribute specifically and are covered in Section 5.
+picked on finish alone. `pers-13` is the discontinued case: CUST-002's `PXNUT16888PL0901`,
+bought once on 2025-12-02, is inactive, so the label falls to the one active stainless
+item, `PXNUT1680A2HG0894`, under the half repeat weight `docs/DESIGN.md` 7.3 assigns to a
+compatible item sharing a discontinued item's family. `pers-15` turns on the `standard`
+attribute directly (DIN 912), with its reasoning recorded in its own `rationale` field in
+`golden.jsonl`; `pers-21`'s standard override is covered in Section 5.
 
 **CUST-003, Marine Electrical Corp** (17 lines, all BRASS) has no dominant finish — HDG,
 MECH ZINC, PLAIN, YELLOW ZINC and ZINC all appear in its history. `pers-03` picks
