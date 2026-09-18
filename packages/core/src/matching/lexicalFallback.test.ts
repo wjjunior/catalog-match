@@ -123,6 +123,15 @@ describe('score: shape of the result', () => {
 
     expect(skus(score(buildIndex([b, a]), ['brass']))).toEqual(['SKU-AAA', 'SKU-BBB']);
   });
+
+  it('breaks ties by code unit, so the order never depends on the locale of the runner', () => {
+    // Every locale collates `a` below the capitals, and Lithuanian puts `Y` between `I` and
+    // `J`; code units order all four the other way.
+    const ordered = ['SKU-I', 'SKU-J', 'SKU-Y', 'SKU-a'];
+    const tied = ordered.map((sku) => item('brass nut', { sku }));
+
+    expect(skus(score(buildIndex([...tied].reverse()), ['brass']))).toEqual(ordered);
+  });
 });
 
 describe('score: over the shipped catalog', () => {
