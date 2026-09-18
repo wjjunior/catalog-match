@@ -144,6 +144,77 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a type phrase outside the catalog', () => {
+  it('marks the phrase unrecognized and quotes it', () => {
+    const spec = parse('carriage bolt 3/8');
+
+    expect(spec.provenance.type).toBe('unrecognized');
+    expect(spec.evidence.type).toBe('carriage bolt');
+    expect(spec.type).toBeUndefined();
+  });
+
+  it('claims the phrase, so it does not also arrive as residue', () => {
+    expect(parse('carriage bolt 3/8').residue).toEqual([]);
+  });
+
+  it('reads the rest of the query as it would otherwise', () => {
+    const spec = parse('carriage bolt 3/8');
+
+    expect(spec.diameter).toEqual({
+      system: 'imperial',
+      nominal: '3/8',
+      mm: 9.525,
+      known: true,
+    });
+    expect(spec.pitch).toBe('16');
+  });
+
+  it.each([
+    'eye bolt 1/2',
+    'u bolt 3/8',
+    'j bolt',
+    'shoulder bolt M8',
+    'square head bolt 3/8',
+    'wing nut M8',
+    'acorn nut 1/2',
+  ])('marks %s unrecognized as well', (query) => {
+    const spec = parse(query);
+
+    expect(spec.provenance.type).toBe('unrecognized');
+    expect(spec.type).toBeUndefined();
+  });
+
+  // docs/DESIGN.md 6 keeps this one ambiguous: `big` sizes a bolt, it does not name a
+  // different product, and nothing before `bolt` is left unclaimed to suggest otherwise.
+  it('leaves big brass bolt the three readings of bolt', () => {
+    const spec = parse('big brass bolt');
+
+    expect(spec.provenance.type).toBe('explicit');
+    expect(spec.type).toHaveLength(3);
+    expect(spec.residue).toEqual(['big']);
+  });
+
+  // The rule the whole scan follows: whichever reading of an attribute comes first wins,
+  // and the loser is left unclaimed.
+  it.each([
+    ['hex nut carriage bolt', 'explicit', ['carriage', 'bolt']],
+    ['carriage bolt hex nut', 'unrecognized', ['hex', 'nut']],
+  ])('lets the first reading of the type in %s win', (query, provenance, residue) => {
+    const spec = parse(query);
+
+    expect(spec.provenance.type).toBe(provenance);
+    expect(spec.residue).toEqual(residue);
+  });
+
+  it('leaves a modifier on a stocked type in the residue', () => {
+    const spec = parse('M8 hex nut nylon insert');
+
+    expect(spec.provenance.type).toBe('explicit');
+    expect(spec.type).toEqual([{ value: 'hex_nut', strength: 1 }]);
+    expect(spec.residue).toEqual(['nylon', 'insert']);
+  });
+});
+
 describe('the parser as a contract', () => {
   it('satisfies QueryParser with the spec of the rich parse', () => {
     const contract: QueryParser = queryParser;
