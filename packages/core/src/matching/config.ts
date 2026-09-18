@@ -43,6 +43,9 @@ export interface MatcherConfig {
   readonly backoffOrder: readonly BackoffStep[];
   readonly lengthTolerance: number;
   readonly lexicalCap: number;
+  /** How far the runner-up must trail the best lexical hit before the baseline calls a
+   * query unique. Set by hand like the labels; PRG-36 owns the measured value. */
+  readonly lexicalUniqueGap: number;
   readonly historyConfidence: number;
   readonly historyDecayPerRank: number;
 }
@@ -71,6 +74,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   backoffOrder: BACKOFF_STEPS,
   lengthTolerance: 0.25,
   lexicalCap: 0.4,
+  lexicalUniqueGap: 0.1,
   historyConfidence: 0.7,
   historyDecayPerRank: 0.8,
 };
