@@ -282,9 +282,9 @@ describe('the use case', () => {
     expect(core.matchQuery({ query: '5/16-18 flat washer', limit: 5 }).results).toHaveLength(5);
   });
 
-  it('withholds a confidence label while the thresholds are provisional', () => {
-    expect(core.config.labels.provisional).toBe(true);
-    expect(ask('M8 flat washer').results.every((match) => match.label === undefined)).toBe(true);
+  it('labels every match now the thresholds are measured, and calls a seven-way tie Low', () => {
+    expect(core.config.labels.provisional).toBe(false);
+    expect(ask('M8 flat washer').results.every((match) => match.label === 'Low')).toBe(true);
   });
 
   it('is the Matcher port', () => {

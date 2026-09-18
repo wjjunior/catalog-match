@@ -129,7 +129,7 @@ describe('matcher config defaults', () => {
   it('carries the personalization parameters', () => {
     expect(DEFAULT_MATCHER_CONFIG.tauDays).toBe(180);
     expect(DEFAULT_MATCHER_CONFIG.k).toBe(5);
-    expect(DEFAULT_MATCHER_CONFIG.alpha).toBe(0.5);
+    expect(DEFAULT_MATCHER_CONFIG.alpha).toBe(1);
     expect(DEFAULT_MATCHER_CONFIG.wSku).toBe(2);
   });
 
@@ -145,11 +145,11 @@ describe('matcher config defaults', () => {
     });
   });
 
-  it('marks the label thresholds as provisional until calibration', () => {
+  it('carries the thresholds calibration measured, no longer provisional', () => {
     expect(DEFAULT_MATCHER_CONFIG.labels).toEqual({
-      high: 0.7,
+      high: 0.8,
       medium: 0.35,
-      provisional: true,
+      provisional: false,
     });
   });
 
@@ -167,6 +167,7 @@ describe('matcher config defaults', () => {
     expect(DEFAULT_MATCHER_CONFIG.lexicalCap).toBe(0.4);
     expect(DEFAULT_MATCHER_CONFIG.historyConfidence).toBe(0.7);
     expect(DEFAULT_MATCHER_CONFIG.historyDecayPerRank).toBe(0.8);
+    expect(DEFAULT_MATCHER_CONFIG.lexicalUniqueGap).toBe(0.01);
   });
 
   it('keeps every probability-like parameter inside its range', () => {

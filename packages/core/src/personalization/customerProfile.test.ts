@@ -210,8 +210,8 @@ describe('the real files', () => {
     expect(history.byCustomer('CUST-002')).toHaveLength(17);
     expect(profile.nEff).toBeCloseTo(8.2918838, 6);
     expect(profile.lambda).toBeCloseTo(0.6238306, 6);
-    expect(profile.shares.material).toMatchObject({ ss_18_8: expect.closeTo(0.778602, 5) });
-    expect(profile.shares.finish).toMatchObject({ plain: expect.closeTo(0.778602, 5) });
+    expect(profile.shares.material).toMatchObject({ ss_18_8: expect.closeTo(0.650151, 5) });
+    expect(profile.shares.finish).toMatchObject({ plain: expect.closeTo(0.650151, 5) });
   });
 
   it('gives the twice-bought M8 washer of CUST-002 the full repeat weight', () => {
@@ -235,8 +235,8 @@ describe('the real files', () => {
   it('reads CUST-004 as alloy and black oxide', () => {
     const profile = profileOf('CUST-004');
 
-    expect(profile.shares.material).toMatchObject({ alloy: expect.closeTo(0.794551, 5) });
-    expect(profile.shares.finish).toMatchObject({ black_oxide: expect.closeTo(0.794551, 5) });
+    expect(profile.shares.material).toMatchObject({ alloy: expect.closeTo(0.670368, 5) });
+    expect(profile.shares.finish).toMatchObject({ black_oxide: expect.closeTo(0.670368, 5) });
   });
 
   it('gives a customer the file has never seen no weight at all', () => {
