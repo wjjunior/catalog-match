@@ -236,18 +236,14 @@ describe('docs/DESIGN.md 6, without a customer', () => {
     expect(response.results[0]?.explanation.unspecified).toEqual(['material']);
   });
 
-  it('leaves an unknown type phrase ambiguous rather than empty', () => {
+  it('answers a type the catalog does not carry with a note and nothing else', () => {
     const response = ask('carriage bolt 3/8');
 
-    // DESIGN 6 asks for status none here, on the strength of an unrecognized type
-    // phrase. `bolt` is in the lexicon, so the parser reads a type and leaves only
-    // `carriage` behind; nothing marks the phrase unrecognized, which is the input
-    // matching/compatibility.ts already accepts but the query parser never produces.
-    expect(response.status).toBe('ambiguous');
-    expect(response.notes).toContainEqual({
-      code: 'unverifiedResidue',
-      message: 'not verifiable: carriage',
-    });
+    expect(response.status).toBe('none');
+    expect(response.alternatives).toEqual([]);
+    expect(response.notes).toEqual([
+      { code: 'unknownType', message: 'carriage bolt is not a product type in this catalog' },
+    ]);
   });
 });
 
