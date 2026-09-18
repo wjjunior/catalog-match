@@ -66,10 +66,6 @@ const SEPARATOR = 'x';
  * alone when the user put a space before it. */
 const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 
-/** Trailing punctuation belongs to the sentence, not to the phrase: `last time, but
- * brass` must still resolve the reference. */
-const TRAILING_PUNCTUATION = /[,.;:!?]+$/;
-
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
 function read(query: string): Token[] {
@@ -197,8 +193,7 @@ function takeIntent(draft: Draft): string[] {
       const phrase = draft.tokens
         .slice(index, index + width)
         .map((token) => token.original)
-        .join(' ')
-        .replace(TRAILING_PUNCTUATION, '');
+        .join(' ');
 
       if (!INTENT_PHRASES.includes(phrase)) continue;
 
