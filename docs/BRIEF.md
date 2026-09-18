@@ -283,7 +283,7 @@ Rules:
 - An inactive history item is never in C. Add the note "previously ordered PXNUT16888PL0901 is discontinued; showing closest active" and apply the 0.5 repeat weight above.
 - Expected, not promised: for `M8 flat washer` and CUST-002 the 18-8 SS plain washer bought twice should reach top-1 with a clear margin (posterior around 0.65 to 0.70 under the initial parameters); for CUST-004 only the finish share acts and the A2 SS black oxide washer should be top-1 with a small margin; for CUST-005 the single earlier purchase should be top-1 with a modest margin. Record the measured values in the eval report; do not hard-code labels in tests.
 
-Intent (IntentDetector) triggers on `same`, `last time`, `usual`, `again`, `reorder`, `like before`, `what we always get`:
+Intent (IntentDetector) triggers on `same`, `last time`, `usual`, `again`, `reorder`, `like before`, `what we always get`, `previous order`:
 
 - Pure reference (`the same washers as last time`), customer selected: status `history`; candidates are the customer's most recent lines whose type or diameter matches any such words in the query (`washers` covers flat and lock washers), ranked by recency; confidence 0.7 for the most recent decaying by rank; explanation carries order date and quantity.
 - Reference with an override (`same washers as last time, but brass`): the referenced line's parsed attributes become the base specification, the query's explicit attributes overwrite it, and the merged specification runs through the normal pipeline with status derived from C; note "based on your 2026-04-15 order, material changed to brass".

@@ -329,7 +329,7 @@ Worked figures for "M8 flat washer" and CUST-002 under these initial parameters,
 
 ## 7.4 Intent: history references
 
-Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get. With a customer selected, the referenced order lines are those customer's most recent lines whose type or diameter matches any such words in the query ("washers" covers flat and lock washers). Two forms:
+Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get, previous order. With a customer selected, the referenced order lines are those customer's most recent lines whose type or diameter matches any such words in the query ("washers" covers flat and lock washers). Two forms:
 
 - Pure reference ("the same washers as last time"): status history; candidates are the referenced lines ranked by recency, confidence 0.7 for the most recent decaying by rank, with the order date and quantity in the explanation.
 - Reference with an override ("same washers as last time, but brass"): the referenced line's parsed attributes become the base specification, the query's explicit attributes overwrite it (material becomes brass), and the merged specification runs through the normal pipeline with status derived from C; the note says "based on your 2026-04-15 order, material changed to brass".
