@@ -15,6 +15,7 @@ import type {
   Provenance,
   Weighted,
 } from '../domain/spec';
+import { INTENT_PHRASES } from '../personalization/intent';
 import { correct } from './fuzzy';
 import { longestMatch, type LexiconValue } from './lexicon';
 import { normalize } from './normalize';
@@ -65,16 +66,9 @@ const SEPARATOR = 'x';
  * alone when the user put a space before it. */
 const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 
-/** Longest first: `last time` must win over `time`. docs/DESIGN.md 7.4. */
-const INTENT_PHRASES: readonly string[] = [
-  'what we always get',
-  'like before',
-  'last time',
-  'reorder',
-  'usual',
-  'again',
-  'same',
-];
+/** Trailing punctuation belongs to the sentence, not to the phrase: `last time, but
+ * brass` must still resolve the reference. */
+const TRAILING_PUNCTUATION = /[,.;:!?]+$/;
 
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
@@ -192,7 +186,8 @@ function takeIntent(draft: Draft): string[] {
       const phrase = draft.tokens
         .slice(index, index + width)
         .map((token) => token.original)
-        .join(' ');
+        .join(' ')
+        .replace(TRAILING_PUNCTUATION, '');
 
       if (!INTENT_PHRASES.includes(phrase)) continue;
 
