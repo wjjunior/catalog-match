@@ -1,6 +1,7 @@
-import type { Alternative, Match, MatchResponse } from '@catalog-match/core';
+import type { Alternative, CustomerSummary, Match, MatchResponse } from '@catalog-match/core';
 import { describe, expect, it } from 'vitest';
 
+import { GET } from '../../app/api/customers/route';
 import { POST } from '../../app/api/match/route';
 import type {
   Alternative as ClientAlternative,
@@ -8,7 +9,7 @@ import type {
   MatchResponse as ClientMatchResponse,
 } from '../../src/shared/api/client';
 import { EXAMPLE_QUERIES } from '../../src/shared/api/exampleQueries';
-import { matchResponseSchema } from '../../src/shared/api/schema';
+import { customersResponseSchema, matchResponseSchema } from '../../src/shared/api/schema';
 
 const post = (body: unknown): Promise<Response> =>
   POST(
@@ -98,5 +99,63 @@ describe('the wire carries what the catalog holds', () => {
     expect(response.notes).toEqual([
       { code: 'customerRequired', message: "select a customer to resolve 'last time'" },
     ]);
+  });
+});
+
+// The stub core in test/api cannot show this: only the real parser decides that text is
+// unreadable, and the contract is that it never becomes a 500.
+describe('text the parser cannot read', () => {
+  it.each(['qqq zzz nothing here', '!!!', 'the quick brown fox'])(
+    'answers %s with 200 and a valid body',
+    async (query) => {
+      const response = await post({ query });
+
+      expect(response.status).toBe(200);
+      expect(matchResponseSchema.safeParse(await response.json()).success).toBe(true);
+    },
+  );
+});
+
+describe('the customer list over the real history', () => {
+  const customers = async (search = ''): Promise<CustomerSummary[]> => {
+    const response = GET(new Request(`http://localhost/api/customers${search}`));
+
+    expect(response.status).toBe(200);
+
+    return (await response.json()) as CustomerSummary[];
+  };
+
+  it('lists every customer the history file holds', async () => {
+    const all = await customers();
+
+    expect(customersResponseSchema.safeParse(all).success).toBe(true);
+    expect(all).toHaveLength(5);
+  });
+
+  it('finds a customer by the prefix of its id', async () => {
+    expect((await customers('?q=CUST-001'))[0]?.customerId).toBe('CUST-001');
+  });
+
+  it('finds a customer by a fragment of its name, whatever the casing', async () => {
+    expect((await customers('?q=midwest'))[0]?.customerName).toBe('Midwest Industrial Supply');
+  });
+});
+
+describe('latency through the route handler', () => {
+  it('answers the example queries under 50 ms at p95', async () => {
+    for (const query of EXAMPLE_QUERIES) await match(query);
+
+    const timings: number[] = [];
+
+    for (const query of EXAMPLE_QUERIES) {
+      const started = performance.now();
+      await match(query);
+      timings.push(performance.now() - started);
+    }
+
+    const sorted = [...timings].sort((left, right) => left - right);
+    const p95 = sorted[Math.ceil(sorted.length * 0.95) - 1] ?? 0;
+
+    expect(p95).toBeLessThan(50);
   });
 });
