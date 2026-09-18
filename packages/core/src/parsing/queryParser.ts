@@ -145,6 +145,17 @@ function takeAttributes(draft: Draft): LexiconAttributes {
   const found: LexiconAttributes = {};
 
   for (const match of longestMatch(draft.tokens.map((token) => token.text))) {
+    // A phrase naming a product the catalog does not carry. It is claimed rather than
+    // left to the residue, which docs/DESIGN.md 5.3 forbids from emptying C.
+    if (match.attribute === 'unknownType') {
+      if (draft.provenance.type !== undefined) continue;
+
+      draft.evidence.type = quote(draft, match.start, match.end);
+      draft.provenance.type = 'unrecognized';
+      claim(draft, match.start, match.end);
+      continue;
+    }
+
     const factor = discount(draft, match.start, match.end);
     const values = weigh(match.values, factor);
     const [first] = values;
@@ -153,7 +164,7 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     // The lexicon keys its values by attribute; the type system carries the union, so
     // the branch that reads the attribute is where the value regains its type.
     if (match.attribute === 'type') {
-      if (found.type !== undefined) continue;
+      if (found.type !== undefined || draft.provenance.type === 'unrecognized') continue;
       found.type = values as Weighted<ProductType>[];
     } else if (match.attribute === 'material') {
       if (found.material !== undefined) continue;

@@ -18,6 +18,7 @@ import {
   failedConstraintNote,
   unitMismatchNote,
   unknownDiameterNote,
+  unknownTypeNote,
   unverifiedResidueNote,
 } from '../matching/explainer';
 import type { LexicalIndex } from '../matching/lexicalFallback';
@@ -55,6 +56,10 @@ function labelled(match: Match, config: MatcherConfig): Match {
 function diagnosis(spec: ParsedSpec, failed: AttributeName): Note {
   if (failed === 'diameter' && spec.diameter?.known === false) {
     return unknownDiameterNote(spec.diameter.nominal);
+  }
+
+  if (failed === 'type' && spec.provenance.type === 'unrecognized') {
+    return unknownTypeNote(spec.evidence.type ?? '');
   }
 
   return failedConstraintNote(spec, failed);

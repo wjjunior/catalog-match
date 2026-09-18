@@ -147,6 +147,39 @@ describe('query abbreviations', () => {
   });
 });
 
+describe('type phrases the catalog does not carry', () => {
+  const UNKNOWN = [
+    'carriage bolt',
+    'eye bolt',
+    'u bolt',
+    'j bolt',
+    'shoulder bolt',
+    'square head bolt',
+    'wing nut',
+    'acorn nut',
+  ];
+
+  it.each(UNKNOWN)('spans the whole of %s', (phrase) => {
+    const match = firstOf(phrase, 'unknownType');
+
+    expect(match?.term).toBe(phrase);
+    expect(match?.start).toBe(0);
+    expect(match?.end).toBe(tokens(phrase).length);
+  });
+
+  it.each(UNKNOWN)('lets %s win over the head word inside it', (phrase) => {
+    expect(longestMatch(tokens(phrase)).map((m) => m.attribute)).toEqual(['unknownType']);
+  });
+
+  it('carries no reading, since the phrase names nothing the catalog stocks', () => {
+    expect(firstOf('carriage bolt', 'unknownType')?.values).toEqual([]);
+  });
+
+  it.each(['hex bolt', 'lag bolt', 'allen bolt', 'hex nut'])('leaves %s a type', (phrase) => {
+    expect(longestMatch(tokens(phrase)).map((m) => m.attribute)).toEqual(['type']);
+  });
+});
+
 describe('longest match', () => {
   it('prefers the four-token phrase over the two-token one inside it', () => {
     const match = firstOf('socket head cap screw', 'type');
