@@ -131,7 +131,11 @@ function has(spec: ParsedSpec, attr: AttributeName): boolean {
 
 /** Describes agreement; it never decides it. Items outside C never reach the explainer,
  * so where this and `compatibility` could differ, C has already had the last word. */
-function agreement(attr: AttributeName, query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+function agreement(
+  attr: AttributeName,
+  query: ParsedSpec,
+  item: ParsedSpec,
+): Agreement | undefined {
   switch (attr) {
     // The pitch is part of the diameter designation (1/2-13), not a chip of its own.
     case 'pitch':
@@ -223,8 +227,7 @@ function unspecifiedAttributes(
   relaxed: ReadonlySet<string>,
 ): AttributeName[] {
   return ATTRIBUTE_NAMES.filter(
-    (attr) =>
-      attr !== 'pitch' && !relaxed.has(attr) && !has(query, attr) && has(item, attr),
+    (attr) => attr !== 'pitch' && !relaxed.has(attr) && !has(query, attr) && has(item, attr),
   );
 }
 
@@ -368,10 +371,7 @@ export interface AttributeChange {
   value: string;
 }
 
-export function historyReferenceNote(
-  orderDate: string,
-  changes: readonly AttributeChange[],
-): Note {
+export function historyReferenceNote(orderDate: string, changes: readonly AttributeChange[]): Note {
   const base = `based on your ${orderDate} order`;
   if (changes.length === 0) return note('historyReference', base);
 

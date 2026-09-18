@@ -7,7 +7,13 @@ import type {
   MaterialFamily,
   ProductType,
 } from '../domain/attributes';
-import { FINISHES, FINISH_FAMILIES, MATERIALS, MATERIAL_FAMILIES, PRODUCT_TYPES } from '../domain/attributes';
+import {
+  FINISHES,
+  FINISH_FAMILIES,
+  MATERIALS,
+  MATERIAL_FAMILIES,
+  PRODUCT_TYPES,
+} from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type { Diameter, Length, LengthUnit, ParsedSpec } from '../domain/spec';
 import { resolveDiameter, toMm } from '../parsing/units';
@@ -356,18 +362,24 @@ describe('explainMatch', () => {
       provenance: { type: 'explicit', material: 'explicit' },
     });
 
-    expect(explainMatch(query, HEX_BRASS, { compatibleCount: 3, disambiguateBy: ['finish'] })).toEqual(
-      {
-        matched: [
-          { attr: 'type', query: 'bolt', item: 'hex cap screw', provenance: 'explicit', partial: true },
-          { attr: 'material', query: 'brass', item: 'brass', provenance: 'explicit' },
-        ],
-        unspecified: ['diameter', 'length', 'finish', 'standard'],
-        unverified: ['big'],
-        compatibleCount: 3,
-        disambiguateBy: ['finish'],
-      },
-    );
+    expect(
+      explainMatch(query, HEX_BRASS, { compatibleCount: 3, disambiguateBy: ['finish'] }),
+    ).toEqual({
+      matched: [
+        {
+          attr: 'type',
+          query: 'bolt',
+          item: 'hex cap screw',
+          provenance: 'explicit',
+          partial: true,
+        },
+        { attr: 'material', query: 'brass', item: 'brass', provenance: 'explicit' },
+      ],
+      unspecified: ['diameter', 'length', 'finish', 'standard'],
+      unverified: ['big'],
+      compatibleCount: 3,
+      disambiguateBy: ['finish'],
+    });
   });
 
   it('preserves the original token text of every residue word', () => {
@@ -404,8 +416,10 @@ describe('explainMatch', () => {
       provenance: { type: 'corrected' },
     });
 
-    expect(explainMatch(query, WASHER_M8_18_8, { compatibleCount: 14, disambiguateBy: ['material'] })
-      .matched).toEqual([
+    expect(
+      explainMatch(query, WASHER_M8_18_8, { compatibleCount: 14, disambiguateBy: ['material'] })
+        .matched,
+    ).toEqual([
       { attr: 'type', query: 'washr', item: 'flat washer', provenance: 'corrected', partial: true },
     ]);
   });
@@ -643,9 +657,9 @@ describe('note builders', () => {
   });
 
   it('names what the query changed against that order', () => {
-    expect(
-      historyReferenceNote('2026-04-15', [{ attr: 'material', value: 'brass' }]).message,
-    ).toBe('based on your 2026-04-15 order, material changed to brass');
+    expect(historyReferenceNote('2026-04-15', [{ attr: 'material', value: 'brass' }]).message).toBe(
+      'based on your 2026-04-15 order, material changed to brass',
+    );
   });
 
   it('joins two changes with and', () => {
@@ -662,7 +676,9 @@ describe('note builders', () => {
       code: 'unverifiedResidue',
       message: 'not verifiable: nylon',
     });
-    expect(unverifiedResidueNote(['nylon', 'insert']).message).toBe('not verifiable: nylon, insert');
+    expect(unverifiedResidueNote(['nylon', 'insert']).message).toBe(
+      'not verifiable: nylon, insert',
+    );
   });
 
   it('contains no template placeholder in any note', () => {
