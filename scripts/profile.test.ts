@@ -189,3 +189,45 @@ describe('catalogStats', () => {
     expect(stats.separatorForms.get(' X ')).toBe(2);
   });
 });
+
+import { historyStats, toHistoryRows } from './profile';
+
+const historyFixture = [
+  'customer_id,customer_name,order_date,sku,catalog_description,quantity',
+  'CUST-001,Acme,2025-08-12,PXHEX1434STZC0001,"1/4-20 X 3/4"" HEX CAP SCREW STEEL ZINC",10',
+  'CUST-001,Acme,2025-08-12,PXROD126STZC0005,1/2-13 X 6FT THREADED ROD STEEL ZINC,5',
+  'CUST-001,Acme,2025-09-03,PXHEX1434STZC0001,"1/4-20 X 3/4"" HEX CAP SCREW STEEL ZINC",20',
+  'CUST-002,Beta,2026-01-15,PXNUT1216STZC0003,M12-1.75 HEX NUT STEEL ZINC,7',
+  'CUST-002,Beta,2026-01-15,PXGONE0000STZC9999,NOT IN THE CATALOG STEEL ZINC,1',
+].join('\n');
+
+describe('historyStats', () => {
+  const stats = historyStats(
+    toHistoryRows(parseCsv(historyFixture)),
+    toCatalogRows(parseCsv(catalogFixture)),
+  );
+
+  it('counts lines, customers and the date range', () => {
+    expect(stats.lines).toBe(5);
+    expect(stats.customers).toBe(2);
+    expect(stats.firstDate).toBe('2025-08-12');
+    expect(stats.lastDate).toBe('2026-01-15');
+  });
+
+  it('counts an order as a distinct date and a repeat SKU as one bought twice', () => {
+    expect(stats.byCustomer[0]?.lines).toBe(3);
+    expect(stats.byCustomer[0]?.orders).toBe(2);
+    expect(stats.byCustomer[0]?.repeatSkus).toBe(1);
+  });
+
+  it('names the SKUs missing from the catalog and the inactive ones purchased', () => {
+    expect(stats.skusMissingFromCatalog).toEqual(['PXGONE0000STZC9999']);
+    expect(stats.inactiveSkusPurchased).toEqual(['PXNUT1216STZC0003']);
+  });
+
+  it('shares material and finish, and the metric share, over a customer lines', () => {
+    expect(stats.byCustomer[0]?.materialShares.get('STEEL')).toBe(3);
+    expect(stats.byCustomer[0]?.metricShare).toBe(0);
+    expect(stats.byCustomer[1]?.metricShare).toBe(0.5);
+  });
+});

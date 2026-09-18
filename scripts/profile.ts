@@ -361,3 +361,80 @@ export function catalogStats(raw: CatalogRow[]): CatalogStats {
 
   return stats;
 }
+
+export type CustomerStats = {
+  customerId: string;
+  customerName: string;
+  lines: number;
+  orders: number;
+  repeatSkus: number;
+  materialShares: Map<string, number>;
+  finishShares: Map<string, number>;
+  metricShare: number;
+};
+
+export type HistoryStats = {
+  lines: number;
+  customers: number;
+  firstDate: string;
+  lastDate: string;
+  skusMissingFromCatalog: string[];
+  inactiveSkusPurchased: string[];
+  byCustomer: CustomerStats[];
+};
+
+export function historyStats(history: HistoryRow[], catalog: CatalogRow[]): HistoryStats {
+  const known = new Set(catalog.map((row) => row.sku));
+  const inactive = new Set(catalog.filter((row) => !row.active).map((row) => row.sku));
+  const dates = history.map((row) => row.orderDate).sort();
+
+  const grouped = new Map<string, HistoryRow[]>();
+  for (const row of history) {
+    const lines = grouped.get(row.customerId) ?? [];
+    lines.push(row);
+    grouped.set(row.customerId, lines);
+  }
+
+  const byCustomer = [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([customerId, lines]) => {
+      const skuCounts = new Map<string, number>();
+      const materialShares = new Map<string, number>();
+      const finishShares = new Map<string, number>();
+      let metric = 0;
+
+      for (const line of lines) {
+        bump(skuCounts, line.sku);
+        const parsed = parseDescription(line.description);
+        if (parsed === null) continue;
+        bump(materialShares, parsed.material);
+        bump(finishShares, parsed.finish);
+        if (parsed.diameter.startsWith('M')) metric += 1;
+      }
+
+      return {
+        customerId,
+        customerName: lines[0]?.customerName ?? '',
+        lines: lines.length,
+        orders: new Set(lines.map((line) => line.orderDate)).size,
+        repeatSkus: [...skuCounts.values()].filter((count) => count > 1).length,
+        materialShares,
+        finishShares,
+        metricShare: lines.length === 0 ? 0 : metric / lines.length,
+      };
+    });
+
+  return {
+    lines: history.length,
+    customers: grouped.size,
+    firstDate: dates[0] ?? '',
+    lastDate: dates[dates.length - 1] ?? '',
+    skusMissingFromCatalog: [...new Set(history.map((row) => row.sku))]
+      .filter((sku) => !known.has(sku))
+      .sort(),
+    inactiveSkusPurchased: [...new Set(history.map((row) => row.sku))]
+      .filter((sku) => inactive.has(sku))
+      .sort(),
+    byCustomer,
+  };
+}
