@@ -260,6 +260,8 @@ const customerProfile = {
     threadSystem: { imperial: 0.6 },
   },
   repeats: { PXROD126STZC0002: 1 },
+  discontinued: ['PXNUT16888PL0901'],
+  warnings: [],
 } satisfies CustomerProfile;
 
 const explanation = {

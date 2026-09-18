@@ -318,7 +318,7 @@ q_i      = λ_c · h_i + (1 − λ_c) / |C|                  the prior used in s
 
 The prior is a distribution over C: a mixture of the history-derived distribution and the uniform one, weighted by how much history there is. It contains no free scale parameter that could be tuned to promise a label; the only parameters are the recency horizon, the shrinkage constant and the smoothing pseudo-count.
 
-Worked estimate for "M8 flat washer" and CUST-002 under these initial parameters: n_eff around 10 of 17 lines after recency weighting, λ_c around 0.66, material and finish shares for 18-8 SS and plain around 0.8, the SS plain washer bought twice gets repeat weight 1. Its posterior comes out near 0.65 to 0.70 and the other six near 0.05. Whether that sits above the High threshold is decided by calibration, not asserted here. For CUST-005, n_eff is about 3, λ_c about 0.37, and the single earlier purchase of the same SKU makes it top-1 with a modest margin.
+Worked figures for "M8 flat washer" and CUST-002 under these initial parameters, measured by the profile builder over the real file: n_eff 8.29 of 17 lines after recency weighting, λ_c 0.62, material and finish shares for 18-8 SS and plain 0.78, the SS plain washer bought twice gets repeat weight 1. Its posterior comes out near 0.65 to 0.70 and the other six near 0.05. Whether that sits above the High threshold is decided by calibration, not asserted here. For CUST-005, n_eff is 2.71, λ_c 0.35, and the single earlier purchase of the same SKU makes it top-1 with a modest margin.
 
 ## 7.3 Rules
 
