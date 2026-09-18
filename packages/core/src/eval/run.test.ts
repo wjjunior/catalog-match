@@ -142,3 +142,46 @@ describe('a matcher that ranks the intended SKU last', () => {
     expect(report.status.accuracy).toBe(0);
   });
 });
+
+describe('a matcher that reorders when the limit grows', () => {
+  // The served answer must be the first page of the raised-limit one. Otherwise the report
+  // takes status from one ranking and MRR, the set and the constraints from another.
+  it('is rejected, since status and compatibleCount alone would not notice', () => {
+    const reordering: Matcher = {
+      match: (request: MatchRequest) =>
+        responseOf(
+          request.query,
+          (request.limit ?? 3) > 3 ? ['BO', 'SS', 'BR'] : ['SS', 'BO', 'BR'],
+          'ambiguous',
+        ),
+    };
+
+    expect(() => run({ matcher: reordering, catalog, cases: [caseOf({ id: 'r-9' })] })).toThrow(
+      /r-9.*rank 1/,
+    );
+  });
+
+  it('accepts the served answer when it is the prefix of the wider one', () => {
+    const paging: Matcher = {
+      match: (request: MatchRequest) => {
+        const full = responseOf(request.query, ['SS', 'BO', 'BR', 'NUT'], 'ambiguous');
+
+        return { ...full, results: full.results.slice(0, request.limit ?? 3) };
+      },
+    };
+
+    expect(() => run({ matcher: paging, catalog, cases: [caseOf({ id: 'r-8' })] })).not.toThrow();
+  });
+});
+
+describe('the limit the harness raises to', () => {
+  // A history answer is drawn from the customer's orders through bySku, not from the
+  // compatible set, so a bound taken from the active catalog alone is the wrong reason
+  // even where the number happens to hold.
+  it('covers the whole catalog, inactive rows included', () => {
+    const { matcher, seen } = stubMatcher(ANSWERS);
+    run({ matcher, catalog, cases: [caseOf({ id: 'r-7' })], clock: ticking() });
+
+    expect(seen[1]?.limit).toBeGreaterThanOrEqual(catalog.all().length);
+  });
+});

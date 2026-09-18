@@ -63,6 +63,15 @@ function agree(entry: EvalCase, served: MatchResponse, full: MatchResponse): voi
       `${entry.id}: compatibleCount ${String(served.compatibleCount)} at limit ${String(SERVED_LIMIT)} but ${String(full.compatibleCount)} at the raised limit`,
     );
   }
+
+  served.results.forEach((match, index) => {
+    const wider = full.results[index]?.sku;
+    if (match.sku !== wider) {
+      throw new Error(
+        `${entry.id}: rank ${String(index + 1)} is ${match.sku} at limit ${String(SERVED_LIMIT)} but ${wider ?? 'absent'} at the raised limit`,
+      );
+    }
+  });
 }
 
 /** Receives a Matcher and repositories; it never wires them. docs/DESIGN.md 4.2. */
@@ -73,8 +82,9 @@ export function run({
   clock = () => performance.now(),
 }: EvalRunInput): EvalReport {
   const validated = loadCases(cases, catalog);
-  // Wide enough for any compatible set, since C is drawn from the active catalog.
-  const fullLimit = Math.max(catalog.active().length, SERVED_LIMIT);
+  // Wide enough for any answer: the compatible set is drawn from the active catalog, and a
+  // history answer names one catalog row per referenced order, inactive rows included.
+  const fullLimit = Math.max(catalog.all().length, SERVED_LIMIT);
 
   const outcomes: CaseOutcome[] = validated.map((entry) => {
     const started = clock();
