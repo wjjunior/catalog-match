@@ -35,3 +35,30 @@ Every assumption taken while implementing a card, tagged with the card key.
 - **Prettier does not format `docs/DESIGN.md` or `docs/BRIEF.md`.** Both are committed as
   provided by the owner; reformatting them would rewrite documents this repository does
   not own.
+
+## PRG-18
+
+- **An unrecognized type phrase reaches matching as `provenance.type = 'unrecognized'`
+  with no `spec.type`.** PRG-17 must set it. The compatibility filter turns that marker
+  into a constraint no item satisfies, which is how `carriage bolt 3/8` reaches status
+  `none` instead of becoming an ambiguous set of every active 3/8 item. It is the exact
+  counterpart of `Diameter.known === false` for M14. Without the marker the query is
+  indistinguishable from one that never mentioned a type.
+- **`M8 x 3/4 hex cap screw` offers the 16 mm item, not the 20 mm one.** The card and
+  `docs/DESIGN.md` 6 both name a 20 mm approximate alternative. No M8 hex cap screw exists
+  at 20 mm: every M8 item at that length is a button socket cap screw (CAT-0404,
+  CAT-1000), a pan machine screw (CAT-0689) or a socket head cap screw (CAT-0888), and
+  widening to the whole hex-head family adds no 20 mm item either. `3/4"` is 19.05 mm and
+  the `lengthTolerance` window is [14.2875, 23.8125] mm, so the alternative is CAT-0387,
+  `M8-1.25 X 16MM HEX CAP SCREW ASTM A307 ALLOY BLACK OXIDE`, 3.05 mm away.
+- **`compatibleSet`, `deriveStatus` and `failedConstraint` take no `MatcherConfig`.** The
+  card writes `config` into their signatures, but nothing in set membership reads one:
+  `familyCredit` and `termStrengths` are PRG-19's scoring inputs, and `lengthTolerance`
+  and `backoffOrder` are used only by `alternatives`, which keeps the parameter.
+- **Backoff steps are cumulative, and `relaxed` lists only constraints that were both
+  specified and genuinely loosened.** Dropping a standard the query never named, or
+  widening a query that already said `stainless`, records nothing, so
+  `closeness = (specified - relaxed.length) / specified` stays honest.
+- **Length equality compares millimetres scaled to integers** (`Math.round(mm * 1000)`).
+  This is a float-representation guard, not a tunable threshold, so it is not a
+  `config.ts` parameter.

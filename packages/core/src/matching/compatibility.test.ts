@@ -369,3 +369,108 @@ describe('alternatives', () => {
     expect(reversed).toEqual(forward);
   });
 });
+
+describe('DESIGN 6 acceptance criteria', () => {
+  const evaluate = (spec: ParsedSpec) => {
+    const c = compatibleSet(spec, ITEMS);
+    return {
+      c,
+      status: deriveStatus(spec, c),
+      disambiguateBy: disambiguateBy(c),
+      failed: failedConstraint(spec, ITEMS),
+      alternatives: alternatives(spec, ITEMS, CONFIG),
+    };
+  };
+
+  it('HHB 3/4-10 x 5/8 is unique and resolves to the tap bolt', () => {
+    const result = evaluate(
+      query({
+        diameter: { system: 'imperial', nominal: '3/4', mm: 19.05, known: true },
+        type: [
+          { value: 'hex_cap_screw', strength: 1 },
+          { value: 'tap_bolt', strength: 1 },
+        ],
+        length: { value: 0.625, unit: 'in', mm: 15.875 },
+      }),
+    );
+    expect(result.status).toBe('unique');
+    expect(result.c[0]?.catalogId).toBe('CAT-0384');
+    expect(result.c[0]?.spec.type?.[0]?.value).toBe('tap_bolt');
+  });
+
+  it('brass hex nut 1/2-13 returns brass only', () => {
+    const result = evaluate(
+      query({
+        diameter: { system: 'imperial', nominal: '1/2', mm: 12.7, known: true },
+        type: [{ value: 'hex_nut', strength: 1 }],
+        material: { value: 'brass', strength: 1 },
+      }),
+    );
+    expect(result.status).toBe('unique');
+    expect(result.c.map((i) => i.catalogId)).toEqual(['CAT-0107']);
+  });
+
+  it('M14 hex nut is none with a diameter note and no alternatives', () => {
+    const result = evaluate(
+      query({
+        diameter: { system: 'metric', nominal: 'M14', mm: 14, known: false },
+        type: [{ value: 'hex_nut', strength: 1 }],
+      }),
+    );
+    expect(result.status).toBe('none');
+    expect(result.failed).toBe('diameter');
+    expect(result.alternatives).toEqual([]);
+  });
+
+  it('the discontinued M8 brass black oxide flat washer never enters C', () => {
+    const everyQuery = [
+      query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] }),
+      query({
+        diameter: M8,
+        type: [{ value: 'flat_washer', strength: 1 }],
+        material: { value: 'brass', strength: 1 },
+      }),
+      query({
+        diameter: M8,
+        type: [{ value: 'flat_washer', strength: 1 }],
+        finish: { value: 'black_oxide', strength: 1 },
+      }),
+    ];
+    for (const spec of everyQuery) {
+      expect(compatibleSet(spec, ITEMS).some((i) => i.catalogId === 'CAT-0619')).toBe(false);
+    }
+  });
+});
+
+describe('determinism', () => {
+  const specs: ParsedSpec[] = [
+    query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] }),
+    query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+    }),
+    query({ diameter: M8, type: [{ value: 'hex_cap_screw', strength: 1 }] }),
+  ];
+
+  it('gives byte-identical results when the catalog order changes', () => {
+    const shuffled = [...ITEMS].reverse();
+    for (const spec of specs) {
+      const a = compatibleSet(spec, ITEMS).map((i) => i.catalogId);
+      const b = compatibleSet(spec, shuffled).map((i) => i.catalogId);
+      expect(b).toEqual(a);
+
+      expect(alternatives(spec, shuffled, CONFIG).map((x) => x.item.catalogId)).toEqual(
+        alternatives(spec, ITEMS, CONFIG).map((x) => x.item.catalogId),
+      );
+      expect(failedConstraint(spec, shuffled)).toBe(failedConstraint(spec, ITEMS));
+    }
+  });
+
+  it('repeats itself exactly on a second call', () => {
+    for (const spec of specs) {
+      expect(compatibleSet(spec, ITEMS)).toEqual(compatibleSet(spec, ITEMS));
+      expect(alternatives(spec, ITEMS, CONFIG)).toEqual(alternatives(spec, ITEMS, CONFIG));
+    }
+  });
+});
