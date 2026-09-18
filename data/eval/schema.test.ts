@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { EXAMPLE_QUERIES } from '../../packages/core/test/fixtures/example-queries';
 import { dedupeBySku, parseCsv, toCatalogRows } from '../../scripts/profile';
+import { activeSkus } from '../../scripts/expected-sets';
+import type { Filter } from '../../scripts/expected-sets';
 import { EvalCase } from './schema';
 
 const base = {
@@ -119,7 +121,7 @@ const catalog = new Map(
 
 describe('golden.jsonl', () => {
   it('parses every line against the schema', () => {
-    expect(cases).toHaveLength(rows.length);
+    expect(() => rows.map((row) => EvalCase.parse(row))).not.toThrow();
   });
 
   it('has unique ids', () => {
@@ -141,6 +143,12 @@ describe('golden.jsonl', () => {
       .flatMap((row) => row.expected)
       .filter((sku) => catalog.get(sku)?.active !== true);
     expect(offenders).toEqual([]);
+
+    const relying = cases
+      .filter((row) => row.tags.includes('discontinued'))
+      .flatMap((row) => row.expected)
+      .filter((sku) => catalog.get(sku)?.active !== true);
+    expect(relying).toEqual([]);
   });
 
   it('keeps the example queries identical to the parser fixtures', () => {
@@ -150,6 +158,31 @@ describe('golden.jsonl', () => {
 
   it('holds 33 example rows', () => {
     expect(cases.filter((row) => row.id.startsWith('ex-'))).toHaveLength(33);
+  });
+
+  const TIE_FILTERS: [string, Filter][] = [
+    ['ex-01', { diameter: 'M8', types: ['WASH'] }],
+    ['ex-02', { diameter: '5/16', types: ['NUT'] }],
+    ['ex-03', { diameter: '1/2', types: ['NUT'] }],
+    ['ex-04', { diameter: 'M6', types: ['NUT'] }],
+    ['ex-08', { diameter: '5/8', types: ['LOCK'] }],
+    ['ex-11', { diameter: '5/8', types: ['WASH'] }],
+    ['ex-13', { diameter: '#8', types: ['LOCK'] }],
+    ['ex-19', { diameter: '5/16', types: ['WASH'] }],
+    ['ex-23', { diameter: 'M12', types: ['NUT'] }],
+    ['ex-30', { diameter: 'M4', types: ['NUT'] }],
+  ];
+
+  it('derives every tie row from the catalog', () => {
+    for (const [id, filter] of TIE_FILTERS) {
+      const row = cases.find((one) => one.id === id);
+      expect(row?.expected, id).toEqual(activeSkus(filter));
+    }
+
+    const ambiguousExamples = cases.filter(
+      (one) => one.id.startsWith('ex-') && one.expectedStatus === 'ambiguous',
+    );
+    expect(TIE_FILTERS.map(([id]) => id)).toEqual(ambiguousExamples.map((one) => one.id));
   });
 
   it('reproduces the M8 flat washer anchor of docs/data-profile.md', () => {
