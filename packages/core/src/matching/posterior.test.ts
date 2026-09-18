@@ -1,0 +1,294 @@
+import fc from 'fast-check';
+import { describe, expect, it } from 'vitest';
+
+import type { CatalogItem } from '../domain/catalog';
+import { DEFAULT_MATCHER_CONFIG } from './config';
+import { labelFor, posterior, uniformPrior } from './posterior';
+
+const config = DEFAULT_MATCHER_CONFIG;
+
+const items = (count: number): CatalogItem[] =>
+  Array.from({ length: count }, (_unused, index) => ({
+    catalogId: `CAT-${String(index).padStart(4, '0')}`,
+    sku: `SKU-${String(index).padStart(4, '0')}`,
+    description: `test item ${String(index)}`,
+    active: true,
+    spec: { residue: [], evidence: {}, provenance: {} },
+  }));
+
+const ones = (count: number) => Array.from({ length: count }, () => 1);
+
+describe('uniformPrior', () => {
+  it('splits the mass evenly over the compatible set', () => {
+    expect(uniformPrior(items(4))).toEqual([0.25, 0.25, 0.25, 0.25]);
+  });
+
+  it('gives the single item of a unique match all of the mass', () => {
+    expect(uniformPrior(items(1))).toEqual([1]);
+  });
+
+  it('sums to 1 for a set that does not divide evenly', () => {
+    const q = uniformPrior(items(7));
+
+    expect(q.reduce((sum, value) => sum + value, 0)).toBeCloseTo(1, 12);
+  });
+
+  it('returns nothing for an empty compatible set', () => {
+    expect(uniformPrior([])).toEqual([]);
+  });
+});
+
+describe('posterior: the worked values of docs/DESIGN.md 5.5', () => {
+  it('reaches 0.98 for a unique match with no residue', () => {
+    const C = items(1);
+    const { p, pNull } = posterior(C, [1], uniformPrior(C), 0, config);
+
+    expect(p.get('SKU-0000')).toBeCloseTo(0.98, 10);
+    expect(pNull).toBeCloseTo(0.02, 10);
+  });
+
+  it('falls to 0.84 for a unique match with two residue tokens', () => {
+    const C = items(1);
+    const { p } = posterior(C, [1], uniformPrior(C), 2, config);
+
+    expect(p.get('SKU-0000')).toBeCloseTo(0.84, 2);
+    expect(Math.abs((p.get('SKU-0000') ?? 0) - 0.84)).toBeLessThan(0.005);
+  });
+
+  it('gives about 0.14 to each of seven equally compatible items', () => {
+    const C = items(7);
+    const { p } = posterior(C, ones(7), uniformPrior(C), 0, config);
+
+    for (const item of C) {
+      expect(p.get(item.sku)).toBeCloseTo(0.14, 10);
+    }
+  });
+});
+
+describe('posterior: edge cases', () => {
+  it('puts all the mass on null when the compatible set is empty', () => {
+    const { p, pNull } = posterior([], [], [], 0, config);
+
+    expect(p.size).toBe(0);
+    expect(pNull).toBe(1);
+  });
+
+  it('puts all the mass on null for an empty set even with residue', () => {
+    const { pNull } = posterior([], [], [], 3, config);
+
+    expect(pNull).toBe(1);
+  });
+
+  it('produces no NaN for a single item and no residue', () => {
+    const C = items(1);
+    const { p, pNull } = posterior(C, [1], [1], 0, config);
+
+    expect(Number.isNaN(p.get('SKU-0000'))).toBe(false);
+    expect(Number.isNaN(pNull)).toBe(false);
+  });
+
+  it('carries one entry per SKU of the compatible set', () => {
+    const C = items(3);
+    const { p } = posterior(C, ones(3), uniformPrior(C), 0, config);
+
+    expect([...p.keys()]).toEqual(['SKU-0000', 'SKU-0001', 'SKU-0002']);
+  });
+
+  it('rejects an s vector that is not aligned with the compatible set', () => {
+    const C = items(3);
+
+    expect(() => posterior(C, [1, 1], uniformPrior(C), 0, config)).toThrow(/aligned/i);
+  });
+
+  it('rejects a q vector that is not aligned with the compatible set', () => {
+    const C = items(3);
+
+    expect(() => posterior(C, ones(3), [0.5, 0.5], 0, config)).toThrow(/aligned/i);
+  });
+});
+
+describe('labelFor', () => {
+  it('calls a posterior at or above the high threshold High', () => {
+    expect(labelFor(0.98, config).label).toBe('High');
+    expect(labelFor(0.7, config).label).toBe('High');
+  });
+
+  it('calls a posterior at or above the medium threshold Medium', () => {
+    expect(labelFor(0.69, config).label).toBe('Medium');
+    expect(labelFor(0.35, config).label).toBe('Medium');
+  });
+
+  it('calls anything below the medium threshold Low', () => {
+    expect(labelFor(0.3499, config).label).toBe('Low');
+    expect(labelFor(0, config).label).toBe('Low');
+  });
+
+  it('reports the thresholds as provisional while the config says they are', () => {
+    expect(labelFor(0.98, config).provisional).toBe(true);
+  });
+
+  it('drops the provisional flag once calibration sets it false', () => {
+    const calibrated = { ...config, labels: { ...config.labels, provisional: false } };
+
+    expect(labelFor(0.98, calibrated).provisional).toBe(false);
+  });
+
+  it('reads the thresholds from the config rather than hard-coding them', () => {
+    const strict = { ...config, labels: { high: 0.95, medium: 0.9, provisional: true } };
+
+    expect(labelFor(0.94, strict).label).toBe('Medium');
+    expect(labelFor(0.96, strict).label).toBe('High');
+  });
+});
+
+const NUM_RUNS = 500;
+
+const strengths = (size: number) =>
+  fc.array(fc.double({ min: 0.01, max: 0.9, noNaN: true }), {
+    minLength: size,
+    maxLength: size,
+  });
+
+const priors = (size: number) =>
+  fc.array(fc.double({ min: 0.001, max: 1, noNaN: true }), {
+    minLength: size,
+    maxLength: size,
+  });
+
+const scenario = fc.integer({ min: 1, max: 12 }).chain((size) =>
+  fc.record({
+    C: fc.constant(items(size)),
+    s: strengths(size),
+    q: priors(size),
+    residueCount: fc.integer({ min: 0, max: 6 }),
+    pick: fc.integer({ min: 0, max: size - 1 }),
+    bump: fc.double({ min: 0.01, max: 0.1, noNaN: true }),
+  }),
+);
+
+const rankedSkus = (p: ReadonlyMap<string, number>) =>
+  [...p.entries()]
+    .sort(([skuA, a], [skuB, b]) => b - a || skuA.localeCompare(skuB))
+    .map(([sku]) => sku);
+
+describe('posterior: properties (docs/DESIGN.md 5.5)', () => {
+  it('leaves the mass over C and null summing to 1', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount }) => {
+        const { p, pNull } = posterior(C, s, q, residueCount, config);
+        const total = [...p.values()].reduce((sum, value) => sum + value, 0) + pNull;
+
+        expect(Math.abs(total - 1)).toBeLessThan(1e-9);
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it('gives equal posteriors to equally compatible items under a uniform prior', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 12 }),
+        fc.double({ min: 0.01, max: 1, noNaN: true }),
+        fc.integer({ min: 0, max: 6 }),
+        (size, strength, residueCount) => {
+          const C = items(size);
+          const s = Array.from({ length: size }, () => strength);
+          const { p } = posterior(C, s, uniformPrior(C), residueCount, config);
+          const values = [...p.values()];
+          const first = values[0] ?? Number.NaN;
+
+          for (const value of values) {
+            expect(Math.abs(value - first)).toBeLessThan(1e-12);
+          }
+        },
+      ),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it('lowers every posterior when residue is added, and keeps the order', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount }) => {
+        const before = posterior(C, s, q, residueCount, config);
+        const after = posterior(C, s, q, residueCount + 1, config);
+
+        for (const [sku, value] of before.p) {
+          expect(after.p.get(sku)).toBeLessThan(value);
+        }
+        expect(rankedSkus(after.p)).toEqual(rankedSkus(before.p));
+        expect(after.pNull).toBeGreaterThan(before.pNull);
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  // Strict, not merely non-decreasing: the null mass keeps d p_i / d s_i above zero, and
+  // a non-strict assertion would also pass an implementation that ignored the input.
+  it('raises p_i when s_i rises', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount, pick, bump }) => {
+        const raised = s.map((value, index) => (index === pick ? value + bump : value));
+        const sku = C[pick]?.sku ?? '';
+
+        const before = posterior(C, s, q, residueCount, config).p.get(sku) ?? Number.NaN;
+        const after = posterior(C, raised, q, residueCount, config).p.get(sku) ?? Number.NaN;
+
+        expect(after).toBeGreaterThan(before);
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it('raises p_i when q_i rises', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount, pick, bump }) => {
+        const raised = q.map((value, index) => (index === pick ? value + bump : value));
+        const sku = C[pick]?.sku ?? '';
+
+        const before = posterior(C, s, q, residueCount, config).p.get(sku) ?? Number.NaN;
+        const after = posterior(C, s, raised, residueCount, config).p.get(sku) ?? Number.NaN;
+
+        expect(after).toBeGreaterThan(before);
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it('produces no NaN, including for a single item and for no residue', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount }) => {
+        const { p, pNull } = posterior(C, s, q, residueCount, config);
+
+        expect(Number.isFinite(pNull)).toBe(true);
+        for (const value of p.values()) {
+          expect(Number.isFinite(value)).toBe(true);
+          expect(value).toBeGreaterThan(0);
+        }
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it('gives each SKU the same posterior whatever order C arrives in', () => {
+    fc.assert(
+      fc.property(scenario, ({ C, s, q, residueCount }) => {
+        const straight = posterior(C, s, q, residueCount, config);
+
+        const order = [...C.keys()].reverse();
+        const shuffled = posterior(
+          order.map((index) => C[index]!),
+          order.map((index) => s[index]!),
+          order.map((index) => q[index]!),
+          residueCount,
+          config,
+        );
+
+        expect(shuffled.pNull).toBeCloseTo(straight.pNull, 12);
+        for (const [sku, value] of straight.p) {
+          expect(shuffled.p.get(sku)).toBeCloseTo(value, 12);
+        }
+      }),
+      { numRuns: NUM_RUNS },
+    );
+  });
+});
