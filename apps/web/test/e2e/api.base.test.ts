@@ -48,7 +48,7 @@ describe('the example set over the real catalog', () => {
   it.each(EXAMPLE_QUERIES)('answers %s on the wire', async (query) => {
     const response = await match(query);
 
-    expect(matchResponseSchema.safeParse(response).success).toBe(true);
+    expect(matchResponseSchema.safeParse(response).error?.issues ?? []).toEqual([]);
     expect(response.results.length).toBeLessThanOrEqual(3);
     expect(response.compatibleCount).toBeGreaterThanOrEqual(0);
 
@@ -114,10 +114,17 @@ describe('text the parser cannot read', () => {
 
       const body = (await response.json()) as MatchResponse;
 
-      expect(matchResponseSchema.safeParse(body).success).toBe(true);
+      expect(matchResponseSchema.safeParse(body).error?.issues ?? []).toEqual([]);
       expect(body.status).toBe('unparsed');
     },
   );
+
+  it('offers the closest text matches when a token still overlaps the catalog', async () => {
+    const response = await match('zinc plated shiny');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.results.length).toBeGreaterThan(0);
+  });
 });
 
 describe('the customer list over the real history', () => {
@@ -132,7 +139,7 @@ describe('the customer list over the real history', () => {
   it('lists every customer the history file holds', async () => {
     const all = await customers();
 
-    expect(customersResponseSchema.safeParse(all).success).toBe(true);
+    expect(customersResponseSchema.safeParse(all).error?.issues ?? []).toEqual([]);
     expect(all).toHaveLength(5);
   });
 

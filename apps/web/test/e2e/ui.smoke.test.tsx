@@ -12,9 +12,11 @@ beforeEach(() => {
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
     const url = new URL(input, 'http://localhost');
 
-    return url.pathname === '/api/match'
-      ? await POST(new Request(url, { ...init, method: 'POST' }))
-      : GET(new Request(url));
+    if (url.pathname === '/api/match')
+      return await POST(new Request(url, { ...init, method: 'POST' }));
+    if (url.pathname === '/api/customers') return GET(new Request(url));
+
+    throw new Error(`unexpected fetch to ${url.pathname}`);
   });
 });
 
