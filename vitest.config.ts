@@ -15,6 +15,7 @@ export default defineConfig({
             'packages/*/{src,test}/**/*.test.ts',
             'apps/web/**/*.test.ts',
             'scripts/**/*.test.ts',
+            'data/**/*.test.ts',
           ],
         },
       },
