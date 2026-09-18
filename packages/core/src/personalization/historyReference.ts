@@ -30,6 +30,12 @@ export type HistoryReference =
  * query states is a change it asks for. docs/DESIGN.md 7.4. */
 const OVERRIDABLE = ['material', 'finish', 'standard', 'length'] as const;
 
+/** True when the query asks for something the referenced order cannot supply, which is
+ * what separates an override from a reference that only names which orders it means. */
+export function statesOverride(spec: ParsedSpec): boolean {
+  return OVERRIDABLE.some((attribute) => stated(spec, attribute));
+}
+
 interface Selected {
   line: HistoryLine;
   spec: ParsedSpec;
@@ -166,7 +172,7 @@ export function resolveReference(
   const selected = select(lines, spec);
   const base = selected[0];
 
-  if (base === undefined || !OVERRIDABLE.some((attribute) => stated(spec, attribute))) {
+  if (base === undefined || !statesOverride(spec)) {
     return { form: 'pure', lines: selected.map((entry, rank) => referenced(entry, rank, config)) };
   }
 
