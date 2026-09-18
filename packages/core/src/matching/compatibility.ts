@@ -179,10 +179,7 @@ export function compatibleSet(
     .sort(bySku);
 }
 
-export function deriveStatus(
-  spec: ParsedSpec,
-  compatible: readonly CatalogItem[],
-): MatchStatus {
+export function deriveStatus(spec: ParsedSpec, compatible: readonly CatalogItem[]): MatchStatus {
   const hasDiameter = spec.diameter !== undefined;
   const hasType = spec.type !== undefined && spec.type.length > 0;
   if (!hasDiameter && !hasType) return 'unparsed';
@@ -264,7 +261,9 @@ function rankByLengthDistance(
   const target = spec.length?.mm;
   if (target === undefined) return [...found].sort(bySku);
   const distance = (item: CatalogItem): number =>
-    item.spec.length === undefined ? Number.POSITIVE_INFINITY : Math.abs(item.spec.length.mm - target);
+    item.spec.length === undefined
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(item.spec.length.mm - target);
   return [...found].sort((a, b) => distance(a) - distance(b) || bySku(a, b));
 }
 

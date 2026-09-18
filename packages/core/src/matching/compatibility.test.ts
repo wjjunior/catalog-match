@@ -194,9 +194,9 @@ describe('deriveStatus', () => {
   });
 
   it('is unparsed when neither a diameter nor a type was recognized', () => {
-    expect(run(query({ residue: ['carriage', 'bolt'], provenance: { type: 'unrecognized' } }))).toBe(
-      'unparsed',
-    );
+    expect(
+      run(query({ residue: ['carriage', 'bolt'], provenance: { type: 'unrecognized' } })),
+    ).toBe('unparsed');
   });
 
   it('decides unparsed before it looks at C', () => {
@@ -312,7 +312,11 @@ describe('alternatives', () => {
   it('never relaxes an unknown diameter', () => {
     const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
     expect(
-      alternatives(query({ diameter: m14, type: [{ value: 'hex_nut', strength: 1 }] }), ITEMS, CONFIG),
+      alternatives(
+        query({ diameter: m14, type: [{ value: 'hex_nut', strength: 1 }] }),
+        ITEMS,
+        CONFIG,
+      ),
     ).toEqual([]);
   });
 
