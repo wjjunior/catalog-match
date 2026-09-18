@@ -91,6 +91,12 @@ const SEEDS: readonly Seed[] = [
   { catalogId: 'CAT-0384', sku: 'PXTAP3458STZC0384', description: '3/4-10 X 5/8" TAP BOLT ASME B18.2.1 STEEL ZINC', diameter: '3/4', type: 'tap_bolt', material: 'steel', finish: 'zinc', standard: 'ASME B18.2.1', length: [0.625, 'in'] },
   { catalogId: 'CAT-0652', sku: 'PXROD3458ALMZ0652', description: '3/4-10 X 5/8" THREADED ROD ASME B18.2.1 ALLOY MECH ZINC', diameter: '3/4', type: 'threaded_rod', material: 'alloy', finish: 'mech_zinc', length: [0.625, 'in'] },
 
+  // 3/8-16 items. A query naming 3/8 with an unrecognized type must fail on TYPE, so the
+  // diameter has to exist in the fixtures; without these three the test passes vacuously.
+  { catalogId: 'CAT-0001', sku: 'PXLAG38112STHG0001', description: '3/8-16 X 1-1/2 HX HD LAG SCR STEEL HDG', diameter: '3/8', type: 'lag_screw', material: 'steel', finish: 'hdg', length: [1.5, 'in'] },
+  { catalogId: 'CAT-0128', sku: 'PXWASH383888PL0128', description: '3/8-16 FLAT WASHER DIN 912 18-8 SS PLN', diameter: '3/8', type: 'flat_washer', material: 'ss_18_8', finish: 'plain', standard: 'DIN 912' },
+  { catalogId: 'CAT-0251', sku: 'PXWASH38288YZ0251', description: '3/8-16 FLAT WASHER DIN 912 18-8 SS YELLOW ZN', diameter: '3/8', type: 'flat_washer', material: 'ss_18_8', finish: 'yellow_zinc', standard: 'DIN 912' },
+
   // 1/2-13 hex nuts: exactly one is brass.
   { catalogId: 'CAT-0038', sku: 'PXNUT126A2BO0038', description: '1/2-13 HEX NUT IFI 111 A2 SS BLACK OXIDE', diameter: '1/2', type: 'hex_nut', material: 'ss_a2', finish: 'black_oxide', standard: 'IFI 111' },
   { catalogId: 'CAT-0107', sku: 'PXNUT123BRZC0107', description: '1/2-13 HEX NUT ISO 7380 BRASS ZINC', diameter: '1/2', type: 'hex_nut', material: 'brass', finish: 'zinc', standard: 'ISO 7380' },

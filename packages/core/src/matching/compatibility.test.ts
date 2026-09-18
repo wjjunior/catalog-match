@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ITEMS } from '../../test/fixtures/items';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { ParsedSpec } from '../domain/spec';
-import { compatibleSet, deriveStatus, disambiguateBy } from './compatibility';
+import { compatibleSet, deriveStatus, disambiguateBy, failedConstraint } from './compatibility';
 
 describe('fixtures', () => {
   it('holds seven active M8 flat washers and one discontinued', () => {
@@ -225,5 +225,45 @@ describe('disambiguateBy', () => {
     const positions = result.map((attr) => ATTRIBUTE_NAMES.indexOf(attr));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(result).toContain('length');
+  });
+});
+
+describe('failedConstraint', () => {
+  it('names length when the diameter and type both exist', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+    });
+    expect(failedConstraint(spec, ITEMS)).toBe('length');
+  });
+
+  it('names diameter for M14', () => {
+    const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
+    const spec = query({ diameter: m14, type: [{ value: 'hex_nut', strength: 1 }] });
+    expect(failedConstraint(spec, ITEMS)).toBe('diameter');
+  });
+
+  it('names type for an unrecognized type phrase', () => {
+    const spec = query({
+      diameter: { system: 'imperial', nominal: '3/8', mm: 9.525, known: true },
+      residue: ['carriage', 'bolt'],
+      provenance: { type: 'unrecognized' },
+    });
+    expect(failedConstraint(spec, ITEMS)).toBe('type');
+  });
+
+  it('is undefined when C is not empty', () => {
+    const spec = query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] });
+    expect(failedConstraint(spec, ITEMS)).toBeUndefined();
+  });
+
+  it('is undefined when the query states no constraint at all', () => {
+    expect(failedConstraint(query({ residue: ['red'] }), ITEMS)).toBeUndefined();
+  });
+
+  it('is undefined for an empty catalog rather than blaming the first probe', () => {
+    const spec = query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] });
+    expect(failedConstraint(spec, [])).toBeUndefined();
   });
 });

@@ -151,6 +151,21 @@ export function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): 
 export const bySku = (a: CatalogItem, b: CatalogItem): number =>
   a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0;
 
+export function failedConstraint(
+  spec: ParsedSpec,
+  items: readonly CatalogItem[],
+): AttributeName | undefined {
+  const active = items.filter((item) => item.active);
+  if (active.length === 0) return undefined;
+
+  let surviving: readonly CatalogItem[] = active;
+  for (const constraint of buildConstraints(spec)) {
+    surviving = surviving.filter((item) => constraint.satisfiedBy(item) !== 'no');
+    if (surviving.length === 0) return constraint.attr;
+  }
+  return undefined;
+}
+
 export function compatibleSet(
   spec: ParsedSpec,
   items: readonly CatalogItem[],
