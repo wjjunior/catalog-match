@@ -199,6 +199,7 @@ describe('personalization', () => {
       hit1: 1,
       hit1WithoutCustomer: expect.closeTo(1 / 2, 10),
       margin: expect.closeTo((0.6 + 0.1) / 2, 10),
+      marginCases: 2,
     });
   });
 });
@@ -267,5 +268,91 @@ describe('an item that is silent about a stated attribute', () => {
     const outcomes = [outcomeOf(caseOf({ id: 'q-2', query: 'M8 flat washer' }), ['NUT'])];
 
     expect(constraintPreservation(outcomes, catalog).violations).toBe(1);
+  });
+});
+
+describe('the rule two lengths are judged by', () => {
+  const statingLength = (outcome: CaseOutcome, mm: number): CaseOutcome => ({
+    ...outcome,
+    full: {
+      ...outcome.full,
+      parsed: {
+        ...outcome.full.parsed,
+        length: { value: mm, unit: 'mm', mm },
+        provenance: { ...outcome.full.parsed.provenance, length: 'explicit' },
+      },
+    },
+  });
+
+  const against = (mm: number): number =>
+    constraintPreservation(
+      [
+        statingLength(
+          outcomeOf(caseOf({ id: 'len', query: 'M8 socket head cap screw' }), ['SCREW']),
+          mm,
+        ),
+      ],
+      catalog,
+    ).violations;
+
+  // The catalog resolves lengths to a thousandth of a millimetre, so the harness may not
+  // be looser than that: a difference the matcher rejects must not pass here unseen.
+  it('counts a difference the catalog can still tell apart', () => {
+    expect(against(20.005)).toBe(1);
+  });
+
+  it('lets two spellings of the same length through', () => {
+    expect(against(20)).toBe(0);
+  });
+});
+
+describe('an attribute the query stated through a typo', () => {
+  // `washr` and `hex nutt` reach the parser as corrected, not explicit, and
+  // docs/eval/golden-rationale.md 5 says those rows measure constraint preservation.
+  // Reading only the `explicit` enum would leave the metric with nothing to check there.
+  it('constrains the answer as an exactly spelled one does', () => {
+    const outcomes = [outcomeOf(caseOf({ id: 't-1', query: 'hex nutt' }), ['SS'])];
+
+    expect(constraintPreservation(outcomes, catalog).offenders).toEqual([
+      { id: 't-1', sku: 'SS', attribute: 'type' },
+    ]);
+  });
+
+  // A pitch read off the diameter is the parser's own inference, not a promise the
+  // customer made, so it is not something the answer can break.
+  it('does not constrain it through an attribute the parser merely inferred', () => {
+    const outcomes = [outcomeOf(caseOf({ id: 't-2', query: '12 millimeter hex nut' }), ['NUT'])];
+
+    expect(constraintPreservation(outcomes, catalog).violations).toBe(0);
+  });
+});
+
+describe('the answer given without a customer', () => {
+  // docs/DESIGN.md 10.2 asks for the count on all queries with and without a customer.
+  it('is scanned for contradictions too, not only the personalized one', () => {
+    const outcomes = [
+      outcomeOf(caseOf({ id: 'w-1', customerId: 'CUST-001' }), ['SS'], { without: ['NUT'] }),
+    ];
+
+    expect(constraintPreservation(outcomes, catalog).offenders).toEqual([
+      { id: 'w-1', sku: 'NUT', attribute: 'diameter' },
+    ]);
+  });
+});
+
+describe('the margin a personalized answer opens', () => {
+  it('reports its own denominator, since a lone result has no second to measure against', () => {
+    const outcomes = [
+      outcomeOf(caseOf({ id: 'm-1', customerId: 'A', expectedTop1: 'SS' }), ['SS', 'BO'], {
+        confidences: [0.8, 0.5],
+      }),
+      outcomeOf(caseOf({ id: 'm-2', customerId: 'B', expected: ['SS'] }), ['SS']),
+    ];
+
+    expect(personalization(outcomes)).toMatchObject({
+      cases: 2,
+      marginCases: 1,
+      margin: expect.closeTo(0.3, 10),
+    });
   });
 });

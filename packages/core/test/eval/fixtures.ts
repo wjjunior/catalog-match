@@ -21,6 +21,10 @@ export const ITEMS: readonly CatalogItem[] = [
   item('BR', 'M8-1.25 FLAT WASHER ISO 7380 BRASS ZINC'),
   item('NUT', 'M16-2.0 HEX NUT ASTM A307 A2 SS HDG'),
   item('SILENT', '5/16 FLAT WASHER STEEL PLAIN'),
+  item('SCREW', 'M8-1.25 X 20MM SOCKET HEAD CAP SCREW DIN 912 A2 SS PLAIN'),
+  // A row the catalog dropped: a referenced order still names it, so the harness must
+  // leave room for it in the limit it raises to.
+  item('GONE', 'M16-2.0 HEX NUT IFI 111 18-8 SS PLAIN', false),
 ];
 
 export const catalog = new InMemoryCatalogRepository([...ITEMS]);

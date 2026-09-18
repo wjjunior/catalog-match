@@ -2,7 +2,7 @@ import type { Finish, Material } from '../domain/attributes';
 import { FINISH_FAMILY, MATERIAL_FAMILY } from '../domain/attributes';
 import type { MatchResponse, MatchStatus } from '../domain/match';
 import { MATCH_STATUSES } from '../domain/match';
-import type { AttributeName, ParsedSpec } from '../domain/spec';
+import type { AttributeName, ParsedSpec, Provenance } from '../domain/spec';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { CatalogRepository } from '../ports/catalogRepository';
 import type { EvalCase } from './loader';
@@ -134,6 +134,11 @@ const isMaterial = (value: string): value is Material => value in MATERIAL_FAMIL
 
 const isFinish = (value: string): value is Finish => value in FINISH_FAMILY;
 
+/** What the customer asked for: an exact spelling, and a typo the parser repaired into one.
+ * An inferred value is the parser's own reading and an approximate one is a deliberate
+ * relaxation, so neither is a promise the answer can break. docs/DESIGN.md 10.2. */
+const STATED = new Set<Provenance | undefined>(['explicit', 'corrected']);
+
 /** True only when the item carries a value that differs from the one the query stated. An
  * item silent about an attribute is not contradicting it: a washer has no pitch, and the
  * golden set lists exactly such a row as a correct answer to a query that states one. */
@@ -148,10 +153,12 @@ function contradicts(attribute: AttributeName, query: ParsedSpec, item: ParsedSp
     case 'pitch':
       return item.pitch !== undefined && item.pitch !== query.pitch;
     case 'length':
+      // Millimetres scaled to integers, the resolution the catalog resolves lengths to.
+      // A looser window here would wave through a length the matcher itself rejects.
       return (
         item.length !== undefined &&
         query.length !== undefined &&
-        Math.abs(item.length.mm - query.length.mm) >= 0.01
+        Math.round(item.length.mm * 1000) !== Math.round(query.length.mm * 1000)
       );
     case 'type': {
       const wanted = new Set((query.type ?? []).map((entry) => entry.value));
@@ -185,22 +192,33 @@ export function constraintPreservation(
   const offenders: Offender[] = [];
 
   for (const outcome of outcomes) {
-    const query = outcome.full.parsed;
-    const stated = ATTRIBUTE_NAMES.filter((name) => query.provenance[name] === 'explicit');
+    for (const response of [outcome.full, outcome.withoutCustomer]) {
+      if (response === undefined) continue;
+      offenders.push(...brokenBy(outcome.entry.id, response, catalog));
+    }
+  }
 
-    for (const match of outcome.full.results) {
+  return { cases: outcomes.length, violations: offenders.length, offenders };
+}
+
+function brokenBy(id: string, response: MatchResponse, catalog: CatalogRepository): Offender[] {
+  const found: Offender[] = [];
+  {
+    const query = response.parsed;
+    const stated = ATTRIBUTE_NAMES.filter((name) => STATED.has(query.provenance[name]));
+
+    for (const match of response.results) {
       const item = catalog.bySku(match.sku);
       const broken =
         item === undefined
           ? undefined
           : stated.find((attribute) => contradicts(attribute, query, item.spec));
 
-      if (broken !== undefined)
-        offenders.push({ id: outcome.entry.id, sku: match.sku, attribute: broken });
+      if (broken !== undefined) found.push({ id, sku: match.sku, attribute: broken });
     }
   }
 
-  return { cases: outcomes.length, violations: offenders.length, offenders };
+  return found;
 }
 
 export interface PersonalizationMetrics {
@@ -210,6 +228,9 @@ export interface PersonalizationMetrics {
   /** Mean gap between top-1 and top-2 confidence: how far personalization moved the
    * intended item clear of the rest, not merely whether it reached the front. */
   margin: number;
+  /** Its own denominator: a case answered with one result has no second to measure
+   * against, so the margin is averaged over fewer cases than `cases`. */
+  marginCases: number;
 }
 
 export function personalization(outcomes: readonly CaseOutcome[]): PersonalizationMetrics {
@@ -220,18 +241,20 @@ export function personalization(outcomes: readonly CaseOutcome[]): Personalizati
       ? 1
       : 0;
 
+  const margins = scored.flatMap((outcome) => {
+    const [first, second] = outcome.full.results;
+
+    return first === undefined || second === undefined
+      ? []
+      : [first.confidence - second.confidence];
+  });
+
   return {
     cases: scored.length,
     hit1: mean(scored.map((o) => top1(o.full, intendedSku(o.entry)))),
     hit1WithoutCustomer: mean(scored.map((o) => top1(o.withoutCustomer, intendedSku(o.entry)))),
-    margin: mean(
-      scored.flatMap((o) => {
-        const [first, second] = o.full.results;
-        return first === undefined || second === undefined
-          ? []
-          : [first.confidence - second.confidence];
-      }),
-    ),
+    margin: mean(margins),
+    marginCases: margins.length,
   };
 }
 
