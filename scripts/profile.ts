@@ -100,3 +100,103 @@ export function whitespaceIssues(description: string): string[] {
   if (/\s{2,}/.test(description.trim())) issues.push('repeated');
   return issues;
 }
+
+export type Parsed = {
+  diameter: string;
+  pitch: string | null;
+  length: string | null;
+  lengthUnit: string | null;
+  typePhrase: string;
+  standard: string | null;
+  material: string;
+  finish: string;
+  finishSurface: string;
+};
+
+export const MATERIALS = ['18-8 SS', '316 SS', 'A2 SS', 'STEEL', 'BRASS', 'ALLOY'] as const;
+
+export const FINISH_SURFACES = new Map<string, string>([
+  ['HDG', 'HDG'],
+  ['BLACK OXIDE', 'BLACK OXIDE'],
+  ['ZINC', 'ZINC'],
+  ['ZN', 'ZINC'],
+  ['PLAIN', 'PLAIN'],
+  ['PLN', 'PLAIN'],
+  ['MECH ZINC', 'MECH ZINC'],
+  ['MECH ZN', 'MECH ZINC'],
+  ['YELLOW ZINC', 'YELLOW ZINC'],
+  ['YELLOW ZN', 'YELLOW ZINC'],
+  ['YEL ZINC', 'YELLOW ZINC'],
+  ['YEL ZN', 'YELLOW ZINC'],
+]);
+
+const DIAMETER = /^(#\d+|M\d+|\d+(?:-\d+\/\d+|\/\d+)?)(?:-([\d.]+))?/;
+const LENGTH = /^X\s*(\d+(?:-\d+\/\d+)?(?:\/\d+)?)\s*(MM|FT|IN|")?/;
+// A standards body is a 3 or 4 letter acronym, which is what keeps the CLASS 8 of
+// HEX NUT CLASS 8 inside the type phrase where it belongs.
+const STANDARD = /\s([A-Z]{3,4}) ([A-Z]?\d[\w.]*)$/;
+const SEPARATOR = /[\d"](\s*)([xX])(\s*)\d/;
+
+export function normalize(description: string): string {
+  return description.replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
+export function splitOnMaterial(
+  normalized: string,
+): { head: string; material: string; finishSurface: string } | null {
+  let best: { material: string; at: number } | null = null;
+
+  for (const material of MATERIALS) {
+    const at = normalized.indexOf(material);
+    if (at === -1) continue;
+    if (best === null || at < best.at || (at === best.at && material.length > best.material.length)) {
+      best = { material, at };
+    }
+  }
+
+  if (best === null) return null;
+
+  return {
+    head: normalized.slice(0, best.at).trim(),
+    material: best.material,
+    finishSurface: normalized.slice(best.at + best.material.length).trim(),
+  };
+}
+
+export function separatorForm(description: string): string | null {
+  const match = SEPARATOR.exec(description);
+  if (match === null) return null;
+  return `${match[1] ?? ''}${match[2] ?? ''}${match[3] ?? ''}`;
+}
+
+export function parseDescription(description: string): Parsed | null {
+  const split = splitOnMaterial(normalize(description));
+  if (split === null) return null;
+
+  const finish = FINISH_SURFACES.get(split.finishSurface);
+  if (finish === undefined) return null;
+
+  const diameter = DIAMETER.exec(split.head);
+  if (diameter === null || diameter[1] === undefined) return null;
+
+  let rest = split.head.slice(diameter[0].length).trim();
+
+  const length = LENGTH.exec(rest);
+  if (length !== null) rest = rest.slice(length[0].length).trim();
+
+  const standard = STANDARD.exec(` ${rest}`);
+  const typePhrase =
+    standard === null ? rest : rest.slice(0, rest.length - (standard[0].length - 1)).trim();
+
+  return {
+    diameter: diameter[1],
+    pitch: diameter[2] ?? null,
+    length: length?.[1] ?? null,
+    lengthUnit: length === null ? null : (length[2] ?? ''),
+    typePhrase,
+    standard: standard === null ? null : `${standard[1] ?? ''} ${standard[2] ?? ''}`,
+    material: split.material,
+    finish,
+    finishSurface: split.finishSurface,
+  };
+}
