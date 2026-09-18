@@ -201,7 +201,11 @@ describe('performance', () => {
     'threded',
   ];
 
-  it('runs ten thousand corrections in well under 100 ms', () => {
+  // The budget is 1000 ms rather than the 100 ms of the card because CI runs the suite
+  // under --coverage, and V8 instrumentation costs about 4x on this loop: 27 ms here
+  // without it, 102 ms here with it, 408 ms on a CI runner. It still catches the
+  // regression that matters, since an unbanded distance took 132 ms uninstrumented.
+  it('runs ten thousand corrections without a performance regression', () => {
     const tokens = Array.from({ length: 10_000 }, (_, i) => SAMPLE[i % SAMPLE.length] ?? '');
 
     const started = performance.now();
@@ -210,6 +214,6 @@ describe('performance', () => {
     const elapsed = performance.now() - started;
 
     expect(corrected).toBeGreaterThan(0);
-    expect(elapsed).toBeLessThan(100);
+    expect(elapsed).toBeLessThan(1000);
   });
 });
