@@ -50,6 +50,7 @@ describe('EvalCase', () => {
 
   it('ties the history status to whether a customer is named', () => {
     expect(parse({ expectedStatus: 'history', expected: [] }).success).toBe(true);
+    expect(parse({ expectedStatus: 'history', expected: ['A'] }).success).toBe(false);
     expect(
       parse({ expectedStatus: 'history', expected: [], customerId: 'CUST-002', rationale: 'r' })
         .success,
@@ -86,6 +87,13 @@ describe('EvalCase', () => {
   it('rejects duplicates in any SKU list', () => {
     expect(parse({ expected: ['A', 'A'] }).success).toBe(false);
     expect(parse({ tags: ['example', 'example'] }).success).toBe(false);
+    expect(
+      parse({
+        expectedStatus: 'none',
+        expected: [],
+        expectedAlternatives: ['A', 'A'],
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects a malformed customer id', () => {
