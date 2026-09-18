@@ -319,6 +319,7 @@ const matchRequest = {
 
 const catalogRepository: CatalogRepository = {
   all: () => [catalogItem],
+  active: () => [catalogItem],
   bySku: (sku) => (sku === catalogItem.sku ? catalogItem : undefined),
 };
 
