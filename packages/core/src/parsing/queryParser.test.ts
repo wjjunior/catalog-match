@@ -59,6 +59,22 @@ describe('the adversarial queries', () => {
   });
 });
 
+describe('an intent phrase', () => {
+  it('survives the punctuation the user glued to it', () => {
+    const { spec, intentCandidates } = parseQuery('same washers as last time, but brass');
+
+    expect(intentCandidates).toEqual(['same', 'last time']);
+    expect(spec.residue).toEqual(['as', 'but']);
+  });
+
+  it('survives the punctuation that ends a sentence', () => {
+    const { spec, intentCandidates } = parseQuery('reorder.');
+
+    expect(intentCandidates).toEqual(['reorder']);
+    expect(spec.residue).toEqual([]);
+  });
+});
+
 describe('abbreviation parity', () => {
   it('reads an abbreviated query and its expansion into the same values', () => {
     const abbreviated = parse('SHCS 7/16 x 2-1/2');
