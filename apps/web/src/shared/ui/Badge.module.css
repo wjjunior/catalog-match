@@ -1,0 +1,21 @@
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge[data-tone='active'] {
+  background: var(--ok-surface);
+  color: var(--ok);
+}
+
+.badge[data-tone='inactive'] {
+  background: var(--warn-surface);
+  color: var(--warn);
+}
