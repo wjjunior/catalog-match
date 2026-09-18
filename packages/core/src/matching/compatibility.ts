@@ -6,14 +6,12 @@ import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
 import type { BackoffStep, MatcherConfig } from './config';
 
-export type Satisfaction = 'exact' | 'family' | 'no';
-
 interface Constraint {
   attr: AttributeName;
-  satisfiedBy(item: CatalogItem): Satisfaction;
+  satisfiedBy(item: CatalogItem): boolean;
 }
 
-export interface BuildOptions {
+interface BuildOptions {
   dropStandard?: boolean;
   widenMaterialFinish?: boolean;
   length?: 'exact' | 'approximate' | 'drop';
@@ -30,6 +28,12 @@ const isMaterial = (value: string): value is Material =>
 const isFinish = (value: string): value is Finish =>
   (FINISHES as readonly string[]).includes(value);
 
+const widensMaterial = (value: Material): boolean =>
+  MATERIALS.some((m) => m !== value && MATERIAL_FAMILY[m] === MATERIAL_FAMILY[value]);
+
+const widensFinish = (value: Finish): boolean =>
+  FINISHES.some((f) => f !== value && FINISH_FAMILY[f] === FINISH_FAMILY[value]);
+
 const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily =>
   isMaterial(value) ? MATERIAL_FAMILY[value] : value;
 
@@ -39,12 +43,12 @@ const finishFamilyOf = (value: Finish | FinishFamily): FinishFamily =>
 function diameterConstraint(spec: ParsedSpec): Constraint | undefined {
   const q = spec.diameter;
   if (!q) return undefined;
-  if (!q.known) return { attr: 'diameter', satisfiedBy: () => 'no' };
+  if (!q.known) return { attr: 'diameter', satisfiedBy: () => false };
   return {
     attr: 'diameter',
     satisfiedBy: (item) => {
       const i = item.spec.diameter;
-      return i && i.nominal === q.nominal && i.system === q.system ? 'exact' : 'no';
+      return i !== undefined && i.nominal === q.nominal && i.system === q.system;
     },
   };
 }
@@ -53,16 +57,14 @@ function typeConstraint(spec: ParsedSpec): Constraint | undefined {
   // A type phrase the parser could not place is a constraint nothing satisfies, not an
   // absent attribute. Without this branch `carriage bolt 3/8` comes back ambiguous.
   if (spec.provenance.type === 'unrecognized') {
-    return { attr: 'type', satisfiedBy: () => 'no' };
+    return { attr: 'type', satisfiedBy: () => false };
   }
   const candidates = spec.type;
   if (!candidates || candidates.length === 0) return undefined;
   return {
     attr: 'type',
     satisfiedBy: (item) =>
-      candidates.some((c) => (item.spec.type ?? []).some((t) => t.value === c.value))
-        ? 'exact'
-        : 'no',
+      candidates.some((c) => (item.spec.type ?? []).some((t) => t.value === c.value)),
   };
 }
 
@@ -73,7 +75,7 @@ function lengthConstraint(spec: ParsedSpec): Constraint | undefined {
     attr: 'length',
     satisfiedBy: (item) => {
       const i = item.spec.length;
-      return i && mmKey(i.mm) === mmKey(q.mm) ? 'exact' : 'no';
+      return i !== undefined && mmKey(i.mm) === mmKey(q.mm);
     },
   };
 }
@@ -84,10 +86,9 @@ function approximateLengthConstraint(spec: ParsedSpec, tolerance: number): Const
   const window = Math.abs(q.mm) * tolerance;
   return {
     attr: 'length',
-    // 'family' here means accepted-but-not-exact; only membership reads this value.
     satisfiedBy: (item) => {
       const i = item.spec.length;
-      return i && Math.abs(i.mm - q.mm) <= window ? 'family' : 'no';
+      return i !== undefined && Math.abs(i.mm - q.mm) <= window;
     },
   };
 }
@@ -100,10 +101,10 @@ function materialConstraint(spec: ParsedSpec, widen: boolean): Constraint | unde
     attr: 'material',
     satisfiedBy: (item) => {
       const value = item.spec.material?.value;
-      if (value === undefined || !isMaterial(value)) return 'no';
-      if (value === q.value) return 'exact';
-      if (widen) return MATERIAL_FAMILY[value] === queryFamily ? 'family' : 'no';
-      return !isMaterial(q.value) && MATERIAL_FAMILY[value] === q.value ? 'family' : 'no';
+      if (value === undefined || !isMaterial(value)) return false;
+      if (value === q.value) return true;
+      if (widen) return MATERIAL_FAMILY[value] === queryFamily;
+      return !isMaterial(q.value) && MATERIAL_FAMILY[value] === q.value;
     },
   };
 }
@@ -116,10 +117,10 @@ function finishConstraint(spec: ParsedSpec, widen: boolean): Constraint | undefi
     attr: 'finish',
     satisfiedBy: (item) => {
       const value = item.spec.finish?.value;
-      if (value === undefined || !isFinish(value)) return 'no';
-      if (value === q.value) return 'exact';
-      if (widen) return FINISH_FAMILY[value] === queryFamily ? 'family' : 'no';
-      return !isFinish(q.value) && FINISH_FAMILY[value] === q.value ? 'family' : 'no';
+      if (value === undefined || !isFinish(value)) return false;
+      if (value === q.value) return true;
+      if (widen) return FINISH_FAMILY[value] === queryFamily;
+      return !isFinish(q.value) && FINISH_FAMILY[value] === q.value;
     },
   };
 }
@@ -127,12 +128,12 @@ function finishConstraint(spec: ParsedSpec, widen: boolean): Constraint | undefi
 function standardConstraint(spec: ParsedSpec): Constraint | undefined {
   const q = spec.standard;
   if (q === undefined) return undefined;
-  return { attr: 'standard', satisfiedBy: (item) => (item.spec.standard === q ? 'exact' : 'no') };
+  return { attr: 'standard', satisfiedBy: (item) => item.spec.standard === q };
 }
 
 /** The order of this array is the probe order of `failedConstraint`, which is what makes
  * the note read `no M8 socket head cap screw at 45 mm`. */
-export function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): Constraint[] {
+function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): Constraint[] {
   const widen = options.widenMaterialFinish ?? false;
   const candidates: (Constraint | undefined)[] = [
     diameterConstraint(spec),
@@ -149,7 +150,7 @@ export function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): 
   return candidates.filter((c): c is Constraint => c !== undefined);
 }
 
-export const bySku = (a: CatalogItem, b: CatalogItem): number =>
+const bySku = (a: CatalogItem, b: CatalogItem): number =>
   a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0;
 
 export function failedConstraint(
@@ -161,7 +162,7 @@ export function failedConstraint(
 
   let surviving: readonly CatalogItem[] = active;
   for (const constraint of buildConstraints(spec)) {
-    surviving = surviving.filter((item) => constraint.satisfiedBy(item) !== 'no');
+    surviving = surviving.filter((item) => constraint.satisfiedBy(item));
     if (surviving.length === 0) return constraint.attr;
   }
   return undefined;
@@ -174,7 +175,7 @@ export function compatibleSet(
   const constraints = buildConstraints(spec);
   return items
     .filter((item) => item.active)
-    .filter((item) => constraints.every((c) => c.satisfiedBy(item) !== 'no'))
+    .filter((item) => constraints.every((c) => c.satisfiedBy(item)))
     .sort(bySku);
 }
 
@@ -239,9 +240,11 @@ function applyStep(
       return;
     case 'materialFinishFamily':
       options.widenMaterialFinish = true;
-      // A query that already names a family loses nothing by being widened.
-      if (spec.material && isMaterial(spec.material.value)) relaxed.push('material');
-      if (spec.finish && isFinish(spec.finish.value)) relaxed.push('finish');
+      // A singleton family widens to nothing, so only a family with siblings counts as relaxed.
+      if (spec.material && isMaterial(spec.material.value) && widensMaterial(spec.material.value))
+        relaxed.push('material');
+      if (spec.finish && isFinish(spec.finish.value) && widensFinish(spec.finish.value))
+        relaxed.push('finish');
       return;
     case 'approximateLength':
       options.length = 'approximate';
@@ -271,10 +274,9 @@ export function alternatives(
   config: MatcherConfig,
 ): readonly AlternativeCandidate[] {
   const failed = failedConstraint(spec, items);
-  if (failed === 'diameter' || failed === 'type') return [];
+  if (failed === undefined || failed === 'diameter' || failed === 'type') return [];
 
   const specified = buildConstraints(spec).length;
-  if (specified === 0) return [];
 
   const active = items.filter((item) => item.active);
   const options: BuildOptions = {};
@@ -283,7 +285,7 @@ export function alternatives(
   for (const step of config.backoffOrder) {
     applyStep(step, spec, options, relaxed, config);
     const constraints = buildConstraints(spec, options);
-    const found = active.filter((item) => constraints.every((c) => c.satisfiedBy(item) !== 'no'));
+    const found = active.filter((item) => constraints.every((c) => c.satisfiedBy(item)));
     if (found.length > 0) {
       const closeness = (specified - relaxed.length) / specified;
       return rankByLengthDistance(found, spec).map((item) => ({

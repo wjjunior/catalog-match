@@ -349,13 +349,48 @@ describe('alternatives', () => {
     const found = alternatives(spec, ITEMS, CONFIG);
 
     expect(found.map((a) => a.item.catalogId)).toEqual(['CAT-0688']);
-    expect(found[0]?.relaxed).toEqual(['material', 'finish']);
-    expect(found[0]?.closeness).toBeCloseTo(2 / 4, 10);
+    // ss_316 has stainless siblings, so widening it can admit something: relaxed.
+    // plain is a singleton finish family, so widening it can admit nothing: not relaxed.
+    expect(found[0]?.relaxed).toEqual(['material']);
+    expect(found[0]?.closeness).toBeCloseTo(3 / 4, 10);
   });
 
-  it('returns nothing when there is no length to relax and no standard to drop', () => {
-    const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
-    expect(alternatives(query({ diameter: m14 }), ITEMS, CONFIG)).toEqual([]);
+  it('does not record material as relaxed for a singleton family', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+      material: { value: 'brass', strength: 1 },
+    });
+    const found = alternatives(spec, ITEMS, CONFIG);
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((a) => a.item.spec.material?.value === 'brass')).toBe(true);
+    expect(found[0]?.relaxed).toContain('length');
+    expect(found[0]?.relaxed).not.toContain('material');
+  });
+
+  it('exhausts the backoff ladder for a material no M8 flat washer has, or is in the family of', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'flat_washer', strength: 1 }],
+      material: { value: 'alloy', strength: 1 },
+    });
+    expect(alternatives(spec, ITEMS, CONFIG)).toEqual([]);
+  });
+
+  it('returns nothing when the compatible set already has a unique match', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'flat_washer', strength: 1 }],
+      standard: 'DIN 912',
+    });
+    expect(compatibleSet(spec, ITEMS).map((i) => i.catalogId)).toEqual(['CAT-0624']);
+    expect(alternatives(spec, ITEMS, CONFIG)).toEqual([]);
+  });
+
+  it('returns nothing when the query states no constraints at all', () => {
+    expect(alternatives(query({ residue: ['red'] }), ITEMS, CONFIG)).toEqual([]);
   });
 
   it('is independent of input order', () => {
