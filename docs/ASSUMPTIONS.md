@@ -35,3 +35,18 @@ Every assumption taken while implementing a card, tagged with the card key.
 - **Prettier does not format `docs/DESIGN.md` or `docs/BRIEF.md`.** Both are committed as
   provided by the owner; reformatting them would rewrite documents this repository does
   not own.
+
+## PRG-36
+
+- **`alpha` is 1, not the 0.5 of `docs/BRIEF.md` 8.** The calibration session measured it:
+  at 0.5 a six-line profile was confident enough about material to outrank the SKU the
+  customer had actually bought. The sweep and the reasoning are in `docs/calibration.md`.
+  A later card reading the brief may take 0.5 for the intended value; it is not.
+- **The base specification of a history override carries the referenced line's finish but
+  not its standard.** `docs/DESIGN.md` 7.4 says the referenced line's attributes become
+  the base specification and does not say which of them survive. Read literally, both
+  survive and `same washers as last time, but brass` returns nothing, because there is no
+  brass ISO 7380 washer. The implementation drops the standard and keeps the finish,
+  returning one washer; the golden label `pers-21` expects neither to survive, and two.
+  Nothing here was changed to make that case pass. Whoever settles it should fix DESIGN
+  7.4 first and the code second.
