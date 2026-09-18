@@ -29,7 +29,12 @@ import {
   formatMaterial,
   formatType,
   historyReferenceNote,
+  orderedReason,
   overrideReason,
+  preferenceReason,
+  repeatReason,
+  siblingReason,
+  unmatchedReason,
   tieBanner,
   unitMismatchNote,
   unknownDiameterNote,
@@ -728,5 +733,52 @@ describe('banner and override strings', () => {
     expect(overrideReason(['alloy', 'black oxide'])).toBe(
       'history prefers alloy black oxide; overridden by the query',
     );
+  });
+});
+
+describe('personalization reasons', () => {
+  it('counts the orders and dates the last one', () => {
+    expect(repeatReason(2, '2026-04-15')).toBe('bought 2x, last 2026-04-15');
+  });
+
+  it('names the discontinued SKU an active item stands in for', () => {
+    expect(siblingReason('PXNUT16888PL0901')).toBe(
+      'shares diameter, type and material family with PXNUT16888PL0901',
+    );
+  });
+
+  it('says which preference the compatible set could not honour', () => {
+    expect(unmatchedReason('material', 'alloy')).toBe(
+      'no alloy in the compatible set; material could not be matched',
+    );
+  });
+
+  it('states the preference the history expresses', () => {
+    expect(preferenceReason(['18-8 SS', 'plain'])).toBe('history prefers 18-8 SS plain');
+  });
+
+  it('states a single preference without padding', () => {
+    expect(preferenceReason(['brass'])).toBe('history prefers brass');
+  });
+
+  it('carries no placeholder and no raw enum value', () => {
+    const reasons = [
+      repeatReason(1, '2025-08-15'),
+      siblingReason('PXNUT16888PL0901'),
+      unmatchedReason('finish', 'black oxide'),
+      preferenceReason(['A2 SS', 'hot dip galvanized']),
+      overrideReason(['alloy', 'black oxide']),
+    ];
+
+    for (const reason of reasons) {
+      expect(reason).not.toMatch(/undefined|\[object|\$\{|_/);
+      expect(reason.trim()).toBe(reason);
+    }
+  });
+});
+
+describe('a referenced order line', () => {
+  it('states the quantity and the date it was ordered on', () => {
+    expect(orderedReason(2500, '2026-04-15')).toBe('ordered 2500 on 2026-04-15');
   });
 });
