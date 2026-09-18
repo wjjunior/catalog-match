@@ -23,6 +23,49 @@ describe('tokenizing', () => {
   });
 });
 
+describe('trailing punctuation', () => {
+  it('drops the comma a user glues to a word', () => {
+    expect(normalize('M8 hex nut, zinc').canonical).toBe('m8 hex nut zinc');
+  });
+
+  it('narrows the span to the word and leaves it pointing into the input', () => {
+    const { tokens } = normalize('hex nut, zinc');
+
+    expect(tokens.map((token) => [token.text, token.start, token.end])).toEqual([
+      ['hex', 0, 3],
+      ['nut', 4, 7],
+      ['zinc', 9, 13],
+    ]);
+  });
+
+  it.each([
+    ['2",', '2"'],
+    ['1/2"', '1/2"'],
+    ["6',", "6'"],
+    ['b18.2.1,', 'b18.2.1'],
+    ['m6-1.0,', 'm6-1.0'],
+    ['2.5.', '2.5'],
+    ['rod.', 'rod'],
+    ['reorder?!', 'reorder'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  it('drops a token that is nothing but punctuation', () => {
+    expect(normalize('m8 , zinc').canonical).toBe('m8 zinc');
+  });
+
+  // The strip runs before the separator split, so a comma cannot hide the x that glues
+  // a length to its diameter.
+  it('frees the separator the comma was glued to', () => {
+    expect(normalize('1/2-13x3", zinc').canonical).toBe('1/2-13 x 3" zinc');
+  });
+
+  it('still reads a number word that ends in a period', () => {
+    expect(normalize('washer no. 10').canonical).toBe('washer #10');
+  });
+});
+
 describe('quote unification', () => {
   it.each([
     ['3"', '3"'],
@@ -289,6 +332,8 @@ const CORPUS: readonly string[] = [
   '2½"',
   "3''",
   'no. 10-24 HEX NUT',
+  'M8 hex nut, zinc',
+  '1/2" rod.',
   '  HEX   CAP\tSCREW ',
   'qty 200 M8',
   'box of M8',

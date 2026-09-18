@@ -75,6 +75,38 @@ describe('an intent phrase', () => {
   });
 });
 
+describe('punctuation glued to a word', () => {
+  it('reads the type phrase a comma interrupts', () => {
+    const spec = parse('M8 hex nut, zinc');
+
+    expect(spec.type).toEqual([{ value: 'hex_nut', strength: 1 }]);
+    expect(spec.finish).toEqual({ value: 'zinc', strength: 1 });
+    expect(spec.diameter?.nominal).toBe('M8');
+    expect(spec.residue).toEqual([]);
+  });
+
+  it('reads the length a comma follows', () => {
+    const spec = parse('hex bolt, 1/2-13 x 2", zinc');
+
+    expect(spec.length).toEqual({ value: 2, unit: 'in', mm: 50.8 });
+    expect(spec.residue).toEqual([]);
+  });
+
+  it('reads the standard a comma follows', () => {
+    const spec = parse('hex cap screw ASME B18.2.1, zinc');
+
+    expect(spec.standard).toBe('ASME B18.2.1');
+    expect(spec.residue).toEqual([]);
+  });
+
+  // The span stops at the word, so evidence quotes the term and not the sentence.
+  it('quotes the term without the punctuation behind it', () => {
+    const { spec } = parseQuery('M8 hex nut, zinc');
+
+    expect(spec.evidence.type).toBe('hex nut');
+  });
+});
+
 describe('abbreviation parity', () => {
   it('reads an abbreviated query and its expansion into the same values', () => {
     const abbreviated = parse('SHCS 7/16 x 2-1/2');
