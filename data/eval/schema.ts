@@ -13,6 +13,10 @@ export type EvalCase = {
   customerId?: string;
   expectedStatus: MatchStatus;
   expected: string[];
+  /** The SKU that must rank first, where one exists. A personalized tie query needs both:
+   * its status comes from the whole set, its intended answer is a single item. */
+  expectedTop1?: string;
+  expectedAlternatives?: string[];
   tags: string[];
   rationale?: string;
 };
@@ -42,6 +46,7 @@ export function parseEvalCase(value: unknown, where: string): EvalCase {
   const row = value as Record<string, unknown>;
 
   const { id, query, customerId, expectedStatus, expected, tags, rationale } = row;
+  const { expectedTop1, expectedAlternatives } = row;
 
   if (typeof id !== 'string' || id === '') reject('id must be a non-empty string');
   if (typeof query !== 'string' || query === '') reject('query must be a non-empty string');
@@ -52,6 +57,12 @@ export function parseEvalCase(value: unknown, where: string): EvalCase {
     reject(`expectedStatus must be one of ${MATCH_STATUSES.join(', ')}`);
   }
   if (!isStringArray(expected)) reject('expected must be an array of SKU strings');
+  if (expectedTop1 !== undefined && (typeof expectedTop1 !== 'string' || expectedTop1 === '')) {
+    reject('expectedTop1 must be a non-empty string when present');
+  }
+  if (expectedAlternatives !== undefined && !isStringArray(expectedAlternatives)) {
+    reject('expectedAlternatives must be an array of SKU strings when present');
+  }
   if (!isStringArray(tags)) reject('tags must be an array of strings');
   if (rationale !== undefined && typeof rationale !== 'string') {
     reject('rationale must be a string when present');
@@ -63,6 +74,8 @@ export function parseEvalCase(value: unknown, where: string): EvalCase {
     'customerId',
     'expectedStatus',
     'expected',
+    'expectedTop1',
+    'expectedAlternatives',
     'tags',
     'rationale',
   ]);
@@ -75,6 +88,10 @@ export function parseEvalCase(value: unknown, where: string): EvalCase {
     ...(customerId === undefined ? {} : { customerId: customerId as string }),
     expectedStatus: expectedStatus as MatchStatus,
     expected: expected as string[],
+    ...(expectedTop1 === undefined ? {} : { expectedTop1: expectedTop1 as string }),
+    ...(expectedAlternatives === undefined
+      ? {}
+      : { expectedAlternatives: expectedAlternatives as string[] }),
     tags: tags as string[],
     ...(rationale === undefined ? {} : { rationale: rationale as string }),
   };
