@@ -39,4 +39,6 @@ jobs:
 
       - run: pnpm build
 
-      # eval gate: added by the calibration card
+      # Status correctness and constraint preservation on the golden set may not fall
+      # below data/eval/baseline.json, and the set may not shrink. docs/DESIGN.md 10.3.
+      - run: pnpm run eval --gate

@@ -1,0 +1,9 @@
+{
+  "recordedOn": "2026-09-18",
+  "recordedBy": "PRG-36, see docs/calibration.md",
+  "goldenSet": {
+    "cases": 78,
+    "statusAccuracy": 0.9615,
+    "constraintViolations": 0
+  }
+}

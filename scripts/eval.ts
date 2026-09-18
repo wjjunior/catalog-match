@@ -17,6 +17,7 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), 'utf8')
 export interface EvalOptions {
   readonly heldout: boolean;
   readonly baseline: boolean;
+  readonly gate: boolean;
 }
 
 /** The held-out set is reported separately and only on request, so an ordinary run
@@ -24,9 +25,46 @@ export interface EvalOptions {
 export const parseArgs = (argv: readonly string[]): EvalOptions => ({
   heldout: argv.includes('--heldout'),
   baseline: argv.includes('--baseline'),
+  gate: argv.includes('--gate'),
 });
 
-export function evaluate({ heldout, baseline }: EvalOptions): {
+/** The floor CI holds the golden set to, committed in `data/eval/baseline.json`. */
+export interface GateFloor {
+  readonly recordedOn: string;
+  readonly goldenSet: {
+    readonly cases: number;
+    readonly statusAccuracy: number;
+    readonly constraintViolations: number;
+  };
+}
+
+/** docs/DESIGN.md 10.3. The case count is gated too: dropping the cases a change breaks
+ * would raise both other numbers, and is the one way to pass this that must not work. */
+export function gateFailures(summary: JsonSummary, floor: GateFloor): string[] {
+  const golden = summary.sections.find((section) => section.name === 'Golden set');
+  if (golden === undefined) return ['the run produced no golden section to gate on'];
+
+  const failed: string[] = [];
+  const { cases, statusAccuracy, constraintViolations } = floor.goldenSet;
+
+  if (golden.cases < cases) {
+    failed.push(`the golden set holds ${String(golden.cases)} cases, down from ${String(cases)}`);
+  }
+  if (golden.status.accuracy < statusAccuracy) {
+    failed.push(
+      `status accuracy ${golden.status.accuracy.toFixed(4)} is below the committed ${statusAccuracy.toFixed(4)}`,
+    );
+  }
+  if (golden.constraints.violations > constraintViolations) {
+    failed.push(
+      `${String(golden.constraints.violations)} matches contradict the query, above the committed ${String(constraintViolations)}`,
+    );
+  }
+
+  return failed;
+}
+
+export function evaluate({ heldout, baseline }: Omit<EvalOptions, 'gate'>): {
   markdown: string;
   summary: JsonSummary;
 } {
@@ -62,6 +100,18 @@ function main(argv: readonly string[]): void {
   writeFileSync(new URL('data/eval/last-run.json', ROOT), `${JSON.stringify(summary, null, 2)}\n`);
 
   process.stdout.write(markdown);
+
+  if (options.gate) {
+    const failed = gateFailures(summary, JSON.parse(read('data/eval/baseline.json')) as GateFloor);
+    if (failed.length > 0) {
+      process.stderr.write(
+        `\nEval gate failed:\n${failed.map((line) => `  - ${line}`).join('\n')}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write('\nEval gate passed against data/eval/baseline.json.\n');
+  }
 
   const skipped = [
     ...(options.heldout ? [] : ['Held-out set not run. Pass --heldout to include it.']),

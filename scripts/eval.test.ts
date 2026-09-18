@@ -1,8 +1,10 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import type { JsonSummary } from '../packages/core/src/eval/report';
 import type { EvalCase as SchemaRow } from '../data/eval/schema';
 import type { EvalCase as HarnessCase } from '../packages/core/src/eval/loader';
-import { evaluate, parseArgs } from './eval';
+import type { GateFloor } from './eval';
+import { evaluate, gateFailures, parseArgs } from './eval';
 
 describe('the case type the harness consumes', () => {
   // packages/core declares the shape it needs instead of importing a file outside its
@@ -15,12 +17,16 @@ describe('the case type the harness consumes', () => {
 
 describe('the flags', () => {
   it('keep the held-out set out unless it is asked for', () => {
-    expect(parseArgs([])).toEqual({ heldout: false, baseline: false });
-    expect(parseArgs(['--heldout'])).toEqual({ heldout: true, baseline: false });
+    expect(parseArgs([])).toEqual({ heldout: false, baseline: false, gate: false });
+    expect(parseArgs(['--heldout'])).toEqual({ heldout: true, baseline: false, gate: false });
   });
 
   it('keep the baseline out unless it is asked for', () => {
-    expect(parseArgs(['--baseline'])).toEqual({ heldout: false, baseline: true });
+    expect(parseArgs(['--baseline'])).toEqual({ heldout: false, baseline: true, gate: false });
+  });
+
+  it('gate only when asked', () => {
+    expect(parseArgs(['--gate'])).toEqual({ heldout: false, baseline: false, gate: true });
   });
 });
 
@@ -92,5 +98,64 @@ describe('the baseline over the real data', () => {
 
   it('keeps the baseline out of the committed summary', () => {
     expect(JSON.stringify(summary)).not.toMatch(/baseline/i);
+  });
+});
+
+describe('the CI gate', () => {
+  const floor: GateFloor = {
+    recordedOn: '2026-09-18',
+    goldenSet: { cases: 78, statusAccuracy: 0.9615, constraintViolations: 0 },
+  };
+
+  const summaryOf = (over: {
+    cases?: number;
+    accuracy?: number;
+    violations?: number;
+  }): JsonSummary =>
+    ({
+      sections: [
+        {
+          name: 'Golden set',
+          cases: over.cases ?? 78,
+          status: { accuracy: over.accuracy ?? 0.9615, cases: 78 },
+          constraints: { cases: 78, violations: over.violations ?? 0 },
+        },
+      ],
+    }) as unknown as JsonSummary;
+
+  it('passes the run the floor was recorded from', () => {
+    expect(gateFailures(summaryOf({}), floor)).toEqual([]);
+  });
+
+  it('passes a run that improved on the floor', () => {
+    expect(gateFailures(summaryOf({ accuracy: 0.99 }), floor)).toEqual([]);
+  });
+
+  it('fails a drop in status accuracy', () => {
+    expect(gateFailures(summaryOf({ accuracy: 0.95 }), floor)).toEqual([
+      'status accuracy 0.9500 is below the committed 0.9615',
+    ]);
+  });
+
+  it('fails a match that contradicts the query', () => {
+    expect(gateFailures(summaryOf({ violations: 1 }), floor)).toEqual([
+      '1 matches contradict the query, above the committed 0',
+    ]);
+  });
+
+  it('fails a golden set that lost cases, the one way to pass by deleting evidence', () => {
+    expect(gateFailures(summaryOf({ cases: 70, accuracy: 1 }), floor)).toEqual([
+      'the golden set holds 70 cases, down from 78',
+    ]);
+  });
+
+  it('fails a run with no golden section at all', () => {
+    expect(gateFailures({ sections: [] }, floor)).toEqual([
+      'the run produced no golden section to gate on',
+    ]);
+  });
+
+  it('gates against the committed floor over the real data', () => {
+    expect(gateFailures(evaluate({ heldout: false, baseline: false }).summary, floor)).toEqual([]);
   });
 });
