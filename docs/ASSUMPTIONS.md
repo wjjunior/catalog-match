@@ -35,3 +35,19 @@ Every assumption taken while implementing a card, tagged with the card key.
 - **Prettier does not format `docs/DESIGN.md` or `docs/BRIEF.md`.** Both are committed as
   provided by the owner; reformatting them would rewrite documents this repository does
   not own.
+
+## PRG-11
+
+- **DESIGN 3.1 states 7 standard tokens; the file carries 6.** `ASME B18.2.1` (144),
+  `ASTM A307` (135), `DIN 912` (128), `ISO 7380` (121), `IFI 111` (110) and `DIN 933`
+  (107), on 745 of 960 SKUs, which is the "about 78%" the document states. The count of
+  distinct tokens is the figure that does not hold.
+- **DESIGN 3.1 states 10 colliding pairs without the standard; the file gives 11.** The
+  tuple (diameter, length, type, material, finish) yields 949 distinct values over 960
+  SKUs, not 950. The fully specified tuple does identify every SKU, as stated.
+- **`(diameter, type, length)` groups are counted only over rows carrying a length.**
+  Over all 960 SKUs there are 716 groups; the 48 difference is the three lengthless types
+  (nut, flat washer, lock washer) across the sixteen diameters. Only the restricted count
+  reproduces the document's 668 groups with 654 unique.
+- **Anchors carry a basis.** DESIGN 3.1 mixes the 1000 raw rows and the 960 deduplicated
+  SKUs without saying which each figure uses; the report states it per figure.

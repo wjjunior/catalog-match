@@ -2,13 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   caseForm,
+  catalogStats,
+  compareAnchors,
   dedupeBySku,
+  historyStats,
+  normalize,
   parseCsv,
+  parseDescription,
+  separatorForm,
+  skuTypeCode,
+  splitOnMaterial,
   toCatalogRows,
+  toHistoryRows,
   whitespaceIssues,
   type CatalogRow,
 } from './profile';
-import { parseDescription, separatorForm, splitOnMaterial, normalize } from './profile';
 
 const catalogFixture = [
   'catalog_id,sku,catalog_description,active',
@@ -149,8 +157,6 @@ describe('parseDescription', () => {
   });
 });
 
-import { catalogStats, skuTypeCode } from './profile';
-
 describe('catalogStats', () => {
   const stats = catalogStats(toCatalogRows(parseCsv(catalogFixture)));
 
@@ -189,8 +195,6 @@ describe('catalogStats', () => {
     expect(stats.separatorForms.get(' X ')).toBe(2);
   });
 });
-
-import { historyStats, toHistoryRows } from './profile';
 
 const historyFixture = [
   'customer_id,customer_name,order_date,sku,catalog_description,quantity',
@@ -231,8 +235,6 @@ describe('historyStats', () => {
     expect(stats.byCustomer[1]?.metricShare).toBe(0.5);
   });
 });
-
-import { compareAnchors } from './profile';
 
 describe('compareAnchors', () => {
   const anchors = compareAnchors(
