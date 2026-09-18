@@ -2,6 +2,7 @@ import type { Finish, FinishFamily, Material, MaterialFamily } from '../domain/a
 import { FINISHES, FINISH_FAMILY, MATERIALS, MATERIAL_FAMILY } from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type { MatchStatus } from '../domain/match';
+import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
 
 export type Satisfaction = 'exact' | 'family' | 'no';
@@ -171,4 +172,33 @@ export function deriveStatus(
   if (compatible.length === 0) return 'none';
   if (compatible.length === 1) return 'unique';
   return 'ambiguous';
+}
+
+function attributeKey(item: CatalogItem, attr: AttributeName): string {
+  const s = item.spec;
+  switch (attr) {
+    case 'diameter':
+      return s.diameter ? `${s.diameter.system}:${s.diameter.nominal}` : '';
+    case 'pitch':
+      return s.pitch ?? '';
+    case 'length':
+      return s.length ? String(mmKey(s.length.mm)) : '';
+    case 'type':
+      return (s.type ?? []).map((t) => t.value).join(',');
+    case 'material':
+      return s.material?.value ?? '';
+    case 'finish':
+      return s.finish?.value ?? '';
+    case 'standard':
+      return s.standard ?? '';
+  }
+}
+
+export function disambiguateBy(compatible: readonly CatalogItem[]): AttributeName[] {
+  const [first, ...rest] = compatible;
+  if (!first || rest.length === 0) return [];
+  return ATTRIBUTE_NAMES.filter((attr) => {
+    const key = attributeKey(first, attr);
+    return rest.some((item) => attributeKey(item, attr) !== key);
+  });
 }

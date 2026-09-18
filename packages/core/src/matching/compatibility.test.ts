@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { ITEMS } from '../../test/fixtures/items';
+import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { ParsedSpec } from '../domain/spec';
-import { compatibleSet, deriveStatus } from './compatibility';
+import { compatibleSet, deriveStatus, disambiguateBy } from './compatibility';
 
 describe('fixtures', () => {
   it('holds seven active M8 flat washers and one discontinued', () => {
@@ -191,5 +192,38 @@ describe('deriveStatus', () => {
 
   it('decides unparsed before it looks at C', () => {
     expect(deriveStatus(query({ residue: ['red', 'thing'] }), ITEMS)).toBe('unparsed');
+  });
+});
+
+describe('disambiguateBy', () => {
+  it('names material, finish and standard for M8 flat washer', () => {
+    const c = compatibleSet(
+      query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] }),
+      ITEMS,
+    );
+    expect(disambiguateBy(c)).toEqual(['material', 'finish', 'standard']);
+  });
+
+  it('returns nothing for a set of one', () => {
+    const c = compatibleSet(
+      query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }], standard: 'DIN 912' }),
+      ITEMS,
+    );
+    expect(disambiguateBy(c)).toEqual([]);
+  });
+
+  it('returns nothing for an empty set', () => {
+    expect(disambiguateBy([])).toEqual([]);
+  });
+
+  it('reports attributes in ATTRIBUTE_NAMES order', () => {
+    const c = compatibleSet(
+      query({ diameter: M8, type: [{ value: 'socket_head_cap_screw', strength: 1 }] }),
+      ITEMS,
+    );
+    const result = disambiguateBy(c);
+    const positions = result.map((attr) => ATTRIBUTE_NAMES.indexOf(attr));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(result).toContain('length');
   });
 });
