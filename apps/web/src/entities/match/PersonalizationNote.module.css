@@ -1,0 +1,30 @@
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: var(--chip);
+}
+
+.reason {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.label,
+.override {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prior {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
