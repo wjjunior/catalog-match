@@ -127,6 +127,23 @@ describe('CustomerCombobox', () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it('drops the selection the moment the filter is edited by hand', async () => {
+    const onSelect = vi.fn();
+    render(<CustomerCombobox onSelect={onSelect} />);
+    const input = screen.getByRole('combobox', { name: /customer/i });
+
+    await userEvent.click(input);
+    await screen.findAllByRole('option');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ customerId: 'CUST-001' }) as unknown as CustomerSummary,
+    );
+
+    await userEvent.type(input, 'x');
+
+    expect(onSelect).toHaveBeenLastCalledWith(undefined);
+  });
+
   it('closes on Escape without selecting anything', async () => {
     const onSelect = vi.fn();
     render(<CustomerCombobox onSelect={onSelect} />);

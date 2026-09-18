@@ -97,6 +97,9 @@ export function CustomerCombobox({
             setQuery(event.target.value);
             setActive(-1);
             setOpen(true);
+            // Typing over a chosen name abandons it: the box must never show one customer
+            // while the next match is sent for another. `choose` sets the text directly.
+            onSelect(undefined);
           }}
         />
         {query !== '' && (

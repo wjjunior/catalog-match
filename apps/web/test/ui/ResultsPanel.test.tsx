@@ -223,6 +223,22 @@ describe('ResultsPanel', () => {
     expect(await screen.findByText('1 match')).toBeDefined();
   });
 
+  it('never sends a customer the combobox no longer shows', async () => {
+    serve(response({ status: 'unique', compatibleCount: 1, results: [match()] }));
+    render(<ResultsPanel />);
+
+    const combobox = screen.getByRole('combobox', { name: /customer/i });
+    await userEvent.click(combobox);
+    await userEvent.click(await screen.findByRole('option'));
+    await userEvent.type(combobox, 'something else');
+
+    await submit('M12 hex nut');
+
+    await waitFor(() => {
+      expect(matchBody()).toEqual({ query: 'M12 hex nut' });
+    });
+  });
+
   it('carries the selected customer into an example-chip match too', async () => {
     serve(response({ status: 'unique', compatibleCount: 1, results: [match()] }));
     render(<ResultsPanel />);
