@@ -149,7 +149,11 @@ export function splitOnMaterial(
   for (const material of MATERIALS) {
     const at = normalized.indexOf(material);
     if (at === -1) continue;
-    if (best === null || at < best.at || (at === best.at && material.length > best.material.length)) {
+    if (
+      best === null ||
+      at < best.at ||
+      (at === best.at && material.length > best.material.length)
+    ) {
       best = { material, at };
     }
   }
@@ -199,4 +203,161 @@ export function parseDescription(description: string): Parsed | null {
     finish,
     finishSurface: split.finishSurface,
   };
+}
+
+export const TYPE_CODES = [
+  'LOCK',
+  'WASH',
+  'LAG',
+  'ROD',
+  'HEX',
+  'SOC',
+  'NUT',
+  'BTN',
+  'TAP',
+  'PAN',
+] as const;
+
+export type CatalogStats = {
+  rawRows: number;
+  uniqueSkus: number;
+  duplicateRows: number;
+  inactiveRows: number;
+  inactiveSkus: number;
+  lowercaseAllRaw: number;
+  lowercaseAllSku: number;
+  lowercaseAnyRaw: number;
+  whitespaceIrregular: number;
+  unparsed: string[];
+  typePhrasesByType: Map<string, Map<string, number>>;
+  diameterPitches: Map<string, Set<string>>;
+  rowsWithoutPitch: number;
+  lengthPresenceByType: Map<string, { withLength: number; withoutLength: number }>;
+  unitForms: Map<string, number>;
+  separatorForms: Map<string, number>;
+  materialFinish: Map<string, Map<string, number>>;
+  finishSurfaces: Map<string, number>;
+  standards: Map<string, number>;
+  rowsWithStandard: number;
+  standardByType: Map<string, Map<string, number>>;
+  fullTuples: number;
+  tuplesWithoutStandard: number;
+  lengthGroups: number;
+  lengthGroupsUnique: number;
+};
+
+export function skuTypeCode(sku: string): string | null {
+  const body = sku.slice(2);
+  let found: string | null = null;
+  for (const code of TYPE_CODES) {
+    if (!body.startsWith(code)) continue;
+    if (found === null || code.length > found.length) found = code;
+  }
+  return found;
+}
+
+function bump<K>(counter: Map<K, number>, key: K): void {
+  counter.set(key, (counter.get(key) ?? 0) + 1);
+}
+
+function nested(outer: Map<string, Map<string, number>>, key: string): Map<string, number> {
+  const inner = outer.get(key) ?? new Map<string, number>();
+  outer.set(key, inner);
+  return inner;
+}
+
+export function catalogStats(raw: CatalogRow[]): CatalogStats {
+  const bySku = dedupeBySku(raw);
+  const inactive = raw.filter((row) => !row.active);
+
+  const stats: CatalogStats = {
+    rawRows: raw.length,
+    uniqueSkus: bySku.length,
+    duplicateRows: raw.length - bySku.length,
+    inactiveRows: inactive.length,
+    inactiveSkus: new Set(inactive.map((row) => row.sku)).size,
+    lowercaseAllRaw: raw.filter((row) => caseForm(row.description) === 'all-lower').length,
+    lowercaseAllSku: bySku.filter((row) => caseForm(row.description) === 'all-lower').length,
+    lowercaseAnyRaw: raw.filter((row) => caseForm(row.description) !== 'all-upper').length,
+    whitespaceIrregular: raw.filter((row) => whitespaceIssues(row.description).length > 0).length,
+    unparsed: [],
+    typePhrasesByType: new Map(),
+    diameterPitches: new Map(),
+    rowsWithoutPitch: 0,
+    lengthPresenceByType: new Map(),
+    unitForms: new Map(),
+    separatorForms: new Map(),
+    materialFinish: new Map(),
+    finishSurfaces: new Map(),
+    standards: new Map(),
+    rowsWithStandard: 0,
+    standardByType: new Map(),
+    fullTuples: 0,
+    tuplesWithoutStandard: 0,
+    lengthGroups: 0,
+    lengthGroupsUnique: 0,
+  };
+
+  const full = new Set<string>();
+  const withoutStandard = new Set<string>();
+  const lengthGroups = new Map<string, number>();
+
+  for (const row of bySku) {
+    const separator = separatorForm(row.description);
+    if (separator !== null) bump(stats.separatorForms, separator);
+
+    const parsed = parseDescription(row.description);
+    const type = skuTypeCode(row.sku);
+    if (parsed === null || type === null) {
+      stats.unparsed.push(row.description);
+      continue;
+    }
+
+    bump(nested(stats.typePhrasesByType, type), parsed.typePhrase);
+
+    const pitches = stats.diameterPitches.get(parsed.diameter) ?? new Set<string>();
+    if (parsed.pitch !== null) pitches.add(parsed.pitch);
+    else stats.rowsWithoutPitch += 1;
+    stats.diameterPitches.set(parsed.diameter, pitches);
+
+    const presence = stats.lengthPresenceByType.get(type) ?? { withLength: 0, withoutLength: 0 };
+    if (parsed.length === null) presence.withoutLength += 1;
+    else presence.withLength += 1;
+    stats.lengthPresenceByType.set(type, presence);
+
+    if (parsed.lengthUnit !== null) {
+      bump(stats.unitForms, parsed.lengthUnit === '' ? '(mark absent)' : parsed.lengthUnit);
+    }
+
+    bump(nested(stats.materialFinish, parsed.material), parsed.finish);
+    bump(stats.finishSurfaces, parsed.finishSurface);
+
+    if (parsed.standard !== null) {
+      stats.rowsWithStandard += 1;
+      bump(stats.standards, parsed.standard);
+      bump(nested(stats.standardByType, type), parsed.standard);
+    }
+
+    full.add(
+      [parsed.diameter, parsed.length, type, parsed.material, parsed.finish, parsed.standard].join(
+        '|',
+      ),
+    );
+    withoutStandard.add(
+      [parsed.diameter, parsed.length, type, parsed.material, parsed.finish].join('|'),
+    );
+
+    // DESIGN's 668 groups count only rows that carry a length; over all rows it is 716,
+    // the difference being the three lengthless types across the sixteen diameters.
+    if (parsed.length !== null) {
+      bump(lengthGroups, [parsed.diameter, type, parsed.length].join('|'));
+    }
+  }
+
+  stats.fullTuples = full.size;
+  stats.tuplesWithoutStandard = withoutStandard.size;
+  stats.lengthGroups = lengthGroups.size;
+  stats.lengthGroupsUnique = [...lengthGroups.values()].filter((count) => count === 1).length;
+
+  return stats;
 }

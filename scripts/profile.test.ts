@@ -148,3 +148,44 @@ describe('parseDescription', () => {
     expect(separatorForm('M12-1.75 HEX NUT STEEL BLACK OXIDE')).toBe(null);
   });
 });
+
+import { catalogStats, skuTypeCode } from './profile';
+
+describe('catalogStats', () => {
+  const stats = catalogStats(toCatalogRows(parseCsv(catalogFixture)));
+
+  it('anchors the SKU type code instead of taking every leading letter', () => {
+    expect(skuTypeCode('PXWASH8A2BO0004')).toBe('WASH');
+    expect(skuTypeCode('PXNUT1216STZC0003')).toBe('NUT');
+    expect(skuTypeCode('PXLOCK12STZC0009')).toBe('LOCK');
+  });
+
+  it('counts rows on the raw basis and SKUs on the deduped one', () => {
+    expect(stats.rawRows).toBe(5);
+    expect(stats.uniqueSkus).toBe(4);
+    expect(stats.duplicateRows).toBe(1);
+    expect(stats.inactiveRows).toBe(1);
+    expect(stats.inactiveSkus).toBe(1);
+  });
+
+  it('counts fully lowercase descriptions on the raw basis, apart from mixed case', () => {
+    expect(stats.lowercaseAllRaw).toBe(1);
+    expect(stats.lowercaseAnyRaw).toBe(1);
+  });
+
+  it('records a type phrase variant per type and a length presence per type', () => {
+    expect(stats.typePhrasesByType.get('NUT')?.get('HEX NUT')).toBe(1);
+    expect(stats.lengthPresenceByType.get('NUT')).toEqual({ withLength: 0, withoutLength: 1 });
+    expect(stats.lengthPresenceByType.get('HEX')).toEqual({ withLength: 1, withoutLength: 0 });
+  });
+
+  it('counts length groups only over rows that carry a length', () => {
+    expect(stats.lengthGroups).toBe(2);
+    expect(stats.lengthGroupsUnique).toBe(2);
+  });
+
+  it('reports repeated whitespace and the separator forms seen', () => {
+    expect(stats.whitespaceIrregular).toBe(1);
+    expect(stats.separatorForms.get(' X ')).toBe(2);
+  });
+});
