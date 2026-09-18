@@ -30,6 +30,28 @@ The page holds a query box, a customer combobox and chips for the 33 example que
 The first request of a process pays for loading both CSVs and indexing the catalog. Every
 request after that answers in single-digit milliseconds.
 
+## Personalization demo
+
+The customer combobox re-ranks the answer; it never changes which items are compatible.
+
+1. Run `M8 flat washer` with no customer. Seven compatible options share one confidence:
+   nothing in the query separates them.
+2. Select `CUST-002` (CleanRoom Pharma MFG) and run it again. The 18-8 SS plain washer
+   leads, with `bought 2x, last 2026-04-15` and its prior on the card. The count stays 7.
+3. Select `CUST-004` and run it again. No M8 flat washer is alloy, so only the finish share
+   acts: another washer leads, by a smaller margin, and the note says the material could not
+   be matched.
+4. Select `CUST-005` and run it again. That history is thin, so the ranking stays close to
+   even. The shrinkage is doing its work.
+5. Keep `CUST-004` and run `brass hex nut 1/2-13`. Only brass comes back, and the card
+   records that the query overrode the history.
+6. Keep `CUST-002` and run `M16 hex nut`. The note below the cards says the SKU ordered
+   before is discontinued, and the closest active nut leads.
+7. Run `the same washers as last time` with no customer: the status line asks for one.
+   Select `CUST-002` and run it again to get those orders back, most recent first.
+8. With `CUST-002`, run `same washers as last time, but brass`: the referenced order becomes
+   the base specification, and the query overwrites the material.
+
 ## Cold start with no network
 
 1. `git clone` the repository and `cd` into it.
