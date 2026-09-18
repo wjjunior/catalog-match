@@ -10,6 +10,7 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
+          setupFiles: ['packages/core/test/setup/fastCheck.ts'],
           include: [
             'packages/*/{src,test}/**/*.test.ts',
             'apps/web/**/*.test.ts',

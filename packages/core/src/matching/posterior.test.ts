@@ -166,10 +166,29 @@ const scenario = fc.integer({ min: 1, max: 12 }).chain((size) =>
   }),
 );
 
-const rankedSkus = (p: ReadonlyMap<string, number>) =>
-  [...p.entries()]
-    .sort(([skuA, a], [skuB, b]) => b - a || skuA.localeCompare(skuB))
-    .map(([sku]) => sku);
+// Residue divides every posterior by one larger denominator, so the order survives in exact
+// arithmetic; two posteriors within an ulp of each other still round onto the same double,
+// and strict order is claimed only where the gap is wider than that.
+const ORDER_EPSILON = 1e-12;
+
+const expectOrderKept = (
+  before: ReadonlyMap<string, number>,
+  after: ReadonlyMap<string, number>,
+) => {
+  const read = (p: ReadonlyMap<string, number>, sku: string) => p.get(sku) ?? Number.NaN;
+
+  for (const [high, highValue] of before) {
+    for (const [low, lowValue] of before) {
+      if (highValue <= lowValue) continue;
+
+      if (highValue - lowValue > ORDER_EPSILON * highValue) {
+        expect(read(after, high)).toBeGreaterThan(read(after, low));
+      } else {
+        expect(read(after, high)).toBeGreaterThanOrEqual(read(after, low));
+      }
+    }
+  }
+};
 
 describe('posterior: properties (docs/DESIGN.md 5.5)', () => {
   it('leaves the mass over C and null summing to 1', () => {
@@ -215,7 +234,7 @@ describe('posterior: properties (docs/DESIGN.md 5.5)', () => {
         for (const [sku, value] of before.p) {
           expect(after.p.get(sku)).toBeLessThan(value);
         }
-        expect(rankedSkus(after.p)).toEqual(rankedSkus(before.p));
+        expectOrderKept(before.p, after.p);
         expect(after.pNull).toBeGreaterThan(before.pNull);
       }),
       { numRuns: NUM_RUNS },
