@@ -44,6 +44,11 @@ decides whether the status is correctly `ambiguous` and which items belong in it
 `expectedTop1` decides whether personalization moved the intended item to the front of
 that same set.
 
+Both fields are additions to `data/eval/schema.ts`, which PRG-32 defined and which the
+held-out set shares. That module validates structure only; which sizes go with which
+status is a property of each set, so those rules live in each set's own test —
+`data/eval/schema.test.ts` here, `scripts/heldout.test.ts` there.
+
 ## 4. Per-customer reasoning
 
 **CUST-001, Midwest Industrial Supply** (18 lines, all STEEL, 14 ZINC) has the cleanest

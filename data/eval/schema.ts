@@ -1,85 +1,114 @@
-import { z } from 'zod';
+// The shape of one evaluation case, per docs/BRIEF.md 11. Shared by data/eval/golden.jsonl
+// and data/eval/heldout.jsonl so the harness (PRG-33) loads both through one reader.
+// Structure only: which expected sizes go with which status is a property of each set,
+// not of the schema.
 
-export const EVAL_STATUSES = ['unique', 'ambiguous', 'none', 'history', 'unparsed'] as const;
+export const MATCH_STATUSES = ['unique', 'ambiguous', 'none', 'history', 'unparsed'] as const;
 
-export const EVAL_TAGS = [
-  'example',
-  'personalized',
-  'adversarial',
-  'tie',
-  'discontinued',
-  'history-reference',
-  'override',
-  'status-only',
-  'unknown-diameter',
-  'unknown-type',
-  'unknown-length',
-  'residue',
-  'synonym',
-  'unit-form',
-  'typo',
-  'noise',
-  'casing',
-  'permutation',
-  'standard',
-] as const;
+export type MatchStatus = (typeof MATCH_STATUSES)[number];
 
-const unique = <T>(values: readonly T[]): boolean => new Set(values).size === values.length;
+export type EvalCase = {
+  id: string;
+  query: string;
+  customerId?: string;
+  expectedStatus: MatchStatus;
+  expected: string[];
+  /** The SKU that must rank first, where one exists. A personalized tie query needs both:
+   * its status comes from the whole set, its intended answer is a single item. */
+  expectedTop1?: string;
+  expectedAlternatives?: string[];
+  tags: string[];
+  rationale?: string;
+};
 
-export const EvalCase = z
-  .object({
-    id: z.string().regex(/^(ex|pers|adv)-\d{2}$/),
-    query: z.string().min(1),
-    customerId: z
-      .string()
-      .regex(/^CUST-\d{3}$/)
-      .nullable(),
-    expectedStatus: z.enum(EVAL_STATUSES),
-    expected: z.array(z.string().min(1)),
-    expectedTop1: z.string().min(1).optional(),
-    expectedAlternatives: z.array(z.string().min(1)).optional(),
-    tags: z.array(z.enum(EVAL_TAGS)).min(1),
-    rationale: z.string().optional(),
-  })
-  .superRefine((row, ctx) => {
-    const fail = (message: string, path: string) =>
-      ctx.addIssue({ code: 'custom', message, path: [path] });
+// Case, whitespace and separators carry no meaning in a query, so two queries differing
+// only there are the same query. This is the comparison behind the rule that the held-out
+// set and the golden set share none.
+export const normalizeQuery = (query: string): string =>
+  query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    const statusOnly = row.tags.includes('status-only');
+export class EvalSchemaError extends Error {}
 
-    if (row.expectedStatus === 'unique' && row.expected.length !== 1)
-      fail('a unique row names exactly one SKU', 'expected');
-    if (row.expectedStatus === 'ambiguous') {
-      if (statusOnly && row.expected.length !== 0)
-        fail('a status-only row carries no set', 'expected');
-      if (!statusOnly && row.expected.length < 2)
-        fail('an ambiguous row names the whole compatible set', 'expected');
-    }
-    if (
-      (row.expectedStatus === 'none' || row.expectedStatus === 'unparsed') &&
-      row.expected.length !== 0
-    )
-      fail('nothing is expected when nothing matched or nothing parsed', 'expected');
-    if (row.expectedStatus === 'history') {
-      if (row.customerId === null && row.expected.length !== 0)
-        fail('a history reference without a customer resolves to nothing', 'expected');
-      if (row.customerId !== null && row.expected.length === 0)
-        fail('a history reference with a customer names the referenced SKUs', 'expected');
-    }
+const isStatus = (value: unknown): value is MatchStatus =>
+  MATCH_STATUSES.includes(value as MatchStatus);
 
-    if (row.expectedTop1 !== undefined && !row.expected.includes(row.expectedTop1))
-      fail('expectedTop1 must be one of the expected SKUs', 'expectedTop1');
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-    if (row.customerId !== null && (row.rationale === undefined || row.rationale.trim() === ''))
-      fail('every personalized case carries a hand-written rationale', 'rationale');
+export function parseEvalCase(value: unknown, where: string): EvalCase {
+  const reject = (reason: string): never => {
+    throw new EvalSchemaError(`${where}: ${reason}`);
+  };
 
-    if (row.expectedAlternatives !== undefined && row.expectedStatus !== 'none')
-      fail('alternatives exist only when nothing matched', 'expectedAlternatives');
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return reject('expected a JSON object');
+  }
+  const row = value as Record<string, unknown>;
 
-    if (!unique(row.expected)) fail('duplicate SKU', 'expected');
-    if (row.expectedAlternatives !== undefined && !unique(row.expectedAlternatives))
-      fail('duplicate SKU', 'expectedAlternatives');
-    if (!unique(row.tags)) fail('duplicate tag', 'tags');
-  });
+  const { id, query, customerId, expectedStatus, expected, tags, rationale } = row;
+  const { expectedTop1, expectedAlternatives } = row;
 
-export type EvalCase = z.infer<typeof EvalCase>;
+  if (typeof id !== 'string' || id === '') reject('id must be a non-empty string');
+  if (typeof query !== 'string' || query === '') reject('query must be a non-empty string');
+  if (customerId !== undefined && typeof customerId !== 'string') {
+    reject('customerId must be a string when present');
+  }
+  if (!isStatus(expectedStatus)) {
+    reject(`expectedStatus must be one of ${MATCH_STATUSES.join(', ')}`);
+  }
+  if (!isStringArray(expected)) reject('expected must be an array of SKU strings');
+  if (expectedTop1 !== undefined && (typeof expectedTop1 !== 'string' || expectedTop1 === '')) {
+    reject('expectedTop1 must be a non-empty string when present');
+  }
+  if (expectedAlternatives !== undefined && !isStringArray(expectedAlternatives)) {
+    reject('expectedAlternatives must be an array of SKU strings when present');
+  }
+  if (!isStringArray(tags)) reject('tags must be an array of strings');
+  if (rationale !== undefined && typeof rationale !== 'string') {
+    reject('rationale must be a string when present');
+  }
+
+  const known = new Set([
+    'id',
+    'query',
+    'customerId',
+    'expectedStatus',
+    'expected',
+    'expectedTop1',
+    'expectedAlternatives',
+    'tags',
+    'rationale',
+  ]);
+  const unknown = Object.keys(row).filter((key) => !known.has(key));
+  if (unknown.length > 0) reject(`unknown field(s): ${unknown.sort().join(', ')}`);
+
+  return {
+    id: id as string,
+    query: query as string,
+    ...(customerId === undefined ? {} : { customerId: customerId as string }),
+    expectedStatus: expectedStatus as MatchStatus,
+    expected: expected as string[],
+    ...(expectedTop1 === undefined ? {} : { expectedTop1: expectedTop1 as string }),
+    ...(expectedAlternatives === undefined
+      ? {}
+      : { expectedAlternatives: expectedAlternatives as string[] }),
+    tags: tags as string[],
+    ...(rationale === undefined ? {} : { rationale: rationale as string }),
+  };
+}
+
+export function parseEvalJsonl(text: string): EvalCase[] {
+  return text
+    .split('\n')
+    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+    .filter((entry) => entry.line !== '')
+    .map((entry) => {
+      let value: unknown;
+      try {
+        value = JSON.parse(entry.line);
+      } catch (cause) {
+        throw new EvalSchemaError(`line ${entry.number}: invalid JSON`, { cause });
+      }
+      return parseEvalCase(value, `line ${entry.number}`);
+    });
+}

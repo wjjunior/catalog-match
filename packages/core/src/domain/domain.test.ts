@@ -260,6 +260,9 @@ const customerProfile = {
     threadSystem: { imperial: 0.6 },
   },
   repeats: { PXROD126STZC0002: 1 },
+  purchases: {
+    PXROD126STZC0002: { count: 2, lastOrderDate: '2026-04-15', spec: parsedSpec },
+  },
   discontinued: ['PXNUT16888PL0901'],
   warnings: [],
 } satisfies CustomerProfile;

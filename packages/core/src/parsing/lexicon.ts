@@ -11,7 +11,7 @@ import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
 
 const { familyCredit, termStrengths } = DEFAULT_MATCHER_CONFIG;
 
-export type LexiconAttribute = 'type' | 'material' | 'finish' | 'standard';
+export type LexiconAttribute = 'type' | 'material' | 'finish' | 'standard' | 'unknownType';
 
 export type LexiconValue =
   ProductType | Material | MaterialFamily | Finish | FinishFamily | Standard;
@@ -149,6 +149,19 @@ const TYPE_TERMS: ReadonlyArray<readonly [string, Weighted<LexiconValue>[]]> = [
   ],
 ];
 
+/** Fastener types the catalog does not stock, each built on a head word the lexicon reads
+ * alone: without an entry only the modifier reaches the residue, which cannot empty C. */
+const UNKNOWN_TYPE_TERMS: readonly string[] = [
+  'carriage bolt',
+  'eye bolt',
+  'u bolt',
+  'j bolt',
+  'shoulder bolt',
+  'square head bolt',
+  'wing nut',
+  'acorn nut',
+];
+
 const MATERIAL_TERMS: ReadonlyArray<readonly [string, Material | MaterialFamily, number]> = [
   ['steel', 'steel', 1],
   ['18-8 ss', 'ss_18_8', 1],
@@ -215,6 +228,7 @@ const STANDARD_TERMS: ReadonlyArray<readonly [string, Standard]> = [
 
 export const LEXICON: ReadonlyMap<string, LexiconEntry> = new Map<string, LexiconEntry>([
   ...TYPE_TERMS.map(([term, values]) => [term, { attribute: 'type', values }] as const),
+  ...UNKNOWN_TYPE_TERMS.map((term) => [term, { attribute: 'unknownType', values: [] }] as const),
   ...MATERIAL_TERMS.map(
     ([term, value, strength]) =>
       [term, { attribute: 'material', values: [{ value, strength }] }] as const,

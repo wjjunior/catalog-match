@@ -1,5 +1,5 @@
 import { FINISHES, MATERIALS, THREAD_SYSTEMS } from '../domain/attributes';
-import type { CatalogItem, CustomerProfile, HistoryLine } from '../domain/catalog';
+import type { CatalogItem, CustomerProfile, HistoryLine, Purchase } from '../domain/catalog';
 import type { ParsedSpec } from '../domain/spec';
 import type { MatcherConfig } from '../matching/config';
 import { parseDescription } from '../parsing/descriptionParser';
@@ -63,7 +63,8 @@ export function buildProfile(
     finish: new Map<string, number>(),
     threadSystem: new Map<string, number>(),
   };
-  const purchases = new Map<string, number>();
+  const weights = new Map<string, number>();
+  const purchases = new Map<string, Purchase>();
   const discontinued: string[] = [];
   const warnings: string[] = [];
   let customerName = '';
@@ -95,7 +96,15 @@ export function buildProfile(
     const weight = Math.exp(-age / config.tauDays);
 
     nEff += weight;
-    purchases.set(line.sku, (purchases.get(line.sku) ?? 0) + weight);
+    weights.set(line.sku, (weights.get(line.sku) ?? 0) + weight);
+
+    const previous = purchases.get(line.sku);
+    const keepPrevious = previous !== undefined && previous.lastOrderDate > line.orderDate;
+    purchases.set(line.sku, {
+      count: (previous?.count ?? 0) + 1,
+      lastOrderDate: keepPrevious ? previous.lastOrderDate : line.orderDate,
+      spec: keepPrevious ? previous.spec : spec,
+    });
     count(counts.material, spec.material?.value, weight);
     count(counts.finish, spec.finish?.value, weight);
     count(counts.threadSystem, spec.diameter?.system, weight);
@@ -112,7 +121,8 @@ export function buildProfile(
       finish: shares(counts.finish, FINISHES, nEff, config.alpha),
       threadSystem: shares(counts.threadSystem, THREAD_SYSTEMS, nEff, config.alpha),
     },
-    repeats: Object.fromEntries([...purchases].map(([sku, weight]) => [sku, Math.min(1, weight)])),
+    repeats: Object.fromEntries([...weights].map(([sku, weight]) => [sku, Math.min(1, weight)])),
+    purchases: Object.fromEntries(purchases),
     discontinued,
     warnings,
   };

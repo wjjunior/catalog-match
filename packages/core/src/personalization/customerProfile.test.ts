@@ -94,6 +94,33 @@ describe('repeat weights', () => {
   });
 });
 
+describe('purchase facts', () => {
+  it('counts the orders of a SKU and keeps the latest date', () => {
+    const lines = [line('A', '2025-09-28', 'PXW', WASHER), line('A', '2026-04-15', 'PXW', WASHER)];
+
+    expect(buildProfile('A', lines, catalog, config).purchases).toMatchObject({
+      PXW: { count: 2, lastOrderDate: '2026-04-15' },
+    });
+  });
+
+  it('keeps the spec of the most recent line, not of the last one read', () => {
+    const lines = [
+      line('A', '2026-04-15', 'PXW', WASHER),
+      line('A', '2025-09-28', 'PXW', BRASS_WASHER),
+    ];
+
+    const { purchases } = buildProfile('A', lines, catalog, config);
+
+    expect(purchases.PXW?.spec.material?.value).toBe('ss_18_8');
+  });
+
+  it('has nothing to say about a line it could not read', () => {
+    expect(
+      buildProfile('A', [line('A', '2026-06-30', 'PXX', 'mystery')], catalog, config).purchases,
+    ).toEqual({});
+  });
+});
+
 describe('the cross-check against the catalog', () => {
   it('lists a purchased SKU the catalog no longer sells', () => {
     const inactive = [item('PXW', WASHER), item('PXN', NUT, false)];

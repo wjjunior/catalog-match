@@ -15,6 +15,7 @@ import type {
   Provenance,
   Weighted,
 } from '../domain/spec';
+import { INTENT_PHRASES } from '../personalization/intent';
 import { correct } from './fuzzy';
 import { longestMatch, type LexiconValue } from './lexicon';
 import { normalize } from './normalize';
@@ -64,17 +65,6 @@ const SEPARATOR = 'x';
 /** Everything normalization leaves a unit as, plus the inch mark it may leave standing
  * alone when the user put a space before it. */
 const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
-
-/** Longest first: `last time` must win over `time`. docs/DESIGN.md 7.4. */
-const INTENT_PHRASES: readonly string[] = [
-  'what we always get',
-  'like before',
-  'last time',
-  'reorder',
-  'usual',
-  'again',
-  'same',
-];
 
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
@@ -145,6 +135,17 @@ function takeAttributes(draft: Draft): LexiconAttributes {
   const found: LexiconAttributes = {};
 
   for (const match of longestMatch(draft.tokens.map((token) => token.text))) {
+    // A phrase naming a product the catalog does not carry. It is claimed rather than
+    // left to the residue, which docs/DESIGN.md 5.3 forbids from emptying C.
+    if (match.attribute === 'unknownType') {
+      if (draft.provenance.type !== undefined) continue;
+
+      draft.evidence.type = quote(draft, match.start, match.end);
+      draft.provenance.type = 'unrecognized';
+      claim(draft, match.start, match.end);
+      continue;
+    }
+
     const factor = discount(draft, match.start, match.end);
     const values = weigh(match.values, factor);
     const [first] = values;
@@ -153,7 +154,7 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     // The lexicon keys its values by attribute; the type system carries the union, so
     // the branch that reads the attribute is where the value regains its type.
     if (match.attribute === 'type') {
-      if (found.type !== undefined) continue;
+      if (found.type !== undefined || draft.provenance.type === 'unrecognized') continue;
       found.type = values as Weighted<ProductType>[];
     } else if (match.attribute === 'material') {
       if (found.material !== undefined) continue;
