@@ -1,6 +1,7 @@
 import type { Finish, FinishFamily, Material, MaterialFamily } from '../domain/attributes';
 import { FINISHES, FINISH_FAMILY, MATERIALS, MATERIAL_FAMILY } from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
+import type { MatchStatus } from '../domain/match';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
 
 export type Satisfaction = 'exact' | 'family' | 'no';
@@ -158,4 +159,16 @@ export function compatibleSet(
     .filter((item) => item.active)
     .filter((item) => constraints.every((c) => c.satisfiedBy(item) !== 'no'))
     .sort(bySku);
+}
+
+export function deriveStatus(
+  spec: ParsedSpec,
+  compatible: readonly CatalogItem[],
+): MatchStatus {
+  const hasDiameter = spec.diameter !== undefined;
+  const hasType = spec.type !== undefined && spec.type.length > 0;
+  if (!hasDiameter && !hasType) return 'unparsed';
+  if (compatible.length === 0) return 'none';
+  if (compatible.length === 1) return 'unique';
+  return 'ambiguous';
 }

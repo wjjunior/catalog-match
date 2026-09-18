@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ITEMS } from '../../test/fixtures/items';
 import type { ParsedSpec } from '../domain/spec';
-import { compatibleSet } from './compatibility';
+import { compatibleSet, deriveStatus } from './compatibility';
 
 describe('fixtures', () => {
   it('holds seven active M8 flat washers and one discontinued', () => {
@@ -142,5 +142,54 @@ describe('compatibleSet', () => {
     const reversed = compatibleSet(spec, [...ITEMS].reverse()).map((i) => i.sku);
     expect(forward).toEqual([...forward].sort());
     expect(reversed).toEqual(forward);
+  });
+});
+
+describe('deriveStatus', () => {
+  const run = (spec: ParsedSpec) => deriveStatus(spec, compatibleSet(spec, ITEMS));
+
+  it('is ambiguous for M8 flat washer', () => {
+    expect(run(query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] }))).toBe(
+      'ambiguous',
+    );
+  });
+
+  it('is unique for M8 flat washer DIN 912', () => {
+    expect(
+      run(
+        query({
+          diameter: M8,
+          type: [{ value: 'flat_washer', strength: 1 }],
+          standard: 'DIN 912',
+        }),
+      ),
+    ).toBe('unique');
+  });
+
+  it('is none for an unknown diameter', () => {
+    const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
+    expect(run(query({ diameter: m14, type: [{ value: 'hex_nut', strength: 1 }] }))).toBe('none');
+  });
+
+  it('is none, not unparsed, when the diameter parsed but the type did not', () => {
+    expect(
+      run(
+        query({
+          diameter: { system: 'imperial', nominal: '3/8', mm: 9.525, known: true },
+          residue: ['carriage', 'bolt'],
+          provenance: { type: 'unrecognized' },
+        }),
+      ),
+    ).toBe('none');
+  });
+
+  it('is unparsed when neither a diameter nor a type was recognized', () => {
+    expect(run(query({ residue: ['carriage', 'bolt'], provenance: { type: 'unrecognized' } }))).toBe(
+      'unparsed',
+    );
+  });
+
+  it('decides unparsed before it looks at C', () => {
+    expect(deriveStatus(query({ residue: ['red', 'thing'] }), ITEMS)).toBe('unparsed');
   });
 });
