@@ -2,12 +2,13 @@ import { join } from 'node:path';
 
 import { CsvCatalogRepository } from '../adapters/csv/csvCatalogRepository';
 import { CsvOrderHistoryRepository } from '../adapters/csv/csvOrderHistoryRepository';
-import type { CustomerSummary } from '../domain/catalog';
+import type { CustomerProfile, CustomerSummary } from '../domain/catalog';
 import type { MatchRequest, MatchResponse } from '../domain/match';
 import type { MatcherConfig } from '../matching/config';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
 import { buildIndex } from '../matching/lexicalFallback';
 import { descriptionParser } from '../parsing/descriptionParser';
+import { buildProfile } from '../personalization';
 import type { CatalogRepository } from '../ports/catalogRepository';
 import type { OrderHistoryRepository } from '../ports/orderHistoryRepository';
 import { listCustomers } from './listCustomers';
@@ -41,8 +42,21 @@ export function createCoreFromRepositories({
 }: CoreRepositories): Core {
   const index = buildIndex(catalog.active());
 
+  // One profile per customer per catalog load: the history and the catalog it is
+  // cross-checked against both change only when this core is built again.
+  const profiles = new Map<string, CustomerProfile>();
+  const profile = (customerId: string): CustomerProfile => {
+    const known = profiles.get(customerId);
+    if (known !== undefined) return known;
+
+    const built = buildProfile(customerId, history.all(), catalog.all(), config);
+    profiles.set(customerId, built);
+
+    return built;
+  };
+
   return {
-    matchQuery: matchQuery({ catalog, index, config }),
+    matchQuery: matchQuery({ catalog, index, config, history, profile }),
     listCustomers: listCustomers({ history }),
     catalog,
     history,

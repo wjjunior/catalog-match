@@ -1,6 +1,6 @@
 import type { Alternative, Match, MatchRequest, MatchResponse, Note } from '../domain/match';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
-import type { CatalogItem } from '../domain/catalog';
+import type { CatalogItem, CustomerProfile } from '../domain/catalog';
 import {
   alternatives,
   compatibleSet,
@@ -10,32 +10,52 @@ import {
 } from '../matching/compatibility';
 import type { MatcherConfig } from '../matching/config';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
-import type { ExplanationMeta } from '../matching/explainer';
+import type { AttributeChange, ExplanationMeta } from '../matching/explainer';
 import {
   customerRequiredNote,
+  discontinuedNote,
   explainAlternative,
   explainMatch,
   failedConstraintNote,
+  formatFinish,
+  formatLength,
+  formatMaterial,
+  historyReferenceNote,
+  orderedReason,
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
   unverifiedResidueNote,
+  withPersonalization,
 } from '../matching/explainer';
 import type { LexicalIndex } from '../matching/lexicalFallback';
 import { score } from '../matching/lexicalFallback';
-import { labelFor, posterior, uniformPrior } from '../matching/posterior';
+import { labelFor, posterior } from '../matching/posterior';
 import { compatibility } from '../matching/ranking';
 import { correct } from '../parsing/fuzzy';
 import { normalize } from '../parsing/normalize';
 import type { QueryParse } from '../parsing/queryParser';
 import { parseQuery } from '../parsing/queryParser';
 import { unitMismatch } from '../parsing/units';
+import {
+  detectIntent,
+  historyPrior,
+  personalize,
+  resolveReference,
+  statesOverride,
+  type ReferencedLine,
+} from '../personalization';
 import type { CatalogRepository } from '../ports/catalogRepository';
+import type { OrderHistoryRepository } from '../ports/orderHistoryRepository';
 
 export interface MatchQueryDeps {
   readonly catalog: CatalogRepository;
   readonly index: LexicalIndex;
   readonly config?: MatcherConfig;
+  /** Both are absent for a matcher wired without a customer to speak of, which is what
+   * the eval harness and the base tests use. */
+  readonly history?: OrderHistoryRepository;
+  readonly profile?: (customerId: string) => CustomerProfile;
 }
 
 /** The response minus what every branch answers the same way. */
@@ -78,16 +98,46 @@ function notesFor(spec: ParsedSpec, failure: Note | undefined): Note[] {
   return notes;
 }
 
+/** A purchase the catalog has dropped is worth naming where the rep expected to see it:
+ * the diameter and type they just asked for. docs/DESIGN.md 7.3. */
+function discontinuedNotes(profile: CustomerProfile | undefined, spec: ParsedSpec): Note[] {
+  if (profile === undefined) return [];
+
+  const types = spec.type?.map((entry) => entry.value);
+
+  return [...profile.discontinued].sort().flatMap((sku) => {
+    const purchase = profile.purchases[sku];
+    if (purchase === undefined) return [];
+    if (spec.diameter !== undefined && purchase.spec.diameter?.nominal !== spec.diameter.nominal) {
+      return [];
+    }
+    if (
+      types !== undefined &&
+      purchase.spec.type?.some((entry) => types.includes(entry.value)) !== true
+    ) {
+      return [];
+    }
+
+    return [discontinuedNote(sku)];
+  });
+}
+
 function ranked(
   status: Answer['status'],
   spec: ParsedSpec,
   compatible: readonly CatalogItem[],
   config: MatcherConfig,
   limit: number,
+  profile: CustomerProfile | undefined,
 ): Answer {
   const s = compatible.map((item) => compatibility(spec, item, config));
-  const prior = uniformPrior(compatible);
+  // An absent profile leaves lambda at 0, which is the uniform prior exactly, so the
+  // no-customer response needs no branch of its own. docs/DESIGN.md 7.2.
+  const distribution = historyPrior(profile, spec, compatible, config);
+  const prior = compatible.map((item) => distribution.q.get(item.sku) ?? 0);
   const { p } = posterior(compatible, s, prior, spec.residue.length, config);
+  const personal =
+    profile === undefined ? undefined : personalize(profile, spec, compatible, distribution);
 
   const meta: ExplanationMeta = {
     compatibleCount: compatible.length,
@@ -105,20 +155,26 @@ function ranked(
     }))
     .sort((a, b) => b.confidence - a.confidence || bySku(a.item.sku, b.item.sku))
     .slice(0, limit)
-    .map(({ item, confidence, components }) =>
-      labelled(
+    .map(({ item, confidence, components }) => {
+      const explanation = explainMatch(spec, item, meta);
+      const personalization = personal?.get(item.sku);
+
+      return labelled(
         {
           sku: item.sku,
           catalogId: item.catalogId,
           description: item.description,
           active: item.active,
           confidence,
-          explanation: explainMatch(spec, item, meta),
+          explanation:
+            personalization === undefined
+              ? explanation
+              : withPersonalization(explanation, personalization),
           components,
         },
         config,
-      ),
-    );
+      );
+    });
 
   return {
     status,
@@ -204,10 +260,96 @@ function unparsed(
   };
 }
 
-/** `same` and `last time` both fire on "the same washers as last time"; the longer phrase
- * names the reference the rep has to resolve. */
-const mostSpecific = (phrases: readonly string[]): string =>
-  phrases.reduce((best, phrase) => (phrase.length > best.length ? phrase : best));
+/** The lines a reference names, most recent first. There is no compatible set behind
+ * them: recency decides the order, and the quantity and date are the explanation.
+ * docs/DESIGN.md 7.4. */
+function referencedOrders(
+  spec: ParsedSpec,
+  lines: readonly ReferencedLine[],
+  deps: MatchQueryDeps,
+  config: MatcherConfig,
+  limit: number,
+): Answer {
+  const meta: ExplanationMeta = { compatibleCount: 0, disambiguateBy: [] };
+
+  const results = lines
+    .flatMap((line, rank) => {
+      // A SKU the catalog dropped is still what the customer ordered, so it is shown as
+      // inactive rather than hidden; one the catalog never had cannot be shown at all.
+      const item = deps.catalog.bySku(line.sku);
+      if (item === undefined) return [];
+
+      return [
+        labelled(
+          {
+            sku: item.sku,
+            catalogId: item.catalogId,
+            description: item.description,
+            active: item.active,
+            confidence: line.confidence,
+            explanation: withPersonalization(explainMatch(spec, item, meta), {
+              reason: orderedReason(line.quantity, line.orderDate),
+              prior: 1,
+            }),
+            // Rank is the whole of the evidence, and nothing weighted these against each
+            // other the way a prior over C would.
+            components: { compatibility: config.historyDecayPerRank ** rank, prior: 1 },
+          },
+          config,
+        ),
+      ];
+    })
+    .slice(0, limit);
+
+  return {
+    status: 'history',
+    compatibleCount: 0,
+    results,
+    alternatives: [],
+    notes: notesFor(spec, undefined),
+  };
+}
+
+function changeOf(spec: ParsedSpec, attribute: AttributeName): AttributeChange | [] {
+  const value =
+    attribute === 'material'
+      ? spec.material && formatMaterial(spec.material.value)
+      : attribute === 'finish'
+        ? spec.finish && formatFinish(spec.finish.value)
+        : attribute === 'standard'
+          ? spec.standard
+          : attribute === 'length'
+            ? spec.length && formatLength(spec.length)
+            : undefined;
+
+  return value === undefined ? [] : { attr: attribute, value };
+}
+
+/** Everything the query states about attributes, once the intent has had its say. */
+function attributeAnswer(
+  query: string,
+  spec: ParsedSpec,
+  deps: MatchQueryDeps,
+  config: MatcherConfig,
+  limit: number,
+  profile: CustomerProfile | undefined,
+  carried: readonly Note[],
+): Answer {
+  const items = deps.catalog.active();
+  const compatible = compatibleSet(spec, items);
+  const status = deriveStatus(spec, compatible);
+
+  const answer =
+    status === 'unparsed'
+      ? unparsed(query, spec, deps, config, limit)
+      : status === 'none'
+        ? none(spec, items, config, limit)
+        : ranked(status, spec, compatible, config, limit, profile);
+
+  const added = [...carried, ...discontinuedNotes(profile, spec)];
+
+  return added.length === 0 ? answer : { ...answer, notes: [...answer.notes, ...added] };
+}
 
 function answerFor(
   request: MatchRequest,
@@ -217,27 +359,45 @@ function answerFor(
 ): Answer {
   const { spec, intentCandidates } = parse;
   const limit = request.limit ?? DEFAULT_LIMIT;
+  const profile = request.customerId === undefined ? undefined : deps.profile?.(request.customerId);
 
-  // Intent routing arrives with personalization (PRG-26). Without a customer there is
-  // nothing to route to, and the documented answer is the prompt. docs/DESIGN.md 7.4.
-  if (intentCandidates.length > 0 && request.customerId === undefined) {
-    return {
-      status: 'history',
-      compatibleCount: 0,
-      results: [],
-      alternatives: [],
-      notes: [customerRequiredNote(mostSpecific(intentCandidates))],
-    };
+  const { phrase } = detectIntent(intentCandidates);
+  if (phrase === undefined) {
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, []);
   }
 
-  const items = deps.catalog.active();
-  const compatible = compatibleSet(spec, items);
-  const status = deriveStatus(spec, compatible);
+  const reference = resolveReference(
+    request.customerId === undefined ? undefined : deps.history?.byCustomer(request.customerId),
+    spec,
+    config,
+  );
 
-  if (status === 'unparsed') return unparsed(request.query, spec, deps, config, limit);
-  if (status === 'none') return none(spec, items, config, limit);
+  if (reference.form === 'override') {
+    const changes = reference.changed.flatMap((attribute) => changeOf(reference.spec, attribute));
 
-  return ranked(status, spec, compatible, config, limit);
+    return attributeAnswer(request.query, reference.spec, deps, config, limit, profile, [
+      historyReferenceNote(reference.base.orderDate, changes),
+    ]);
+  }
+
+  if (reference.form === 'pure') {
+    return referencedOrders(spec, reference.lines, deps, config, limit);
+  }
+
+  // No customer: the reference cannot be resolved, but a query that also asks for a
+  // change still has attributes the pipeline can answer. docs/DESIGN.md 7.4.
+  const prompt = customerRequiredNote(phrase);
+  if (statesOverride(spec)) {
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, [prompt]);
+  }
+
+  return {
+    status: 'history',
+    compatibleCount: 0,
+    results: [],
+    alternatives: [],
+    notes: [prompt],
+  };
 }
 
 export function matchQuery(deps: MatchQueryDeps): (request: MatchRequest) => MatchResponse {
