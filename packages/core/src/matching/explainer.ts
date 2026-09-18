@@ -396,3 +396,26 @@ export function tieBanner(
 export function overrideReason(preferred: readonly string[]): string {
   return `history prefers ${preferred.join(' ')}; overridden by the query`;
 }
+
+export function repeatReason(count: number, lastOrderDate: string): string {
+  return `bought ${String(count)}x, last ${lastOrderDate}`;
+}
+
+/** What earns an active item part of a discontinued purchase's weight. docs/DESIGN.md 7.2. */
+export function siblingReason(sku: string): string {
+  return `shares diameter, type and material family with ${sku}`;
+}
+
+/** The set, not the item, is what failed: no compatible item carries the value this
+ * customer buys, so the attribute contributes nothing to the ranking. */
+export function unmatchedReason(attribute: AttributeName, preferred: string): string {
+  return `no ${preferred} in the compatible set; ${attribute} could not be matched`;
+}
+
+export function preferenceReason(preferred: readonly string[]): string {
+  return `history prefers ${preferred.join(' ')}`;
+}
+
+export function orderedReason(quantity: number, orderDate: string): string {
+  return `ordered ${String(quantity)} on ${orderDate}`;
+}

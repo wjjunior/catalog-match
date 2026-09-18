@@ -7,7 +7,7 @@ import type { HistoryLine } from '../domain/catalog';
 import type { ParsedSpec } from '../domain/spec';
 import { DEFAULT_MATCHER_CONFIG as config } from '../matching/config';
 import { parseQuery } from '../parsing/queryParser';
-import { resolveReference, type ReferencedLine } from './historyReference';
+import { resolveReference, statesOverride, type ReferencedLine } from './historyReference';
 
 const W8 = 'M8-1.25 FLAT WASHER ISO 7380 18-8 SS PLAIN';
 const W16 = 'M16-2.0 FLAT WASHER ISO 7380 18-8 SS PLAIN';
@@ -258,5 +258,20 @@ describe('the real files', () => {
 
   it('returns the same reference for the same query', () => {
     expect(washersOf('CUST-002')).toEqual(washersOf('CUST-002'));
+  });
+});
+
+describe('a query that asks for a change', () => {
+  const asks = (query: string): boolean => statesOverride(specOf(query));
+
+  it('is one that states an attribute the referenced order cannot supply', () => {
+    expect(asks('same washers as last time, but brass')).toBe(true);
+    expect(asks('reorder the M8 washers in DIN 912')).toBe(true);
+  });
+
+  it('is not one whose only attributes select which orders the reference names', () => {
+    expect(asks('the same washers as last time')).toBe(false);
+    expect(asks('reorder')).toBe(false);
+    expect(asks('the same M8 washers as last time')).toBe(false);
   });
 });
