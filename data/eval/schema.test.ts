@@ -156,4 +156,38 @@ describe('golden.jsonl', () => {
     const row = cases.find((one) => one.id === 'ex-01');
     expect(row?.expected).toHaveLength(7);
   });
+
+  it('holds 21 personalized rows, each with a customer and a rationale', () => {
+    const personalized = cases.filter((row) => row.id.startsWith('pers-'));
+    expect(personalized).toHaveLength(21);
+    for (const row of personalized) {
+      expect(row.customerId).not.toBeNull();
+      expect(row.rationale?.trim()).toBeTruthy();
+    }
+  });
+
+  it('names a customer that appears in the order history', () => {
+    const history = new Set(
+      parseCsv(readFileSync(new URL('../order_history.csv', import.meta.url), 'utf8')).map(
+        (row) => row.customer_id,
+      ),
+    );
+    const named = cases.map((row) => row.customerId).filter((id) => id !== null);
+    expect(named.filter((id) => !history.has(id))).toEqual([]);
+  });
+
+  it('covers all five customers on the M8 flat washer showcase', () => {
+    const showcase = cases.filter(
+      (row) => row.query === 'M8 flat washer' && row.customerId !== null,
+    );
+    expect(showcase.map((row) => row.customerId).sort()).toEqual([
+      'CUST-001',
+      'CUST-002',
+      'CUST-003',
+      'CUST-004',
+      'CUST-005',
+    ]);
+    // docs/DESIGN.md 3.3: five customers, four distinct answers.
+    expect(new Set(showcase.map((row) => row.expectedTop1)).size).toBe(4);
+  });
 });
