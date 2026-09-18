@@ -318,7 +318,9 @@ q_i      = λ_c · h_i + (1 − λ_c) / |C|                  the prior used in s
 
 The prior is a distribution over C: a mixture of the history-derived distribution and the uniform one, weighted by how much history there is. It contains no free scale parameter that could be tuned to promise a label; the only parameters are the recency horizon, the shrinkage constant and the smoothing pseudo-count.
 
-Worked figures for "M8 flat washer" and CUST-002 under these initial parameters, measured by the profile builder over the real file: n_eff 8.29 of 17 lines after recency weighting, λ_c 0.62, material and finish shares for 18-8 SS and plain 0.78, the SS plain washer bought twice gets repeat weight 1. Its posterior comes out near 0.65 to 0.70 and the other six near 0.05. Whether that sits above the High threshold is decided by calibration, not asserted here. For CUST-005, n_eff is 2.71, λ_c 0.35, and the single earlier purchase of the same SKU makes it top-1 with a modest margin.
+Worked figures for "M8 flat washer" and CUST-002 under these initial parameters, measured by the profile builder over the real file: n_eff 8.29 of 17 lines after recency weighting, λ_c 0.62, material and finish shares for 18-8 SS and plain 0.78, the SS plain washer bought twice gets repeat weight 1. Its posterior comes out near 0.65 to 0.70 and the other six near 0.05. Whether that sits above the High threshold is decided by calibration, not asserted here. Measured over the seven active M8 flat washers, q gives that washer 0.663 against 0.065 for the next one, a margin of 10.2x; for CUST-004, where no washer is alloy, only the finish share acts and the A2 SS black oxide washer reaches 0.544 against 0.076, a margin of 7.2x.
+
+For CUST-005, n_eff is 2.71 and λ_c 0.35, and the mixture stays close to uniform: q spreads only from 0.188 to 0.105. The single earlier purchase of the 18-8 SS plain washer does not carry it to the top — the brass zinc washer edges it, 0.188 against 0.178 — because two of those six lines are brass and two are zinc against one line of 18-8 SS plain, and at this n_eff the shares outweigh one repeat. That is the shrinkage doing its work, not a defect, and it is why the sparse case is tested for near-uniformity rather than for a winner.
 
 ## 7.3 Rules
 
@@ -343,7 +345,7 @@ Without a customer, the response carries no matches, status history and the note
 | New or unselected customer | M8 flat washer, no customer | λ_c = 0; identical to the base result |
 | Strong profile with a repeat purchase | M8 flat washer, CUST-002 | 18-8 SS plain washer top-1 with a clear margin; reason "bought 2x, last 2026-04-15" |
 | Profile without a compatible material | M8 flat washer, CUST-004 | No alloy M8 flat washer; only the finish share acts; A2 SS black oxide washer top-1 with a small margin; explanation says material could not be matched |
-| Sparse and conflicting history | M8 flat washer, CUST-005 | Small λ_c; the single earlier purchase makes the 18-8 SS plain washer top-1 with a modest margin |
+| Sparse and conflicting history | M8 flat washer, CUST-005 | Small λ_c; the prior stays close to uniform (q from 0.188 to 0.105) and no item separates from the rest |
 | Conflict between query and history | brass hex nut 1/2-13, CUST-004 | Brass items only; override shown in the explanation |
 | Explicit standard against a repeat purchase | M8 flat washer DIN 912, CUST-002 | Unique: the DIN 912 washer; the ISO 7380 washer bought twice is outside C and cannot appear above it |
 | Discontinued history item | M16 hex nut, CUST-002 | Inactive SKU excluded; discontinued note; stainless-family nut gets repeat weight 0.5 |
