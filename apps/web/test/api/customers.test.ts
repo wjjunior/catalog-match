@@ -66,7 +66,7 @@ describe('GET /api/customers', () => {
     await expect(get().json()).resolves.toEqual(reversed);
   });
 
-  it('refuses to answer while no core is wired', () => {
-    expect(() => get()).toThrow(/not wired/i);
+  it('answers from the real core when no stub is injected', async () => {
+    await expect(get().json()).resolves.toHaveLength(5);
   });
 });

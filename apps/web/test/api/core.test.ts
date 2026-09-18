@@ -1,6 +1,8 @@
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { getCore, setCoreForTests } from '../../server/core';
+import { findDataDir, getCore, setCoreForTests } from '../../server/core';
 import { stubCore } from './fixtures';
 
 afterEach(() => {
@@ -8,10 +10,6 @@ afterEach(() => {
 });
 
 describe('the core seam', () => {
-  it('refuses to answer before a core is wired', () => {
-    expect(() => getCore()).toThrow(/not wired/i);
-  });
-
   it('hands back the injected core', () => {
     const stub = stubCore();
     setCoreForTests(stub);
@@ -19,10 +17,28 @@ describe('the core seam', () => {
     expect(getCore()).toBe(stub);
   });
 
-  it('forgets the injected core once it is cleared', () => {
+  it('falls back to the real core once the injection is cleared', () => {
     setCoreForTests(stubCore());
     setCoreForTests(undefined);
 
-    expect(() => getCore()).toThrow(/not wired/i);
+    expect(getCore().listCustomers()).toHaveLength(5);
+  });
+
+  it('builds the real core once and hands back the same instance', () => {
+    expect(getCore()).toBe(getCore());
+  });
+});
+
+describe('findDataDir', () => {
+  it('finds the data directory from the repository root', () => {
+    expect(findDataDir(process.cwd())).toMatch(/data$/);
+  });
+
+  it('finds the same directory from the web app below it', () => {
+    expect(findDataDir(join(process.cwd(), 'apps', 'web'))).toBe(findDataDir(process.cwd()));
+  });
+
+  it('names where it started when no data directory is above', () => {
+    expect(() => findDataDir('/')).toThrow(/Could not find data\/catalog\.csv in \//);
   });
 });

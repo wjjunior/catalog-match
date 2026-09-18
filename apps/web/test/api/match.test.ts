@@ -112,7 +112,10 @@ describe('POST /api/match', () => {
     expect(core.matchCalls).toEqual([]);
   });
 
-  it('refuses to answer while no core is wired', async () => {
-    await expect(postJson({ query: 'm8 bolt' })).rejects.toThrow(/not wired/i);
+  it('answers from the real core when no stub is injected', async () => {
+    const response = await postJson({ query: '1/4-20 x 3/4 hex cap screw zinc' });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ status: 'unique' });
   });
 });
