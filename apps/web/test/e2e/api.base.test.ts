@@ -106,12 +106,16 @@ describe('the wire carries what the catalog holds', () => {
 // unreadable, and the contract is that it never becomes a 500.
 describe('text the parser cannot read', () => {
   it.each(['qqq zzz nothing here', '!!!', 'the quick brown fox'])(
-    'answers %s with 200 and a valid body',
+    'answers %s with 200 and the unparsed status',
     async (query) => {
       const response = await post({ query });
 
       expect(response.status).toBe(200);
-      expect(matchResponseSchema.safeParse(await response.json()).success).toBe(true);
+
+      const body = (await response.json()) as MatchResponse;
+
+      expect(matchResponseSchema.safeParse(body).success).toBe(true);
+      expect(body.status).toBe('unparsed');
     },
   );
 });
