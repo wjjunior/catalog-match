@@ -137,6 +137,7 @@ describe('matcher config defaults', () => {
     expect(DEFAULT_MATCHER_CONFIG.familyCredit).toBe(0.8);
     expect(DEFAULT_MATCHER_CONFIG.fuzzyStrength).toBe(0.9);
     expect(DEFAULT_MATCHER_CONFIG.termStrengths).toEqual({
+      shortForm: 0.9,
       weak: 0.7,
       generic: 0.6,
       ambiguous: 0.5,

@@ -12,6 +12,8 @@ export type BackoffStep = (typeof BACKOFF_STEPS)[number];
 /** Credit for a term that identifies an attribute weakly, named so the lexicon can
  * reference a level instead of repeating a number: "washer" is generic, "bolt" ambiguous. */
 export interface TermStrengths {
+  /** A term that shortens a value with no rival: "yellow" can only be yellow zinc. */
+  readonly shortForm: number;
   readonly weak: number;
   readonly generic: number;
   readonly ambiguous: number;
@@ -55,6 +57,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   familyCredit: 0.8,
   fuzzyStrength: 0.9,
   termStrengths: {
+    shortForm: 0.9,
     weak: 0.7,
     generic: 0.6,
     ambiguous: 0.5,
