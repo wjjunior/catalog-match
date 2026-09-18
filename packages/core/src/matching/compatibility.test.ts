@@ -3,7 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { ITEMS } from '../../test/fixtures/items';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { ParsedSpec } from '../domain/spec';
-import { compatibleSet, deriveStatus, disambiguateBy, failedConstraint } from './compatibility';
+import { DEFAULT_MATCHER_CONFIG } from './config';
+import {
+  alternatives,
+  compatibleSet,
+  deriveStatus,
+  disambiguateBy,
+  failedConstraint,
+} from './compatibility';
+
+const CONFIG = DEFAULT_MATCHER_CONFIG;
 
 describe('fixtures', () => {
   it('holds seven active M8 flat washers and one discontinued', () => {
@@ -265,5 +274,98 @@ describe('failedConstraint', () => {
   it('is undefined for an empty catalog rather than blaming the first probe', () => {
     const spec = query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] });
     expect(failedConstraint(spec, [])).toBeUndefined();
+  });
+});
+
+describe('alternatives', () => {
+  it('falls through to dropping length for M8 x 45mm SHCS and ranks by distance', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+    });
+    const found = alternatives(spec, ITEMS, CONFIG);
+
+    expect(found).toHaveLength(8);
+    expect(found.slice(0, 3).map((a) => a.item.catalogId)).toEqual([
+      'CAT-0508',
+      'CAT-0004',
+      'CAT-0008',
+    ]);
+    expect(found[0]?.relaxed).toEqual(['length']);
+    expect(found[0]?.closeness).toBeCloseTo(2 / 3, 10);
+  });
+
+  it('offers the 16 mm hex cap screw for M8 x 3/4, not a 20 mm item', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'hex_cap_screw', strength: 1 }],
+      length: { value: 0.75, unit: 'in', mm: 19.05 },
+    });
+    const found = alternatives(spec, ITEMS, CONFIG);
+
+    expect(found.map((a) => a.item.catalogId)).toEqual(['CAT-0387']);
+    expect(found[0]?.item.spec.length?.mm).toBe(16);
+    expect(found[0]?.relaxed).toEqual(['length']);
+  });
+
+  it('never relaxes an unknown diameter', () => {
+    const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
+    expect(
+      alternatives(query({ diameter: m14, type: [{ value: 'hex_nut', strength: 1 }] }), ITEMS, CONFIG),
+    ).toEqual([]);
+  });
+
+  it('never relaxes an unrecognized type', () => {
+    const spec = query({
+      diameter: { system: 'imperial', nominal: '3/8', mm: 9.525, known: true },
+      residue: ['carriage', 'bolt'],
+      provenance: { type: 'unrecognized' },
+    });
+    expect(alternatives(spec, ITEMS, CONFIG)).toEqual([]);
+  });
+
+  it('stops at the first step, dropping an unmatched standard', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'flat_washer', strength: 1 }],
+      standard: 'DIN 999',
+    });
+    const found = alternatives(spec, ITEMS, CONFIG);
+
+    expect(found).toHaveLength(7);
+    expect(found[0]?.relaxed).toEqual(['standard']);
+    expect(found[0]?.closeness).toBeCloseTo(2 / 3, 10);
+    expect(found.map((a) => a.item.sku)).toEqual([...found.map((a) => a.item.sku)].sort());
+  });
+
+  it('widens a concrete material to its family at step two', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'flat_washer', strength: 1 }],
+      material: { value: 'ss_316', strength: 1 },
+      finish: { value: 'plain', strength: 1 },
+    });
+    const found = alternatives(spec, ITEMS, CONFIG);
+
+    expect(found.map((a) => a.item.catalogId)).toEqual(['CAT-0688']);
+    expect(found[0]?.relaxed).toEqual(['material', 'finish']);
+    expect(found[0]?.closeness).toBeCloseTo(2 / 4, 10);
+  });
+
+  it('returns nothing when there is no length to relax and no standard to drop', () => {
+    const m14 = { system: 'metric', nominal: 'M14', mm: 14, known: false } as const;
+    expect(alternatives(query({ diameter: m14 }), ITEMS, CONFIG)).toEqual([]);
+  });
+
+  it('is independent of input order', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+    });
+    const forward = alternatives(spec, ITEMS, CONFIG).map((a) => a.item.catalogId);
+    const reversed = alternatives(spec, [...ITEMS].reverse(), CONFIG).map((a) => a.item.catalogId);
+    expect(reversed).toEqual(forward);
   });
 });

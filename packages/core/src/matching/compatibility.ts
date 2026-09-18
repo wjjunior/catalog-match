@@ -4,6 +4,7 @@ import type { CatalogItem } from '../domain/catalog';
 import type { MatchStatus } from '../domain/match';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
+import type { BackoffStep, MatcherConfig } from './config';
 
 export type Satisfaction = 'exact' | 'family' | 'no';
 
@@ -216,4 +217,81 @@ export function disambiguateBy(compatible: readonly CatalogItem[]): AttributeNam
     const key = attributeKey(first, attr);
     return rest.some((item) => attributeKey(item, attr) !== key);
   });
+}
+
+export interface AlternativeCandidate {
+  item: CatalogItem;
+  closeness: number;
+  relaxed: string[];
+}
+
+function applyStep(
+  step: BackoffStep,
+  spec: ParsedSpec,
+  options: BuildOptions,
+  relaxed: string[],
+  config: MatcherConfig,
+): void {
+  switch (step) {
+    case 'standard':
+      options.dropStandard = true;
+      if (spec.standard !== undefined) relaxed.push('standard');
+      return;
+    case 'materialFinishFamily':
+      options.widenMaterialFinish = true;
+      // A query that already names a family loses nothing by being widened.
+      if (spec.material && isMaterial(spec.material.value)) relaxed.push('material');
+      if (spec.finish && isFinish(spec.finish.value)) relaxed.push('finish');
+      return;
+    case 'approximateLength':
+      options.length = 'approximate';
+      options.lengthTolerance = config.lengthTolerance;
+      if (spec.length !== undefined) relaxed.push('length');
+      return;
+    case 'dropLength':
+      options.length = 'drop';
+      return;
+  }
+}
+
+function rankByLengthDistance(
+  found: readonly CatalogItem[],
+  spec: ParsedSpec,
+): readonly CatalogItem[] {
+  const target = spec.length?.mm;
+  if (target === undefined) return [...found].sort(bySku);
+  const distance = (item: CatalogItem): number =>
+    item.spec.length === undefined ? Number.POSITIVE_INFINITY : Math.abs(item.spec.length.mm - target);
+  return [...found].sort((a, b) => distance(a) - distance(b) || bySku(a, b));
+}
+
+export function alternatives(
+  spec: ParsedSpec,
+  items: readonly CatalogItem[],
+  config: MatcherConfig,
+): readonly AlternativeCandidate[] {
+  const failed = failedConstraint(spec, items);
+  if (failed === 'diameter' || failed === 'type') return [];
+
+  const specified = buildConstraints(spec).length;
+  if (specified === 0) return [];
+
+  const active = items.filter((item) => item.active);
+  const options: BuildOptions = {};
+  const relaxed: string[] = [];
+
+  for (const step of config.backoffOrder) {
+    applyStep(step, spec, options, relaxed, config);
+    const constraints = buildConstraints(spec, options);
+    const found = active.filter((item) => constraints.every((c) => c.satisfiedBy(item) !== 'no'));
+    if (found.length > 0) {
+      const closeness = (specified - relaxed.length) / specified;
+      return rankByLengthDistance(found, spec).map((item) => ({
+        item,
+        closeness,
+        relaxed: [...relaxed],
+      }));
+    }
+  }
+  return [];
 }
