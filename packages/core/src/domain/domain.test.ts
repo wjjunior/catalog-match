@@ -145,7 +145,7 @@ describe('matcher config defaults', () => {
     });
   });
 
-  it('carries the thresholds calibration measured, no longer provisional', () => {
+  it('carries the measured label thresholds, no longer provisional', () => {
     expect(DEFAULT_MATCHER_CONFIG.labels).toEqual({
       high: 0.8,
       medium: 0.35,

@@ -210,11 +210,11 @@ CUST-005 is the case DESIGN 7.5 quotes numerically as "q from 0.188 to 0.105". T
 was measured against `alpha` 0.5 and is now 0.178–0.114. The prose expectation still
 holds; the two figures are stale and belong to the final pass over DESIGN (PRG-39).
 
-## What tuning could not fix
+## The four cases that were failing
 
-Four golden cases fail, and no parameter value reaches any of them. They were left alone
-rather than tuned around, and none of them is a wrong expectation that this card may
-quietly rewrite.
+One of them, `pers-05`, was reachable by a parameter, and `alpha` fixed it. No value
+reaches the other three: they still fail, and they were left alone rather than tuned
+around. None of them is a wrong expectation that this card may quietly rewrite.
 
 | case      | query                                  | expected  | actual               | why it is not a parameter                                                                                                                                                                                                                |
 | --------- | -------------------------------------- | --------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
