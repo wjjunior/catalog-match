@@ -45,13 +45,7 @@ Every assumption taken while implementing a card, tagged with the card key.
 - **DESIGN 3.1 states 10 colliding pairs without the standard; the file gives 11.** The
   tuple (diameter, length, type, material, finish) yields 949 distinct values over 960
   SKUs, not 950. The fully specified tuple does identify every SKU, as stated.
-- **`(diameter, type, length)` groups are counted only over rows carrying a length.**
-  Over all 960 SKUs there are 716 groups; the 48 difference is the three lengthless types
-  (nut, flat washer, lock washer) across the sixteen diameters. Only the restricted count
-  reproduces the document's 668 groups with 654 unique.
-- **Anchors carry a basis.** DESIGN 3.1 mixes the 1000 raw rows and the 960 deduplicated
-  SKUs without saying which each figure uses; the report states it per figure.
-- **The audit covers 3.1, 3.2 and one figure of 3.3, not all of 3.3.** The rest of DESIGN
-  3.3 concerns the 33 example queries, which this repository does not contain. The one
-  figure it can derive from the two CSVs alone, the 7 active compatible M8 flat washer
-  SKUs, is anchored; the query resolution and personalization claims are not.
+- **The audit covers 3.1, 3.2 and one figure of 3.3.** The rest of 3.3 is about how the 33
+  example queries resolve, which needs the parser and the matcher; this card may not import
+  `packages/core`, so it anchors only the figure derivable from the two CSVs alone: the 7
+  active compatible M8 flat washer SKUs.
