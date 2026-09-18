@@ -1,5 +1,5 @@
-import type { MaterialFamily } from '../domain/attributes';
-import { MATERIAL_FAMILY } from '../domain/attributes';
+import type { Material, MaterialFamily } from '../domain/attributes';
+import { MATERIAL_FAMILY, MATERIALS } from '../domain/attributes';
 import type { CatalogItem, CustomerProfile, Purchase } from '../domain/catalog';
 import type { HistoryPrior } from '../domain/contracts';
 import type { ParsedSpec } from '../domain/spec';
@@ -43,10 +43,12 @@ function valueOf(spec: ParsedSpec, name: ShareName): string | undefined {
   }
 }
 
-const familyOf = (value: string | undefined): MaterialFamily | undefined =>
-  value === undefined
-    ? undefined
-    : (MATERIAL_FAMILY as Readonly<Record<string, MaterialFamily | undefined>>)[value];
+const isMaterial = (value: string): value is Material =>
+  (MATERIALS as readonly string[]).includes(value);
+
+/** A generic term parses to the family itself, so the value may already be one. */
+const familyOf = (value: Material | MaterialFamily | undefined): MaterialFamily | undefined =>
+  value === undefined ? undefined : isMaterial(value) ? MATERIAL_FAMILY[value] : value;
 
 /** Diameter, type and material family: what docs/BRIEF.md 8 calls sharing enough with a
  * discontinued purchase to inherit part of its weight. */

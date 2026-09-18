@@ -132,6 +132,24 @@ describe('the repeat weight', () => {
     expect(reasons.get('ST')?.discontinuedSibling).toBeUndefined();
   });
 
+  it('credits the siblings of a purchase whose material was read at family level', () => {
+    const family = { value: 'stainless', strength: config.familyCredit } as const;
+    const profile = withRetiredSibling({
+      purchases: {
+        OLD: {
+          count: 1,
+          lastOrderDate: '2025-12-02',
+          spec: { ...RETIRED.spec, material: family },
+        },
+      },
+    });
+
+    expect(historyPrior(profile, M16_NUT, M16_NUTS, config).reasons.get('A2')).toMatchObject({
+      discontinuedSibling: 'OLD',
+      repeat: config.siblingCredit,
+    });
+  });
+
   it('never lowers a weight the customer earned by buying the item itself', () => {
     const { reasons } = historyPrior(
       withRetiredSibling({ repeats: { A2: 1 } }),

@@ -312,7 +312,7 @@ w_line   = exp(−age_days / τ),   τ = 180 days
 n_eff    = Σ w_line                                   effective history size
 λ_c      = n_eff / (n_eff + k),   k = 5                shrinkage; λ_c = 0 for an unknown or unselected customer
 P(v | c) = (Σ w_line · [attribute = v] + α) / (n_eff + α · V)     α = 0.5, V = number of catalog values of the attribute
-h_i      ∝ (1 + w_sku · repeat_i) · Π_{a unspecified in the query} P(a_i | c)      normalized over C; w_sku = 2; repeat_i = recency-weighted purchases of SKU i, capped at 1
+h_i      ∝ (1 + w_sku · repeat_i) · Π_{a unspecified in the query} P(a_i | c)      normalized over C; w_sku = 2; repeat_i = recency-weighted purchases of SKU i, capped at 1, and at least 0.5 for an active item sharing diameter, type and material family with a discontinued purchased SKU
 q_i      = λ_c · h_i + (1 − λ_c) / |C|                  the prior used in section 5.5
 ```
 
