@@ -86,7 +86,9 @@ export function score(index: LexicalIndex, queryTokens: readonly string[]): Scor
   const best = ranked.reduce((highest, entry) => Math.max(highest, entry.score), 0);
   for (const entry of ranked) entry.score /= best;
 
-  return ranked.sort((a, b) => b.score - a.score || a.sku.localeCompare(b.sku));
+  // Code units, not `localeCompare`: the latter follows the runner's locale, and
+  // Lithuanian collates `Y` between `I` and `J`, which would reorder tied skus.
+  return ranked.sort((a, b) => b.score - a.score || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
 }
 
 /** The baseline of docs/DESIGN.md 10.4: the same scoring the parser falls back to, run
