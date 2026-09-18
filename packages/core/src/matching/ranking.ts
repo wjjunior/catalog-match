@@ -2,6 +2,7 @@ import type { Finish, FinishFamily, Material, MaterialFamily } from '../domain/a
 import { FINISH_FAMILY, MATERIAL_FAMILY } from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type { ParsedSpec, Weighted } from '../domain/spec';
+import { sameLength } from './compatibility';
 import type { MatcherConfig } from './config';
 
 /** The attributes s_i is a product over. docs/DESIGN.md 5.4. `pitch` is absent because a
@@ -16,10 +17,6 @@ export const RANKED_ATTRIBUTES = [
 ] as const;
 
 export type RankedAttribute = (typeof RANKED_ATTRIBUTES)[number];
-
-/** Millimetre lengths are reached by unit conversion, so 3/4in arrives as
- * 19.049999999999997 and an exact comparison would read as a contradiction. */
-const LENGTH_EPSILON_MM = 1e-6;
 
 const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily | undefined =>
   (MATERIAL_FAMILY as Readonly<Record<string, MaterialFamily | undefined>>)[value];
@@ -80,7 +77,7 @@ export function attributeCredit(
       if (query.length === undefined) return 1;
       const held = item.spec.length;
       if (held === undefined) return 0;
-      return Math.abs(held.mm - query.length.mm) <= LENGTH_EPSILON_MM ? 1 : 0;
+      return sameLength(held.mm, query.length.mm) ? 1 : 0;
     }
 
     case 'type':

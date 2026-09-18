@@ -22,6 +22,11 @@ interface BuildOptions {
  * even when the last bit differs. Not a tunable, so it stays out of config.ts. */
 const mmKey = (mm: number): number => Math.round(mm * 1000);
 
+/** The one rule for two lengths being the same length. Ranking reads it from here rather
+ * than keeping a second one: a length the ranker judges differently is an item C admitted
+ * and ranking then refuses, which is a throw, not a low score. */
+export const sameLength = (a: number, b: number): boolean => mmKey(a) === mmKey(b);
+
 const isMaterial = (value: string): value is Material =>
   (MATERIALS as readonly string[]).includes(value);
 
@@ -75,7 +80,7 @@ function lengthConstraint(spec: ParsedSpec): Constraint | undefined {
     attr: 'length',
     satisfiedBy: (item) => {
       const i = item.spec.length;
-      return i !== undefined && mmKey(i.mm) === mmKey(q.mm);
+      return i !== undefined && sameLength(i.mm, q.mm);
     },
   };
 }
