@@ -62,7 +62,7 @@ Customers describe fasteners in their own words: abbreviations (SHCS, BHCS, HHB)
 | Length | Present on 100% of screws, bolts and rods; absent on 100% of nuts and washers. Units: inch mark (once omitted), FT, MM | Length nearly always disambiguates: (diameter, type, length) is unique for 654 of 668 groups |
 | Materials x finishes | 6 materials (STEEL, 18-8 SS, 316 SS, A2 SS, BRASS, ALLOY) x 6 finishes (ZINC, YELLOW ZINC, MECH ZINC, HDG, PLAIN, BLACK OXIDE); all 36 combinations exist | The attributes that remain open in nut and washer queries; personalization acts here |
 | Standards | 7 tokens on about 78% of rows, assigned independently of type (DIN 912 on washers, ISO 7380 on nuts) | Opaque attribute; a constraint only when the query names it; never implies a type |
-| Uniqueness | (diameter, length, type, material, finish, standard) identifies every SKU; without standard, 10 pairs collide | A fully specified query resolves to one SKU |
+| Uniqueness | (diameter, length, type, material, finish, standard) identifies every SKU; without standard, 11 pairs collide | A fully specified query resolves to one SKU |
 | Noise | 74 lowercase rows; irregular whitespace; separator X or x with or without spaces; abbreviation variants (HX, SCR, WSHR, SOC, BTN, PHIL, MACH, ZN, YEL, PLN) | Normalization layer shared by catalog and query parsing |
 | SKU encoding | PX + type code + digits + material code + finish code + sequence | Test oracle for the parser only, never a data source |
 
