@@ -190,4 +190,28 @@ describe('golden.jsonl', () => {
     // docs/DESIGN.md 3.3: five customers, four distinct answers.
     expect(new Set(showcase.map((row) => row.expectedTop1)).size).toBe(4);
   });
+
+  it('holds at least 20 adversarial rows covering every class', () => {
+    const adversarial = cases.filter((row) => row.id.startsWith('adv-'));
+    expect(adversarial.length).toBeGreaterThanOrEqual(20);
+    const classes = [
+      'unknown-diameter',
+      'unknown-type',
+      'unknown-length',
+      'residue',
+      'synonym',
+      'unit-form',
+      'typo',
+      'noise',
+      'casing',
+      'permutation',
+      'standard',
+    ] as const;
+    const covered = new Set(adversarial.flatMap((row) => row.tags));
+    expect(classes.filter((name) => !covered.has(name))).toEqual([]);
+  });
+
+  it('holds 78 rows in total', () => {
+    expect(cases).toHaveLength(78);
+  });
 });
