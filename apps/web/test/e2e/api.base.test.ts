@@ -1,8 +1,9 @@
-import type { Match, MatchResponse } from '@catalog-match/core';
+import type { Alternative, Match, MatchResponse } from '@catalog-match/core';
 import { describe, expect, it } from 'vitest';
 
 import { POST } from '../../app/api/match/route';
 import type {
+  Alternative as ClientAlternative,
   Match as ClientMatch,
   MatchResponse as ClientMatchResponse,
 } from '../../src/shared/api/client';
@@ -26,18 +27,19 @@ const match = async (query: string): Promise<MatchResponse> => {
   return (await response.json()) as MatchResponse;
 };
 
-type Assignable<From, To> = [From] extends [To] ? true : false;
+type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-// The client declares the wire contract by hand; this makes a divergence from the domain
-// types a compile error instead of a runtime surprise.
-const CONTRACT: [Assignable<MatchResponse, ClientMatchResponse>, Assignable<ClientMatch, Match>] = [
-  true,
-  true,
-];
+// The client declares the wire contract by hand; these make a divergence from the domain
+// types a compile error. `parsed` is out because the client narrows it to `unknown`.
+const CONTRACT: [
+  Mutual<Omit<MatchResponse, 'parsed'>, Omit<ClientMatchResponse, 'parsed'>>,
+  Mutual<Match, ClientMatch>,
+  Mutual<Alternative, ClientAlternative>,
+] = [true, true, true];
 
 describe('the client contract', () => {
-  it('stays assignable in both directions', () => {
-    expect(CONTRACT).toEqual([true, true]);
+  it('stays mutually assignable with the domain types', () => {
+    expect(CONTRACT).toEqual([true, true, true]);
   });
 });
 
