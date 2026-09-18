@@ -17,15 +17,18 @@ by SKU keeping the first `catalog_id`, `history` the order history file.
 | Fully lowercase descriptions | 74 | 74 | raw | match |
 | Product types | 10 types, 86 to 103 | 10 types, 86 to 103 | sku | match |
 | Diameters | 16 | 16 | sku | match |
+| Diameters with more than one pitch | 0 | 0 | sku | match |
 | Rows without a pitch | 1 | 1 | sku | match |
 | Materials | 6 | 6 | sku | match |
 | Finish surface forms | 12 | 12 | sku | match |
 | Material x finish combinations | 36 | 36 | sku | match |
+| Descriptions parsed | 960 | 960 | sku | match |
 | Standard tokens | 6 | 7 | sku | differs |
 | Full tuples | 960 | 960 | sku | match |
 | Tuples without the standard | 949 | 950 | sku | differs |
 | Length groups | 668 | 668 | sku | match |
 | Length groups that are unique | 654 | 654 | sku | match |
+| M8 flat washer, active compatible SKUs | 7 | 7 | sku | match |
 | History lines | 76 | 76 | history | match |
 | History customers | 5 | 5 | history | match |
 | First order date | 2025-07-20 | 2025-07-20 | history | match |
@@ -104,8 +107,8 @@ Rows carrying no pitch: 1.
 
 | Separator form | Rows |
 |---|---|
-| ` x ` | 41 |
 | ` X ` | 496 |
+| ` x ` | 41 |
 | `x` | 145 |
 
 ## Material x finish
@@ -151,20 +154,20 @@ Rows carrying no pitch: 1.
 
 ### Finish surface forms
 
-| Surface form | Rows |
-|---|---|
-| BLACK OXIDE | 155 |
-| HDG | 163 |
-| MECH ZINC | 126 |
-| MECH ZN | 29 |
-| PLAIN | 127 |
-| PLN | 30 |
-| YEL ZINC | 29 |
-| YEL ZN | 8 |
-| YELLOW ZINC | 82 |
-| YELLOW ZN | 41 |
-| ZINC | 130 |
-| ZN | 40 |
+| Surface form | Finish | Rows |
+|---|---|---|
+| BLACK OXIDE | BLACK OXIDE | 155 |
+| HDG | HDG | 163 |
+| MECH ZINC | MECH ZINC | 126 |
+| MECH ZN | MECH ZINC | 29 |
+| PLAIN | PLAIN | 127 |
+| PLN | PLAIN | 30 |
+| YEL ZINC | YELLOW ZINC | 29 |
+| YEL ZN | YELLOW ZINC | 8 |
+| YELLOW ZINC | YELLOW ZINC | 82 |
+| YELLOW ZN | YELLOW ZINC | 41 |
+| ZINC | ZINC | 130 |
+| ZN | ZINC | 40 |
 
 ## Standards
 
@@ -200,8 +203,10 @@ Independence shows as every standard appearing under every type.
 
 Fully lowercase descriptions: 74 raw, 71 deduped.
 Descriptions carrying any lowercase character: 215 raw.
-Rows with surrounding or repeated whitespace: 0.
-Descriptions the audit could not parse: 0.
+Rows with surrounding whitespace: 0.
+Rows with repeated whitespace: 0.
+Descriptions that failed to parse: 0.
+SKU type codes not recognized: 0.
 
 ## Order history
 

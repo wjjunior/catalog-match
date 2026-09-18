@@ -41,6 +41,10 @@ describe('parseCsv', () => {
 
     expect(parseCsv(text)).toEqual([{ a: 'x,y', b: 'z' }]);
   });
+
+  it('strips the carriage return of a CRLF file, which both data files use', () => {
+    expect(parseCsv('a,b\r\n1,2\r\n')).toEqual([{ a: '1', b: '2' }]);
+  });
 });
 
 describe('loading and dedupe', () => {
@@ -191,7 +195,8 @@ describe('catalogStats', () => {
   });
 
   it('reports repeated whitespace and the separator forms seen', () => {
-    expect(stats.whitespaceIrregular).toBe(1);
+    expect(stats.whitespaceSurrounding).toBe(0);
+    expect(stats.whitespaceRepeated).toBe(1);
     expect(stats.separatorForms.get(' X ')).toBe(2);
   });
 });
@@ -229,8 +234,8 @@ describe('historyStats', () => {
     expect(stats.inactiveSkusPurchased).toEqual(['PXNUT1216STZC0003']);
   });
 
-  it('shares material and finish, and the metric share, over a customer lines', () => {
-    expect(stats.byCustomer[0]?.materialShares.get('STEEL')).toBe(3);
+  it('counts material and finish, and shares the metric, over a customer lines', () => {
+    expect(stats.byCustomer[0]?.materialCounts.get('STEEL')).toBe(3);
     expect(stats.byCustomer[0]?.metricShare).toBe(0);
     expect(stats.byCustomer[1]?.metricShare).toBe(0.5);
   });

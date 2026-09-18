@@ -16,7 +16,6 @@ export type HistoryRow = {
   orderDate: string;
   sku: string;
   description: string;
-  quantity: number;
 };
 
 export function parseCsv(text: string): CsvRow[] {
@@ -81,7 +80,6 @@ export function toHistoryRows(rows: CsvRow[]): HistoryRow[] {
     orderDate: row.order_date ?? '',
     sku: row.sku ?? '',
     description: row.catalog_description ?? '',
-    quantity: Number(row.quantity ?? '0'),
   }));
 }
 
@@ -191,9 +189,9 @@ export function parseDescription(description: string): Parsed | null {
   const length = LENGTH.exec(rest);
   if (length !== null) rest = rest.slice(length[0].length).trim();
 
-  const standard = STANDARD.exec(` ${rest}`);
-  const typePhrase =
-    standard === null ? rest : rest.slice(0, rest.length - (standard[0].length - 1)).trim();
+  const prefixed = ` ${rest}`;
+  const standard = STANDARD.exec(prefixed);
+  const typePhrase = standard === null ? rest : prefixed.slice(0, standard.index).trim();
 
   return {
     diameter: diameter[1],
@@ -230,8 +228,12 @@ export type CatalogStats = {
   lowercaseAllRaw: number;
   lowercaseAllSku: number;
   lowercaseAnyRaw: number;
-  whitespaceIrregular: number;
-  unparsed: string[];
+  whitespaceSurrounding: number;
+  whitespaceRepeated: number;
+  descriptionParseFailures: number;
+  unrecognizedSkuTypes: number;
+  unparsedRows: number;
+  m8FlatWasherActive: number;
   typePhrasesByType: Map<string, Map<string, number>>;
   diameterPitches: Map<string, Set<string>>;
   rowsWithoutPitch: number;
@@ -269,6 +271,10 @@ function nested(outer: Map<string, Map<string, number>>, key: string): Map<strin
   return inner;
 }
 
+// Locale-independent string ordering: localeCompare varies by system locale (e.g. Lithuanian
+// collates Y between I and J), which would reorder report rows and diff docs/data-profile.md.
+const byKey = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+
 export function catalogStats(raw: CatalogRow[]): CatalogStats {
   const bySku = dedupeBySku(raw);
   const inactive = raw.filter((row) => !row.active);
@@ -282,8 +288,15 @@ export function catalogStats(raw: CatalogRow[]): CatalogStats {
     lowercaseAllRaw: raw.filter((row) => caseForm(row.description) === 'all-lower').length,
     lowercaseAllSku: bySku.filter((row) => caseForm(row.description) === 'all-lower').length,
     lowercaseAnyRaw: raw.filter((row) => caseForm(row.description) !== 'all-upper').length,
-    whitespaceIrregular: raw.filter((row) => whitespaceIssues(row.description).length > 0).length,
-    unparsed: [],
+    whitespaceSurrounding: raw.filter((row) =>
+      whitespaceIssues(row.description).includes('surrounding'),
+    ).length,
+    whitespaceRepeated: raw.filter((row) => whitespaceIssues(row.description).includes('repeated'))
+      .length,
+    descriptionParseFailures: 0,
+    unrecognizedSkuTypes: 0,
+    unparsedRows: 0,
+    m8FlatWasherActive: 0,
     typePhrasesByType: new Map(),
     diameterPitches: new Map(),
     rowsWithoutPitch: 0,
@@ -311,10 +324,14 @@ export function catalogStats(raw: CatalogRow[]): CatalogStats {
 
     const parsed = parseDescription(row.description);
     const type = skuTypeCode(row.sku);
+    if (parsed === null) stats.descriptionParseFailures += 1;
+    if (type === null) stats.unrecognizedSkuTypes += 1;
     if (parsed === null || type === null) {
-      stats.unparsed.push(row.description);
+      stats.unparsedRows += 1;
       continue;
     }
+
+    if (parsed.diameter === 'M8' && type === 'WASH' && row.active) stats.m8FlatWasherActive += 1;
 
     bump(nested(stats.typePhrasesByType, type), parsed.typePhrase);
 
@@ -371,8 +388,8 @@ export type CustomerStats = {
   lines: number;
   orders: number;
   repeatSkus: number;
-  materialShares: Map<string, number>;
-  finishShares: Map<string, number>;
+  materialCounts: Map<string, number>;
+  finishCounts: Map<string, number>;
   metricShare: number;
 };
 
@@ -386,9 +403,9 @@ export type HistoryStats = {
   byCustomer: CustomerStats[];
 };
 
-export function historyStats(history: HistoryRow[], catalog: CatalogRow[]): HistoryStats {
-  const known = new Set(catalog.map((row) => row.sku));
-  const inactive = new Set(catalog.filter((row) => !row.active).map((row) => row.sku));
+export function historyStats(history: HistoryRow[], deduped: CatalogRow[]): HistoryStats {
+  const known = new Set(deduped.map((row) => row.sku));
+  const inactive = new Set(deduped.filter((row) => !row.active).map((row) => row.sku));
   const dates = history.map((row) => row.orderDate).sort();
 
   const grouped = new Map<string, HistoryRow[]>();
@@ -399,19 +416,19 @@ export function historyStats(history: HistoryRow[], catalog: CatalogRow[]): Hist
   }
 
   const byCustomer = [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => byKey(left, right))
     .map(([customerId, lines]) => {
       const skuCounts = new Map<string, number>();
-      const materialShares = new Map<string, number>();
-      const finishShares = new Map<string, number>();
+      const materialCounts = new Map<string, number>();
+      const finishCounts = new Map<string, number>();
       let metric = 0;
 
       for (const line of lines) {
         bump(skuCounts, line.sku);
         const parsed = parseDescription(line.description);
         if (parsed === null) continue;
-        bump(materialShares, parsed.material);
-        bump(finishShares, parsed.finish);
+        bump(materialCounts, parsed.material);
+        bump(finishCounts, parsed.finish);
         if (parsed.diameter.startsWith('M')) metric += 1;
       }
 
@@ -421,8 +438,8 @@ export function historyStats(history: HistoryRow[], catalog: CatalogRow[]): Hist
         lines: lines.length,
         orders: new Set(lines.map((line) => line.orderDate)).size,
         repeatSkus: [...skuCounts.values()].filter((count) => count > 1).length,
-        materialShares,
-        finishShares,
+        materialCounts,
+        finishCounts,
         metricShare: lines.length === 0 ? 0 : metric / lines.length,
       };
     });
@@ -478,15 +495,28 @@ export function compareAnchors(catalog: CatalogStats, history: HistoryStats): An
     anchor('Fully lowercase descriptions', String(catalog.lowercaseAllRaw), '74', 'raw'),
     anchor('Product types', typeRange, '10 types, 86 to 103', 'sku'),
     anchor('Diameters', String(catalog.diameterPitches.size), '16', 'sku'),
+    anchor(
+      'Diameters with more than one pitch',
+      String([...catalog.diameterPitches.values()].filter((pitches) => pitches.size > 1).length),
+      '0',
+      'sku',
+    ),
     anchor('Rows without a pitch', String(catalog.rowsWithoutPitch), '1', 'sku'),
     anchor('Materials', String(catalog.materialFinish.size), '6', 'sku'),
     anchor('Finish surface forms', String(catalog.finishSurfaces.size), '12', 'sku'),
     anchor('Material x finish combinations', String(combinations), '36', 'sku'),
+    anchor('Descriptions parsed', String(catalog.uniqueSkus - catalog.unparsedRows), '960', 'sku'),
     anchor('Standard tokens', String(catalog.standards.size), '7', 'sku'),
     anchor('Full tuples', String(catalog.fullTuples), '960', 'sku'),
     anchor('Tuples without the standard', String(catalog.tuplesWithoutStandard), '950', 'sku'),
     anchor('Length groups', String(catalog.lengthGroups), '668', 'sku'),
     anchor('Length groups that are unique', String(catalog.lengthGroupsUnique), '654', 'sku'),
+    anchor(
+      'M8 flat washer, active compatible SKUs',
+      String(catalog.m8FlatWasherActive),
+      '7',
+      'sku',
+    ),
     anchor('History lines', String(history.lines), '76', 'history'),
     anchor('History customers', String(history.customers), '5', 'history'),
     anchor('First order date', history.firstDate, '2025-07-20', 'history'),
@@ -529,7 +559,7 @@ function table(header: string[], rows: string[][]): string {
 }
 
 function sortedEntries(counter: Map<string, number>): [string, number][] {
-  return [...counter.entries()].sort(([left], [right]) => left.localeCompare(right));
+  return [...counter.entries()].sort(([left], [right]) => byKey(left, right));
 }
 
 export function renderReport(
@@ -570,7 +600,7 @@ export function renderReport(
     table(
       ['Type', 'SKUs', 'Phrase variants'],
       [...catalog.typePhrasesByType.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => byKey(left, right))
         .map(([type, phrases]) => [
           type,
           String([...phrases.values()].reduce((total, count) => total + count, 0)),
@@ -585,7 +615,7 @@ export function renderReport(
     table(
       ['Diameter', 'Pitch or TPI'],
       [...catalog.diameterPitches.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => byKey(left, right))
         .map(([diameter, pitches]) => [diameter, [...pitches].sort().join(', ') || '(none)']),
     ),
     '',
@@ -596,7 +626,7 @@ export function renderReport(
     table(
       ['Type', 'With a length', 'Without a length'],
       [...catalog.lengthPresenceByType.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => byKey(left, right))
         .map(([type, presence]) => [
           type,
           String(presence.withLength),
@@ -621,7 +651,7 @@ export function renderReport(
     table(
       ['Material', 'Finish', 'SKUs'],
       [...catalog.materialFinish.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => byKey(left, right))
         .flatMap(([material, finishes]) =>
           sortedEntries(finishes).map(([finish, count]) => [material, finish, String(count)]),
         ),
@@ -630,8 +660,12 @@ export function renderReport(
     '### Finish surface forms',
     '',
     table(
-      ['Surface form', 'Rows'],
-      sortedEntries(catalog.finishSurfaces).map(([form, count]) => [form, String(count)]),
+      ['Surface form', 'Finish', 'Rows'],
+      sortedEntries(catalog.finishSurfaces).map(([form, count]) => [
+        form,
+        FINISH_SURFACES.get(form) ?? '',
+        String(count),
+      ]),
     ),
     '',
     '## Standards',
@@ -651,7 +685,7 @@ export function renderReport(
     table(
       ['Type', 'Standards'],
       [...catalog.standardByType.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => byKey(left, right))
         .map(([type, standards]) => [
           type,
           sortedEntries(standards)
@@ -664,8 +698,10 @@ export function renderReport(
     '',
     `Fully lowercase descriptions: ${catalog.lowercaseAllRaw} raw, ${catalog.lowercaseAllSku} deduped.`,
     `Descriptions carrying any lowercase character: ${catalog.lowercaseAnyRaw} raw.`,
-    `Rows with surrounding or repeated whitespace: ${catalog.whitespaceIrregular}.`,
-    `Descriptions the audit could not parse: ${catalog.unparsed.length}.`,
+    `Rows with surrounding whitespace: ${catalog.whitespaceSurrounding}.`,
+    `Rows with repeated whitespace: ${catalog.whitespaceRepeated}.`,
+    `Descriptions that failed to parse: ${catalog.descriptionParseFailures}.`,
+    `SKU type codes not recognized: ${catalog.unrecognizedSkuTypes}.`,
     '',
     '## Order history',
     '',
@@ -691,10 +727,10 @@ export function renderReport(
         String(customer.orders),
         String(customer.repeatSkus),
         `${(customer.metricShare * 100).toFixed(0)}%`,
-        sortedEntries(customer.materialShares)
+        sortedEntries(customer.materialCounts)
           .map(([name, count]) => `${name} (${count})`)
           .join('; '),
-        sortedEntries(customer.finishShares)
+        sortedEntries(customer.finishCounts)
           .map(([name, count]) => `${name} (${count})`)
           .join('; '),
       ]),
