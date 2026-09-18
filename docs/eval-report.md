@@ -78,3 +78,34 @@ Measured at the limit the API serves, and the one number here that moves between
 |---|---|
 | p50 | 0.1 |
 | p95 | 0.5 |
+
+### Baseline comparison
+
+The lexical fallback of `docs/DESIGN.md` 5.8 run alone over the same cases: token overlap
+over normalized descriptions, with no parse, no compatible set and no customer. It calls a
+query unique when the runner-up trails the best hit by more than the configured gap, so
+`history` and `unparsed` are statuses it cannot produce at all — cases expecting one of
+those two: 7 of 78.
+Its set recovery is scored on as many top hits as the labeled set holds, the size of the
+answer handed to it for free, because it ranks every row a query token reaches and has no
+compatible set to cut.
+
+| metric | parser | baseline | cases |
+|---|---|---|---|
+| Hit@1 | 0.979 | 0.167 | 48 |
+| Hit@3 | 1.000 | 0.313 | 48 |
+| MRR | 0.990 | 0.268 | 48 |
+| Set precision | 1.000 | 0.118 | 30 |
+| Set recall | 0.983 | 0.118 | 30 |
+| Exact-set rate | 0.967 | 0.033 | 30 |
+| Status accuracy | 0.962 | 0.462 | 78 |
+
+Where the baseline puts each status, against the same expectations:
+
+| expected \ actual | unique | ambiguous | none | history | unparsed |
+|---|---|---|---|---|---|
+| unique | 7 | 22 | 0 | 0 | 0 |
+| ambiguous | 5 | 29 | 0 | 0 | 0 |
+| none | 0 | 8 | 0 | 0 | 0 |
+| history | 0 | 6 | 0 | 0 | 0 |
+| unparsed | 0 | 0 | 1 | 0 | 0 |
