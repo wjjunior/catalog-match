@@ -19,9 +19,9 @@ itself rather than against any label. See `docs/eval/golden-rationale.md`.
 
 | metric | value |
 |---|---|
-| Hit@1 | 0.979 |
+| Hit@1 | 1.000 |
 | Hit@3 | 1.000 |
-| MRR | 0.990 |
+| MRR | 1.000 |
 
 ### Recovery of the compatible set (30 cases)
 
@@ -51,9 +51,9 @@ Accuracy 0.962.
 
 | metric | value | cases |
 |---|---|---|
-| Hit@1 with the customer | 0.952 | 21 |
+| Hit@1 with the customer | 1.000 | 21 |
 | Hit@1 without the customer | 0.143 | 21 |
-| Mean top-1 to top-2 margin | 0.359 | 18 |
+| Mean top-1 to top-2 margin | 0.328 | 18 |
 
 ### Calibration (29 cases)
 
@@ -77,7 +77,7 @@ Measured at the limit the API serves, and the one number here that moves between
 | percentile | ms |
 |---|---|
 | p50 | 0.1 |
-| p95 | 0.5 |
+| p95 | 0.6 |
 
 ### Baseline comparison
 
@@ -92,20 +92,20 @@ compatible set to cut.
 
 | metric | parser | baseline | cases |
 |---|---|---|---|
-| Hit@1 | 0.979 | 0.167 | 48 |
+| Hit@1 | 1.000 | 0.167 | 48 |
 | Hit@3 | 1.000 | 0.313 | 48 |
-| MRR | 0.990 | 0.268 | 48 |
+| MRR | 1.000 | 0.268 | 48 |
 | Set precision | 1.000 | 0.118 | 30 |
 | Set recall | 0.983 | 0.118 | 30 |
 | Exact-set rate | 0.967 | 0.033 | 30 |
-| Status accuracy | 0.962 | 0.462 | 78 |
+| Status accuracy | 0.962 | 0.603 | 78 |
 
 Where the baseline puts each status, against the same expectations:
 
 | expected \ actual | unique | ambiguous | none | history | unparsed |
 |---|---|---|---|---|---|
-| unique | 7 | 22 | 0 | 0 | 0 |
-| ambiguous | 5 | 29 | 0 | 0 | 0 |
+| unique | 20 | 9 | 0 | 0 | 0 |
+| ambiguous | 7 | 27 | 0 | 0 | 0 |
 | none | 0 | 8 | 0 | 0 | 0 |
 | history | 0 | 6 | 0 | 0 | 0 |
 | unparsed | 0 | 0 | 1 | 0 | 0 |
