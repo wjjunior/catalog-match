@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { EXAMPLE_QUERIES } from '../../packages/core/test/fixtures/example-queries';
+import { dedupeBySku, parseCsv, toCatalogRows } from '../../scripts/profile';
 import { EvalCase } from './schema';
 
 const base = {
@@ -98,5 +101,59 @@ describe('EvalCase', () => {
 
   it('rejects a malformed customer id', () => {
     expect(parse({ customerId: 'CUST-2', rationale: 'r' }).success).toBe(false);
+  });
+});
+
+const rows = readFileSync(new URL('golden.jsonl', import.meta.url), 'utf8')
+  .split('\n')
+  .filter((line) => line.trim() !== '')
+  .map((line) => JSON.parse(line) as unknown);
+
+const cases = rows.map((row) => EvalCase.parse(row));
+
+const catalog = new Map(
+  dedupeBySku(
+    toCatalogRows(parseCsv(readFileSync(new URL('../catalog.csv', import.meta.url), 'utf8'))),
+  ).map((row) => [row.sku, row]),
+);
+
+describe('golden.jsonl', () => {
+  it('parses every line against the schema', () => {
+    expect(cases).toHaveLength(rows.length);
+  });
+
+  it('has unique ids', () => {
+    expect(new Set(cases.map((row) => row.id)).size).toBe(cases.length);
+  });
+
+  it('names only SKUs that exist in the catalog', () => {
+    const named = cases.flatMap((row) => [
+      ...row.expected,
+      ...(row.expectedAlternatives ?? []),
+      ...(row.expectedTop1 === undefined ? [] : [row.expectedTop1]),
+    ]);
+    expect(named.filter((sku) => !catalog.has(sku))).toEqual([]);
+  });
+
+  it('names only active SKUs unless the row is tagged discontinued', () => {
+    const offenders = cases
+      .filter((row) => !row.tags.includes('discontinued'))
+      .flatMap((row) => row.expected)
+      .filter((sku) => catalog.get(sku)?.active !== true);
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps the example queries identical to the parser fixtures', () => {
+    const examples = cases.filter((row) => row.id.startsWith('ex-'));
+    expect(examples.map((row) => row.query)).toEqual(EXAMPLE_QUERIES.map((row) => row.query));
+  });
+
+  it('holds 33 example rows', () => {
+    expect(cases.filter((row) => row.id.startsWith('ex-'))).toHaveLength(33);
+  });
+
+  it('reproduces the M8 flat washer anchor of docs/data-profile.md', () => {
+    const row = cases.find((one) => one.id === 'ex-01');
+    expect(row?.expected).toHaveLength(7);
   });
 });

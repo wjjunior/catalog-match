@@ -1,0 +1,33 @@
+{"id":"ex-01","query":"M8 flat washer","customerId":null,"expectedStatus":"ambiguous","expected":["PXWASH812A2YZ0016","PXWASH816A2BO0624","PXWASH82536HG0974","PXWASH825STYZ0009","PXWASH830BRZC0520","PXWASH850BRPL0440","PXWASH88088PL0688"],"tags":["example","tie"]}
+{"id":"ex-02","query":"5/16 hex nut","customerId":null,"expectedStatus":"ambiguous","expected":["PXNUT51612STMZ0742","PXNUT516288PL0853","PXNUT51634A2ZC0672","PXNUT5163ALBO0430","PXNUT5166ALPL0073"],"tags":["example","tie"]}
+{"id":"ex-03","query":"1/2 inch hex nut","customerId":null,"expectedStatus":"ambiguous","expected":["PXNUT12114ALBO0459","PXNUT1221288PL0768","PXNUT123BRZC0107","PXNUT124ALHG0394","PXNUT126A2BO0038"],"tags":["example","tie"]}
+{"id":"ex-04","query":"M6 hex nuts","customerId":null,"expectedStatus":"ambiguous","expected":["PXNUT62036HG0329","PXNUT630ALPL0250","PXNUT650STZC0196","PXNUT66088PL0165"],"tags":["example","tie"]}
+{"id":"ex-05","query":"SHCS 7/16 x 2-1/2","customerId":null,"expectedStatus":"unique","expected":["PXSOC716212STZC0375"],"tags":["example"]}
+{"id":"ex-06","query":"1/2 rod 6 foot","customerId":null,"expectedStatus":"unique","expected":["PXROD126STZC0002"],"tags":["example"]}
+{"id":"ex-07","query":"HHB 3/4-10 x 5/8","customerId":null,"expectedStatus":"unique","expected":["PXTAP3458STZC0384"],"tags":["example"]}
+{"id":"ex-08","query":"lock washer 5/8","customerId":null,"expectedStatus":"ambiguous","expected":["PXLOCK58112ALBO0018","PXLOCK581288HG0822","PXLOCK5821288BO0764","PXLOCK58288MZ0308","PXLOCK583436YZ0687","PXLOCK5858ALMZ0269","PXLOCK586BRPL0135"],"tags":["example","tie"]}
+{"id":"ex-09","query":"M8 x 16 hex cap screw","customerId":null,"expectedStatus":"unique","expected":["PXHEX816ALBO0387"],"tags":["example"]}
+{"id":"ex-10","query":"M16 threaded rod 60mm","customerId":null,"expectedStatus":"unique","expected":["PXROD1660ALBO0244"],"tags":["example"]}
+{"id":"ex-11","query":"5/8 flat washer","customerId":null,"expectedStatus":"ambiguous","expected":["PXWASH5811288BO0628","PXWASH582BRPL0834","PXWASH5834BRHG0035","PXWASH585836BO0319"],"tags":["example","tie"]}
+{"id":"ex-12","query":"M12 x 50mm button socket","customerId":null,"expectedStatus":"unique","expected":["PXBTN1250ALBO0083"],"tags":["example"]}
+{"id":"ex-13","query":"#8-32 lock washer","customerId":null,"expectedStatus":"ambiguous","expected":["PXLOCKN81236HG0052","PXLOCKN814BRPL0245","PXLOCKN82ALBO0198","PXLOCKN83436MZ0856","PXLOCKN8388BO0396","PXLOCKN838ALPL0386"],"tags":["example","tie"]}
+{"id":"ex-14","query":"1/4-20 x 3/4 hex cap screw zinc","customerId":null,"expectedStatus":"unique","expected":["PXHEX1434STZC0003"],"tags":["example"]}
+{"id":"ex-15","query":"M4 x 16mm socket head cap screw","customerId":null,"expectedStatus":"unique","expected":["PXSOC41688PL0685"],"tags":["example"]}
+{"id":"ex-16","query":"3/8 lag screw 1 inch","customerId":null,"expectedStatus":"unique","expected":["PXLAG381BRPL0136"],"tags":["example"]}
+{"id":"ex-17","query":"M5 x 30 threaded rod","customerId":null,"expectedStatus":"unique","expected":["PXROD530BRMZ0014"],"tags":["example"]}
+{"id":"ex-18","query":"7/16-14 phillips pan machine screw 1-1/4","customerId":null,"expectedStatus":"unique","expected":["PXPAN716114ALBO0029"],"tags":["example"]}
+{"id":"ex-19","query":"5/16-18 flat washer","customerId":null,"expectedStatus":"ambiguous","expected":["PXWASH5161236YZ0413","PXWASH51614ALMZ0371","PXWASH5162A2PL0501","PXWASH51634A2YZ0918","PXWASH51634STPL0006","PXWASH5163BRBO0195","PXWASH5164BRHG0664","PXWASH51658A2HG0289","PXWASH5166ALBO0279"],"tags":["example","tie"]}
+{"id":"ex-20","query":"M10 x 60mm lag screw","customerId":null,"expectedStatus":"unique","expected":["PXLAG1060BRZC0148"],"tags":["example"]}
+{"id":"ex-21","query":"M8 x 50mm BHCS","customerId":null,"expectedStatus":"unique","expected":["PXBTN850ALBO0100"],"tags":["example"]}
+{"id":"ex-22","query":"3/4-10 tap bolt 5/8","customerId":null,"expectedStatus":"unique","expected":["PXTAP3458STZC0384"],"tags":["example"]}
+{"id":"ex-23","query":"M12 hex nut","customerId":null,"expectedStatus":"ambiguous","expected":["PXNUT1212BRMZ0719","PXNUT121636ZC0022","PXNUT1216STZC0005","PXNUT1220ALHG0211","PXNUT122536PL0551","PXNUT1230ALMZ0572","PXNUT126036ZC0632","PXNUT1280STBO0051","PXNUT128BRBO0519"],"tags":["example","tie"]}
+{"id":"ex-24","query":"1/2-13 x 3 lag screw","customerId":null,"expectedStatus":"unique","expected":["PXLAG12388PL0842"],"tags":["example"]}
+{"id":"ex-25","query":"M6 x 50mm tap bolt","customerId":null,"expectedStatus":"unique","expected":["PXTAP65088PL0765"],"tags":["example"]}
+{"id":"ex-26","query":"#10-24 x 1/2 threaded rod","customerId":null,"expectedStatus":"unique","expected":["PXRODN1012ALBO0215"],"tags":["example"]}
+{"id":"ex-27","query":"5/8-11 x 3/8 lag screw","customerId":null,"expectedStatus":"unique","expected":["PXLAG5838BRZC0087"],"tags":["example"]}
+{"id":"ex-28","query":"M16 x 8mm pan head machine screw","customerId":null,"expectedStatus":"unique","expected":["PXPAN168BRHG0076"],"tags":["example"]}
+{"id":"ex-29","query":"3/8-16 x 4 hex bolt","customerId":null,"expectedStatus":"unique","expected":["PXHEX384BRMZ0072"],"tags":["example"]}
+{"id":"ex-30","query":"M4 hex nut","customerId":null,"expectedStatus":"ambiguous","expected":["PXNUT412STYZ0125","PXNUT450ALBO0180"],"tags":["example","tie"]}
+{"id":"ex-31","query":"M8 x 50mm button socket cap screw alloy black oxide","customerId":null,"expectedStatus":"unique","expected":["PXBTN850ALBO0100"],"tags":["example"]}
+{"id":"ex-32","query":"brass hex nut 1/2-13","customerId":null,"expectedStatus":"unique","expected":["PXNUT123BRZC0107"],"tags":["example"]}
+{"id":"ex-33","query":"the same washers as last time","customerId":null,"expectedStatus":"history","expected":[],"tags":["example","history-reference"]}
