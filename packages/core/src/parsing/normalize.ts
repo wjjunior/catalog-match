@@ -31,6 +31,10 @@ const LEADING_SEPARATOR = /^[x×][0-9]/;
 const ENDS_WITH_SIZE_CHAR = new RegExp(`[${SIZE_CHAR}]$`);
 const FRACTION = new RegExp(`(\\d?)([${FRACTION_CHARS}])`, 'g');
 
+// Trailing only: a standard carries its periods inside (`b18.2.1`) and a size needs the
+// marks SIZE_CHAR claims, so neither may be read as the end of a sentence.
+const TRAILING_PUNCTUATION = /[,.;:!?]+$/;
+
 const UNIT_ALIASES: Readonly<Record<string, string>> = {
   inch: 'in',
   inches: 'in',
@@ -72,11 +76,13 @@ function slice(token: NormalizedToken, from: number, to: number): NormalizedToke
 }
 
 function tokenize(input: string): NormalizedToken[] {
-  return [...input.matchAll(/\S+/g)].map((match) => ({
-    text: match[0].toLowerCase(),
-    start: match.index,
-    end: match.index + match[0].length,
-  }));
+  return [...input.matchAll(/\S+/g)]
+    .map((match) => {
+      const text = match[0].toLowerCase().replace(TRAILING_PUNCTUATION, '');
+
+      return { text, start: match.index, end: match.index + text.length };
+    })
+    .filter((token) => token.text !== '');
 }
 
 function separatorOffsets(
