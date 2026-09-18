@@ -79,7 +79,11 @@ const historyLines = (customerId: string): string[] => {
   const rows = parseCsv(readFileSync(new URL('data/order_history.csv', ROOT), 'utf8'));
   return rows
     .filter((row) => row.customer_id === customerId)
-    .sort((left, right) => ((left.order_date ?? '') < (right.order_date ?? '') ? 1 : -1))
+    .sort((left, right) => {
+      const a = left.order_date ?? '';
+      const b = right.order_date ?? '';
+      return a < b ? 1 : a > b ? -1 : 0;
+    })
     .map(
       (row) =>
         `${row.order_date} ${(row.sku ?? '').padEnd(22)} qty ${(row.quantity ?? '').padEnd(6)} ${row.catalog_description}`,
