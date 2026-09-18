@@ -27,7 +27,10 @@ afterEach(() => {
 const cards = (): HTMLElement[] =>
   within(screen.getByRole('region', { name: 'Matches' })).getAllByRole('article');
 
-const rendered = (): (string | null)[] => cards().map((card) => card.textContent);
+// The headings, not the whole card: the personalization note changes a card's text without
+// moving it, and this test is about the order.
+const ranked = (): (string | null)[] =>
+  cards().map((card) => within(card).getByRole('heading').textContent);
 
 async function selectCustomer(customerId: string): Promise<void> {
   await userEvent.click(screen.getByRole('combobox', { name: /customer/i }));
@@ -46,15 +49,15 @@ describe('the page with a customer selected', () => {
     await userEvent.click(screen.getByRole('button', { name: 'M8 flat washer' }));
     await screen.findByRole('region', { name: 'Matches' });
 
-    const anonymous = rendered();
+    const anonymous = ranked();
 
     await selectCustomer('CUST-002');
     await userEvent.click(screen.getByRole('button', { name: 'Match' }));
 
     await waitFor(() => {
-      expect(rendered()).not.toEqual(anonymous);
+      expect(ranked()).not.toEqual(anonymous);
     });
-    expect(rendered()[0]).not.toBe(anonymous[0]);
+    expect(ranked()[0]).not.toBe(anonymous[0]);
   });
 
   it('says on the top card why that customer sees it first', async () => {
