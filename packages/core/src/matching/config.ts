@@ -36,6 +36,8 @@ export interface MatcherConfig {
   readonly k: number;
   readonly alpha: number;
   readonly wSku: number;
+  /** What an active item inherits from a discontinued purchase it is a sibling of. */
+  readonly siblingCredit: number;
   readonly familyCredit: number;
   readonly fuzzyStrength: number;
   readonly termStrengths: TermStrengths;
@@ -57,6 +59,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   k: 5,
   alpha: 0.5,
   wSku: 2,
+  siblingCredit: 0.5,
   familyCredit: 0.8,
   fuzzyStrength: 0.9,
   termStrengths: {
