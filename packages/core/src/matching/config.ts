@@ -23,7 +23,8 @@ export interface TermStrengths {
 export interface LabelThresholds {
   readonly high: number;
   readonly medium: number;
-  /** True until PRG-36 measures them; no document or test may promise a label while it is. */
+  /** True until the thresholds are measured; no document or test may promise a label
+   * while it is. Measured on the golden set in docs/calibration.md. */
   readonly provisional: boolean;
 }
 
@@ -57,7 +58,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   kappa: 3,
   tauDays: 180,
   k: 5,
-  alpha: 0.5,
+  alpha: 1,
   wSku: 2,
   siblingCredit: 0.5,
   familyCredit: 0.8,
@@ -69,15 +70,19 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
     ambiguous: 0.5,
     distant: 0.4,
   },
+  // Both cuts fall in gaps of the measured distribution: 0.8 is the widest one there is
+  // (0.706 to 0.845) and separates every unique answer from everything else, and 0.35
+  // lies in the empty band between the ties and the constrained answers.
+  // docs/calibration.md.
   labels: {
-    high: 0.7,
+    high: 0.8,
     medium: 0.35,
-    provisional: true,
+    provisional: false,
   },
   backoffOrder: BACKOFF_STEPS,
   lengthTolerance: 0.25,
   lexicalCap: 0.4,
-  lexicalUniqueGap: 0.1,
+  lexicalUniqueGap: 0.01,
   historyConfidence: 0.7,
   historyDecayPerRank: 0.8,
 };

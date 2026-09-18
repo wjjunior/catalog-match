@@ -110,7 +110,7 @@ describe('posterior: edge cases', () => {
 describe('labelFor', () => {
   it('calls a posterior at or above the high threshold High', () => {
     expect(labelFor(0.98, config).label).toBe('High');
-    expect(labelFor(0.7, config).label).toBe('High');
+    expect(labelFor(0.8, config).label).toBe('High');
   });
 
   it('calls a posterior at or above the medium threshold Medium', () => {
@@ -123,14 +123,14 @@ describe('labelFor', () => {
     expect(labelFor(0, config).label).toBe('Low');
   });
 
-  it('reports the thresholds as provisional while the config says they are', () => {
-    expect(labelFor(0.98, config).provisional).toBe(true);
+  it('reports the shipped thresholds as measured rather than provisional', () => {
+    expect(labelFor(0.98, config).provisional).toBe(false);
   });
 
-  it('drops the provisional flag once calibration sets it false', () => {
-    const calibrated = { ...config, labels: { ...config.labels, provisional: false } };
+  it('carries the provisional flag back while a config still sets it', () => {
+    const uncalibrated = { ...config, labels: { ...config.labels, provisional: true } };
 
-    expect(labelFor(0.98, calibrated).provisional).toBe(false);
+    expect(labelFor(0.98, uncalibrated).provisional).toBe(true);
   });
 
   it('reads the thresholds from the config rather than hard-coding them', () => {

@@ -39,4 +39,14 @@ jobs:
 
       - run: pnpm build
 
-      # eval gate: added by the calibration card
+      # Status correctness and constraint preservation on the golden set may not fall
+      # below the floor, and the set may not shrink. docs/DESIGN.md 10.3. The floor is
+      # read from main rather than from this branch: a change that regresses must not be
+      # able to lower the bar it is measured against in the same commit. The fallback
+      # covers only the commit that first adds the file.
+      - name: eval gate
+        run: |
+          git fetch --depth=1 origin main
+          git show FETCH_HEAD:data/eval/baseline.json > "$RUNNER_TEMP/floor.json" \
+            || cp data/eval/baseline.json "$RUNNER_TEMP/floor.json"
+          pnpm run eval --gate --floor "$RUNNER_TEMP/floor.json"

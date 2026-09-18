@@ -5,9 +5,9 @@
       "cases": 78,
       "retrieval": {
         "cases": 48,
-        "hit1": 0.9792,
+        "hit1": 1,
         "hit3": 1,
-        "mrr": 0.9896
+        "mrr": 1
       },
       "setRecovery": {
         "cases": 30,
@@ -62,9 +62,9 @@
       },
       "personalization": {
         "cases": 21,
-        "hit1": 0.9524,
+        "hit1": 1,
         "hit1WithoutCustomer": 0.1429,
-        "margin": 0.3587,
+        "margin": 0.3281,
         "marginCases": 18
       },
       "calibration": {
