@@ -1,7 +1,7 @@
 # ADR-004: No database, in-memory repositories behind ports
 
 Status: Accepted
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Context
 

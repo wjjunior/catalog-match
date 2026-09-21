@@ -1,7 +1,7 @@
 # ADR-001: Parse-and-score is the primary matcher, not embeddings
 
 Status: Accepted
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Context
 

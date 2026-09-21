@@ -1,7 +1,7 @@
 # ADR-005: No LLM in the matching path
 
 Status: Accepted
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Context
 

@@ -1,7 +1,7 @@
 # ADR-003: Personalization is a prior over the compatible set
 
 Status: Accepted
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Context
 

@@ -1,7 +1,7 @@
 # ADR-002: Match status is decided before confidence
 
 Status: Accepted
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Context
 
