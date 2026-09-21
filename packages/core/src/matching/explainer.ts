@@ -383,16 +383,6 @@ export function unverifiedResidueNote(tokens: readonly string[]): Note {
   return note('unverifiedResidue', `not verifiable: ${tokens.join(', ')}`);
 }
 
-export function tieBanner(
-  compatibleCount: number,
-  disambiguateBy: readonly AttributeName[],
-): string {
-  const banner = `${compatibleCount} compatible options`;
-  if (disambiguateBy.length === 0) return banner;
-
-  return `${banner}, specify ${list(disambiguateBy, 'or')}`;
-}
-
 export function overrideReason(preferred: readonly string[]): string {
   return `history prefers ${preferred.join(' ')}; overridden by the query`;
 }

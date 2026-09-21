@@ -117,8 +117,8 @@ screw`, it just has no way to conclude that the catalog therefore has none.
 Run this end to end before the call, timed.
 
 - [ ] `pnpm install && pnpm lint && pnpm typecheck && pnpm test` clean.
-- [ ] `pnpm run eval --baseline` regenerates `docs/eval-report.md` with no diff. It leaves
-      `docs/eval-heldout.md` alone; that set is spent and is not run again.
+- [ ] `pnpm run eval` regenerates `docs/eval-report.md` with no diff but the p95 line, which
+      moves between runs. It leaves `docs/eval-heldout.md` alone; that set is spent.
 - [ ] `pnpm run demo` prints all fourteen beats.
 - [ ] `pnpm dev`, then one query sent to warm the process.
 - [ ] Beats 1 to 14 in the browser, from the chips where a chip exists.

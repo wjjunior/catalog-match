@@ -17,17 +17,8 @@ describe('the case type the harness consumes', () => {
 
 describe('the flags', () => {
   it('keep the held-out set out unless it is asked for', () => {
-    expect(parseArgs([])).toEqual({
-      heldout: false,
-      baseline: false,
-      gate: false,
-      floor: DEFAULT_FLOOR,
-    });
+    expect(parseArgs([])).toEqual({ heldout: false, gate: false, floor: DEFAULT_FLOOR });
     expect(parseArgs(['--heldout']).heldout).toBe(true);
-  });
-
-  it('keep the baseline out unless it is asked for', () => {
-    expect(parseArgs(['--baseline']).baseline).toBe(true);
   });
 
   it('gate only when asked', () => {
@@ -45,7 +36,7 @@ describe('the flags', () => {
 });
 
 describe('a run over the real data', () => {
-  const { summary } = evaluate({ heldout: false, baseline: false });
+  const { summary } = evaluate({ heldout: false });
 
   it('scores the whole golden set', () => {
     expect(summary.sections).toHaveLength(1);
@@ -64,26 +55,37 @@ describe('a run over the real data', () => {
   });
 
   it('adds the held-out section only when asked', () => {
-    expect(
-      evaluate({ heldout: true, baseline: false }).summary.sections.map((s) => s.name),
-    ).toEqual(['Golden set', 'Held-out set']);
+    expect(evaluate({ heldout: true }).summary.sections.map((s) => s.name)).toEqual([
+      'Golden set',
+      'Held-out set',
+    ]);
   });
 
   // The set may be spent once, so the run that spends it must not write its tables into a
   // file every later `pnpm run eval` overwrites. They go to their own document.
   it('keeps the held-out tables out of the golden report', () => {
-    const run = evaluate({ heldout: true, baseline: false });
+    const run = evaluate({ heldout: true });
 
     expect(run.markdown).not.toContain('Held-out set');
     expect(run.heldout).toContain('Held-out set');
   });
 
   it('writes no held-out document when the set was not run', () => {
-    expect(evaluate({ heldout: false, baseline: false }).heldout).toBeUndefined();
+    expect(evaluate({ heldout: false }).heldout).toBeUndefined();
+  });
+
+  // The committed docs/eval-report.md must be what the documented command produces. Behind
+  // a flag, a plain `pnpm run eval` deleted the table ADR-001 rests on and left the tree
+  // dirty, which is the same trap the held-out set was moved out of the file to avoid.
+  it('always carries the baseline comparison, so the plain run reproduces the report', () => {
+    const { markdown } = evaluate({ heldout: false });
+
+    expect(markdown).toContain('### Baseline comparison');
+    expect(markdown).toMatch(/\| Hit@1 \| [\d.]+ \| [\d.]+ \| \d+ \|/);
   });
 
   it('writes a report that names both the evidence limits and the circularity', () => {
-    const { markdown } = evaluate({ heldout: false, baseline: false });
+    const { markdown } = evaluate({ heldout: false });
 
     expect(markdown).toMatch(/limited evidence/i);
     expect(markdown).toMatch(/circular/i);
@@ -94,7 +96,7 @@ describe('the baseline over the real data', () => {
   const comparisonIn = (markdown: string): string =>
     markdown.slice(markdown.indexOf('### Baseline comparison'));
 
-  const { markdown, summary } = evaluate({ heldout: false, baseline: true });
+  const { markdown, summary } = evaluate({ heldout: false });
 
   it('compares the two approaches on the golden set', () => {
     expect(markdown).toContain('### Baseline comparison');
@@ -118,9 +120,7 @@ describe('the baseline over the real data', () => {
   });
 
   it('answers with the same numbers on a second run', () => {
-    expect(comparisonIn(evaluate({ heldout: false, baseline: true }).markdown)).toBe(
-      comparisonIn(markdown),
-    );
+    expect(comparisonIn(evaluate({ heldout: false }).markdown)).toBe(comparisonIn(markdown));
   });
 
   it('keeps the baseline out of the committed summary', () => {
@@ -183,6 +183,6 @@ describe('the CI gate', () => {
   });
 
   it('gates against the committed floor over the real data', () => {
-    expect(gateFailures(evaluate({ heldout: false, baseline: false }).summary, floor)).toEqual([]);
+    expect(gateFailures(evaluate({ heldout: false }).summary, floor)).toEqual([]);
   });
 });

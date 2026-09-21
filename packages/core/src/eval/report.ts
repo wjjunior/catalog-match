@@ -7,7 +7,7 @@ import type { EvalReport } from './run';
 export interface EvalSection {
   readonly name: string;
   readonly report: EvalReport;
-  /** Present only when `--baseline` ran: the same cases through the lexical fallback alone. */
+  /** The same cases through the lexical fallback alone; absent on the held-out section. */
   readonly baseline?: BaselineComparison;
 }
 
