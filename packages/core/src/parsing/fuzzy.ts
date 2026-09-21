@@ -3,8 +3,6 @@ import { LEXICON, PROTECTED_CODES } from './lexicon';
 
 const { fuzzyStrength } = DEFAULT_MATCHER_CONFIG;
 
-/** Optimal string alignment: like Levenshtein, but an adjacent transposition costs one
- * edit, so "haed" sits one step from "head". */
 /** Longer than any catalog or query word, so the row buffers never need resizing. */
 const MAX_TOKEN_LENGTH = 64;
 
@@ -14,15 +12,6 @@ const ROW_A = new Int32Array(MAX_TOKEN_LENGTH + 1);
 const ROW_B = new Int32Array(MAX_TOKEN_LENGTH + 1);
 const ROW_C = new Int32Array(MAX_TOKEN_LENGTH + 1);
 
-/**
- * Optimal string alignment: like Levenshtein, but an adjacent transposition costs one
- * edit, so "haed" sits one step from "head".
- *
- * `max` bounds the answer: the distance is exact while it fits, and once every alignment
- * has already exceeded `max` the function stops and returns a larger number. Scanning a
- * vocabulary spends most of its time on words that are nowhere near, and this is what
- * makes that cheap.
- */
 /**
  * Optimal string alignment: like Levenshtein, but an adjacent transposition costs one
  * edit, so "haed" sits one step from "head".
