@@ -24,6 +24,7 @@ import {
   parseNumber,
   resolveDiameter,
   resolveLength,
+  toMm,
   type SizeToken,
 } from './units';
 
@@ -278,6 +279,25 @@ function readMillimetres(draft: Draft, size: SizeToken): Thread | undefined {
   return { diameter, pitch };
 }
 
+/** The mirror of `readMillimetres` on the imperial side: with no thread anywhere, a
+ * fraction the user closed with the inch mark is the nominal, not a length. */
+function readInches(draft: Draft, size: SizeToken): Thread | undefined {
+  if (size.kind !== 'length' || size.unit !== 'in') return undefined;
+
+  const mm = toMm(size.value, 'in');
+  const entry = DIAMETERS.find(
+    (candidate) => candidate.system === 'imperial' && candidate.mm === mm,
+  );
+  if (entry === undefined) return undefined;
+
+  const diameter = resolveDiameter(entry.nominal);
+  if (diameter === undefined) return undefined;
+
+  draft.provenance.pitch = 'inferred';
+
+  return { diameter, pitch: entry.pitch };
+}
+
 /** After the diameter, every remaining size token is read as a length: `3/4-10 tap bolt
  * 5/8` and `#10-24 x 1/2` both put a thread-shaped token where the length belongs. */
 function asLength(size: SizeToken): SizeToken | undefined {
@@ -312,7 +332,7 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
       ? undefined
       : size.kind === 'thread'
         ? readThread(draft, size)
-        : readMillimetres(draft, size);
+        : (readMillimetres(draft, size) ?? readInches(draft, size));
 
   if (head !== undefined && thread !== undefined) {
     sizes.diameter = thread.diameter;
