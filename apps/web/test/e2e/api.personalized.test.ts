@@ -72,8 +72,8 @@ const comparable = (response: MatchResponse): Omit<MatchResponse, 'timingsMs'> =
   notes: response.notes,
 });
 
-/** Reported rather than bounded: the threshold that would turn a posterior into a label is
- * PRG-36's to measure. docs/DESIGN.md 5.5. */
+/** Printed, not asserted: these tests own the ordering and the margin, not the band a
+ * confidence lands in. docs/DESIGN.md 5.5. */
 function report(label: string, response: MatchResponse): void {
   const [first, second] = response.results;
   const show = (result?: Match): string =>

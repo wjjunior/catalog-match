@@ -12,16 +12,9 @@ const ROW_A = new Int32Array(MAX_TOKEN_LENGTH + 1);
 const ROW_B = new Int32Array(MAX_TOKEN_LENGTH + 1);
 const ROW_C = new Int32Array(MAX_TOKEN_LENGTH + 1);
 
-/**
- * Optimal string alignment: like Levenshtein, but an adjacent transposition costs one
- * edit, so "haed" sits one step from "head".
- *
- * `max` bounds the answer: the distance is exact while it fits, and a larger number comes
- * back once it cannot. Only cells within `max` of the diagonal are computed, because no
- * alignment reaches further without already spending more than `max` edits. Scanning a
- * vocabulary spends most of its time on words that are nowhere near, and this is what
- * makes that cheap.
- */
+/** Optimal string alignment: a transposition costs one edit, so "haed" is one step from
+ * "head". Exact while it fits `max`, a larger number once it cannot: only cells within
+ * `max` of the diagonal are computed, which is what makes scanning a vocabulary cheap. */
 export function damerauLevenshtein(a: string, b: string, max = Infinity): number {
   if (a === b) return 0;
   if (a.length === 0) return b.length;
@@ -82,7 +75,6 @@ export function damerauLevenshtein(a: string, b: string, max = Infinity): number
 const MIN_LENGTH = 4;
 const LONG_WORD_LENGTH = 8;
 
-/** Every single word of every lexicon phrase. */
 export const VOCABULARY: ReadonlySet<string> = new Set(
   [...LEXICON.keys()].flatMap((phrase) => phrase.split(' ')),
 );
@@ -125,12 +117,9 @@ export function correct(
   return word ? { word, distance: nearestDistance, strength: fuzzyStrength } : null;
 }
 
-/**
- * The catalog abbreviates its own words, so a typo can sit one edit from both a word and
- * its abbreviation: washr is next to washer and to wshr. Those mean the same product, so
- * the longer spelling wins. Words of equal length are a real ambiguity and yield nothing,
- * which also keeps the result independent of iteration order.
- */
+/** A typo can sit one edit from both a word and its abbreviation (washr is next to washer
+ * and wshr), so the longer spelling wins. Equal lengths are a real ambiguity and yield
+ * nothing, which also keeps the result independent of iteration order. */
 function pickOne(candidates: readonly string[]): string | undefined {
   if (candidates.length <= 1) return candidates[0];
 

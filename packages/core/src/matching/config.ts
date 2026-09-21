@@ -23,8 +23,8 @@ export interface TermStrengths {
 export interface LabelThresholds {
   readonly high: number;
   readonly medium: number;
-  /** True until the thresholds are measured; no document or test may promise a label
-   * while it is. Measured on the golden set in docs/calibration.md. */
+  /** While true, no document or test may promise a label. Measured on the golden set and
+   * cleared in docs/calibration.md. */
   readonly provisional: boolean;
 }
 
@@ -47,7 +47,7 @@ export interface MatcherConfig {
   readonly lengthTolerance: number;
   readonly lexicalCap: number;
   /** How far the runner-up must trail the best lexical hit before the baseline calls a
-   * query unique. Set by hand like the labels; PRG-36 owns the measured value. */
+   * query unique. Measured for the control's own benefit, not ours: docs/calibration.md. */
   readonly lexicalUniqueGap: number;
   readonly historyConfidence: number;
   readonly historyDecayPerRank: number;

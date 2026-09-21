@@ -1,7 +1,3 @@
-// Public API of @catalog-match/core. This barrel is the only entry point consumers
-// may import; it is edited by the integration cards (PRG-22, PRG-26) as the use
-// cases, ports, types, config, adapters, parsers and personalization land.
-
 // apps/web/src may never pull core runtime code into the browser bundle, so the wire
 // types it states its zod schemas against stay type-only here.
 export type * from './domain';
