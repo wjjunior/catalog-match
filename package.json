@@ -14,6 +14,7 @@
     "build": "pnpm --filter @catalog-match/web build",
     "dev": "pnpm --filter @catalog-match/web dev",
     "eval": "tsx scripts/eval.ts",
+    "demo": "tsx scripts/demo.ts",
     "profile": "tsx scripts/profile.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
