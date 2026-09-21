@@ -12,8 +12,9 @@ Frozen on 2026-09-18, 20 cases.
   and a failing held-out case is not a reason to change the lexicon or a parameter.
 - It runs once, at the end, from the calibration card (PRG-36), after the parameters are
   fixed on the golden set.
-- `pnpm eval` reports it separately from the golden set, with the number of cases behind
-  every number (docs/DESIGN.md 10.3). Held-out numbers are never merged into golden ones.
+- `pnpm eval --heldout` reports it in its own document, `docs/eval-heldout.md`, with the
+  number of cases behind every number (docs/DESIGN.md 10.3). Held-out numbers are never
+  merged into golden ones, and a routine `pnpm run eval` cannot overwrite them.
 - It is not a CI gate. CI gates status correctness and constraint preservation on the
   golden set; gating on the held-out set would turn it into a tuning target.
 - No query in this set equals a golden query after normalizing case, whitespace and
@@ -38,10 +39,10 @@ Any later change requires a dated note below saying what changed and why. Adding
 after tuning has begun does not restore independence for those cases; mark them and report
 them apart from the frozen 20.
 
-| Date       | Change                                 | Reason                                                                                                                                                   |
-| ---------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-18 | Frozen with 20 cases (PRG-32).         | Initial.                                                                                                                                                 |
-| 2026-09-21 | Run once. No case changed, none added. | The two defects PRG-36 was waiting on (adv-06, adv-15) were fixed; the set was spent as the policy allows, and the numbers are in `docs/eval-report.md`. |
+| Date       | Change                                 | Reason                                                                                                                                                    |
+| ---------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-18 | Frozen with 20 cases (PRG-32).         | Initial.                                                                                                                                                  |
+| 2026-09-21 | Run once. No case changed, none added. | The two defects PRG-36 was waiting on (adv-06, adv-15) were fixed; the set was spent as the policy allows, and the numbers are in `docs/eval-heldout.md`. |
 
 ## The run
 

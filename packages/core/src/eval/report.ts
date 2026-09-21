@@ -210,8 +210,11 @@ function section({ name, report, baseline }: EvalSection): string {
   ].join('\n');
 }
 
-export function toMarkdown(sections: readonly EvalSection[]): string {
-  return ['# Evaluation report', '', PREAMBLE, '', ...sections.map(section)].join('\n') + '\n';
+export function toMarkdown(
+  sections: readonly EvalSection[],
+  title = '# Evaluation report',
+): string {
+  return [title, '', PREAMBLE, '', ...sections.map(section)].join('\n') + '\n';
 }
 
 const round = (value: number): number => Number(value.toFixed(4));

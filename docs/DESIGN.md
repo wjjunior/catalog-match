@@ -98,7 +98,7 @@ Of the 33 example queries, 22 resolve to exactly one SKU once diameter, type and
 
 ## 3.4 Claims ledger
 
-Statuses below were rewritten on 2026-09-21, after calibration (`docs/calibration.md`) and the single held-out run. Every number cites `docs/eval-report.md`.
+Statuses below were rewritten on 2026-09-21, after calibration (`docs/calibration.md`) and the single held-out run. Every number cites `docs/eval-report.md`, or `docs/eval-heldout.md` where it is held-out evidence.
 
 | Claim | Status | Measured |
 |---|---|---|
@@ -179,7 +179,7 @@ apps/web
   src/entities/match, src/entities/customer
   src/shared/api (client, schema, example queries), src/shared/ui
 data/                catalog.csv, order_history.csv, eval/golden.jsonl, eval/heldout.jsonl
-docs/                DESIGN.md (this document), adr/, eval-report.md, ASSUMPTIONS.md, DEMO.md
+docs/                DESIGN.md (this document), adr/, eval-report.md, eval-heldout.md, ASSUMPTIONS.md, DEMO.md, RUNBOOK.md, calibration.md
 scripts/             profile.ts (reproduces section 3), eval.ts, demo.ts
 ```
 
@@ -409,7 +409,7 @@ Single page: free-text input (Enter submits), searchable customer combobox (id, 
 
 ## 10.3 Reporting
 
-`pnpm eval` prints the tables and writes `docs/eval-report.md`, golden and held-out separately, with bin counts and the number of cases behind every number. The README states that these are limited evidence from a small labeled set: they support the design choices for this data, they do not establish calibration or generalization. CI fails when status correctness or constraint preservation on the golden set drops below the committed baseline.
+`pnpm eval` prints the tables and writes `docs/eval-report.md`; `--heldout` writes `docs/eval-heldout.md` beside it, so the frozen set's single run cannot be overwritten by a later golden run. Both carry bin counts and the number of cases behind every number. The README states that these are limited evidence from a small labeled set: they support the design choices for this data, they do not establish calibration or generalization. CI fails when status correctness or constraint preservation on the golden set drops below the committed baseline.
 
 ## 10.4 Baseline comparison
 
