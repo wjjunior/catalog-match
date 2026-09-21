@@ -160,6 +160,9 @@ const UNKNOWN_TYPE_TERMS: readonly string[] = [
   'square head bolt',
   'wing nut',
   'acorn nut',
+  // The catalog stocks lock washers and hex nuts, never a lock nut; without this the
+  // modifier alone reaches the residue and `nut` answers with hex nuts.
+  'lock nut',
 ];
 
 const MATERIAL_TERMS: ReadonlyArray<readonly [string, Material | MaterialFamily, number]> = [

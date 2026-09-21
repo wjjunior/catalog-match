@@ -225,6 +225,7 @@ describe('a type phrase outside the catalog', () => {
     'square head bolt 3/8',
     'wing nut M8',
     'acorn nut 1/2',
+    'nylon lock nut M8',
   ])('marks %s unrecognized as well', (query) => {
     const spec = parse(query);
 
