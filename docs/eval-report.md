@@ -33,13 +33,13 @@ itself rather than against any label. See `docs/eval/golden-rationale.md`.
 
 ### Status correctness (78 cases)
 
-Accuracy 0.962.
+Accuracy 0.987.
 
 | expected \ actual | unique | ambiguous | none | history | unparsed |
 |---|---|---|---|---|---|
 | unique | 29 | 0 | 0 | 0 | 0 |
-| ambiguous | 1 | 32 | 0 | 0 | 1 |
-| none | 0 | 1 | 7 | 0 | 0 |
+| ambiguous | 1 | 33 | 0 | 0 | 0 |
+| none | 0 | 0 | 8 | 0 | 0 |
 | history | 0 | 0 | 0 | 6 | 0 |
 | unparsed | 0 | 0 | 0 | 0 | 1 |
 
@@ -77,7 +77,7 @@ Measured at the limit the API serves, and the one number here that moves between
 | percentile | ms |
 |---|---|
 | p50 | 0.1 |
-| p95 | 0.6 |
+| p95 | 0.4 |
 
 ### Baseline comparison
 
@@ -98,7 +98,7 @@ compatible set to cut.
 | Set precision | 1.000 | 0.118 | 30 |
 | Set recall | 0.983 | 0.118 | 30 |
 | Exact-set rate | 0.967 | 0.033 | 30 |
-| Status accuracy | 0.962 | 0.603 | 78 |
+| Status accuracy | 0.987 | 0.603 | 78 |
 
 Where the baseline puts each status, against the same expectations:
 
@@ -109,3 +109,70 @@ Where the baseline puts each status, against the same expectations:
 | none | 0 | 8 | 0 | 0 | 0 |
 | history | 0 | 6 | 0 | 0 | 0 |
 | unparsed | 0 | 0 | 1 | 0 | 0 |
+## Held-out set
+
+20 cases in this set.
+
+### Retrieval of the intended SKU (11 cases)
+
+| metric | value |
+|---|---|
+| Hit@1 | 1.000 |
+| Hit@3 | 1.000 |
+| MRR | 1.000 |
+
+### Recovery of the compatible set (3 cases)
+
+| metric | value |
+|---|---|
+| Set precision | 1.000 |
+| Set recall | 1.000 |
+| Exact-set rate | 1.000 |
+
+### Status correctness (20 cases)
+
+Accuracy 0.900.
+
+| expected \ actual | unique | ambiguous | none | history | unparsed |
+|---|---|---|---|---|---|
+| unique | 11 | 0 | 0 | 0 | 0 |
+| ambiguous | 0 | 3 | 0 | 0 | 0 |
+| none | 0 | 1 | 3 | 0 | 0 |
+| history | 0 | 1 | 0 | 0 | 0 |
+| unparsed | 0 | 0 | 0 | 0 | 1 |
+
+### Constraint preservation (20 cases)
+
+0 of the matches returned, with and without a customer, contradict an attribute the query asked for.
+
+### Personalization (2 cases)
+
+| metric | value | cases |
+|---|---|---|
+| Hit@1 with the customer | 0.500 | 2 |
+| Hit@1 without the customer | 0.000 | 2 |
+| Mean top-1 to top-2 margin | 0.000 | 1 |
+
+### Calibration (11 cases)
+
+| top-1 confidence | cases | empirical top-1 precision |
+|---|---|---|
+| 0.0–0.1 | 1 | 1.000 |
+| 0.1–0.2 | 0 | — |
+| 0.2–0.3 | 0 | — |
+| 0.3–0.4 | 2 | 1.000 |
+| 0.4–0.5 | 0 | — |
+| 0.5–0.6 | 0 | — |
+| 0.6–0.7 | 0 | — |
+| 0.7–0.8 | 0 | — |
+| 0.8–0.9 | 0 | — |
+| 0.9–1.0 | 8 | 1.000 |
+
+### Latency (20 cases)
+
+Measured at the limit the API serves, and the one number here that moves between runs.
+
+| percentile | ms |
+|---|---|
+| p50 | 0.1 |
+| p95 | 0.3 |

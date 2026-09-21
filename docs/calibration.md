@@ -225,7 +225,23 @@ around. None of them is a wrong expectation that this card may quietly rewrite.
 
 ## Held-out set
 
-Not run. `data/eval/heldout.jsonl` may be spent once, and spending it here would measure a
-matcher with the three known defects above still in it. It is deferred to its own card, to
-be run after they are resolved and before the demo, with the date recorded in the report.
-No parameter may move after that run.
+Not run in this session. `data/eval/heldout.jsonl` may be spent once, and spending it here
+would have measured a matcher with the three known defects above still in it. It was
+deferred to be run after they were resolved and before the demo. No parameter may move
+after that run.
+
+## Addendum, 2026-09-21
+
+Written after this session closed, by the pass that resolved the defects above. Nothing in
+the sweeps or the thresholds changed; every parameter in `matching/config.ts` still carries
+the value this session measured.
+
+`adv-06` and `adv-15` were fixed in the parser, not in a parameter: `lock nut` joined the
+unstocked-type list and an inch-marked fraction in the head position now reads as the
+imperial nominal. Golden status accuracy moved 0.962 to 0.987 and the `none` row of the
+matrix closed at 8 of 8. `pers-21` was left alone: it is the DESIGN 7.4 ambiguity this
+session described, and picking a side is the owner's call, not a defect fix.
+
+The held-out set was then spent, once. 20 cases, Hit@1 1.000 over the 11 single-label ones,
+0 constraint violations, status accuracy 0.900. The two misses and what they say are in
+`docs/eval/heldout-policy.md`. No parameter moved after the run.

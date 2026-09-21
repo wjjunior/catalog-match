@@ -1,6 +1,6 @@
 # Catalog Match: System Design
 
-> 🎯 **Purpose.** System design for the Paragon "Catalog Match" take-home. Status: v2, revised after an external review on 2026-09-17 (section 16 lists every change). Companion artifacts: the engineering brief for the coding agent and ADR-001 to ADR-005, to be written in the repository. English because this document becomes `DESIGN.md` and the basis for the live discussion.
+> 🎯 **Purpose.** System design for the Paragon "Catalog Match" take-home. Status: v3. v2 was revised after an external review on 2026-09-17 (section 16 lists every change); v3 is the pass of 2026-09-21 that replaced the hypotheses of the claims ledger with what the evaluation measured and the worked figures of 7.2 with their post-calibration values. Companion artifacts: the engineering brief for the coding agent and ADR-001 to ADR-005, to be written in the repository. English because this document becomes `DESIGN.md` and the basis for the live discussion.
 
 > 📌 **How to read claims.** Statements are tagged in the ledger of section 3.4 as verified (checked against the files), hypothesis (to be tested by the evaluation) or target (a goal the implementation is measured against). The document states mechanisms and how outcomes will be measured; it does not promise outcomes.
 
@@ -98,15 +98,17 @@ Of the 33 example queries, 22 resolve to exactly one SKU once diameter, type and
 
 ## 3.4 Claims ledger
 
-| Claim | Status | How it is or will be validated |
+Statuses below were rewritten on 2026-09-21, after calibration (`docs/calibration.md`) and the single held-out run. Every number cites `docs/eval-report.md`.
+
+| Claim | Status | Measured |
 |---|---|---|
-| Every catalog description follows the grammar above; 960 of 960 SKUs parse with the SKU encoding as oracle | Verified on the file with a throwaway script; becomes a committed test | Profiling script and parser test in the repo |
-| 22 of 33 example queries have exactly one compatible SKU | Verified with a throwaway parser | Golden set expectations, re-checked by the real parser |
-| Parse-and-score outperforms a normalized lexical baseline on the golden set | Hypothesis | Baseline comparison in the eval report (section 10.4) |
-| Sub-50 ms p95 in memory | Target | Benchmark in the eval report |
-| Lexicon plus fuzzy matching covers the query classes in the example and adversarial sets | Target | Parser tests; held-out set (section 10.3) |
-| Confidence is calibrated | Hypothesis, expected to hold only coarsely | Calibration table on single-label cases with bin counts (section 10.2) |
-| Strong history moves the intended SKU to top-1 with a clear margin | Hypothesis | Hand-labeled personalized cases written before tuning (section 10.2) |
+| Every catalog description follows the grammar above; 960 of 960 SKUs parse with the SKU encoding as oracle | Verified | `descriptionParser.catalog.test.ts` parses all 960 and cross-checks each against the SKU encoding |
+| 22 of 33 example queries have exactly one compatible SKU | Verified | Re-checked by the real parser in the golden set; `queryParser.catalog.test.ts` |
+| Parse-and-score outperforms a normalized lexical baseline on the golden set | **Held** | Golden set, 78 cases: Hit@1 1.000 against 0.167, exact-set rate 0.967 against 0.033, status accuracy 0.987 against 0.603 (section 10.4) |
+| Sub-50 ms p95 in memory | **Held** | p95 0.4 ms over the golden set through the use case; 0.3 ms over the held-out set |
+| Lexicon plus fuzzy matching covers the query classes in the example and adversarial sets | **Held on the tuned sets, and not on the held-out one** | Golden status accuracy 0.987; held-out 0.900, where the two misses are a type phrase and an intent paraphrase neither hand-enumerated list carries (`docs/eval/heldout-policy.md`) |
+| Confidence is calibrated | **Not established** | The golden calibration table is degenerate: 29 of 29 single-label cases land in the top bin at precision 1.000, so only the top band has evidence. The held-out table adds 11 cases across three bins, all at precision 1.000. Neither measures the Medium or Low bands (section 10.2) |
+| Strong history moves the intended SKU to top-1 with a clear margin | **Held** | Personalization Hit@1 1.000 with the customer against 0.143 without, over 21 hand-labeled pairs; mean top-1 to top-2 margin 0.328. Held-out: 1 of 2 |
 
 > 💡 **Implications.** A closed grammar justifies a parser over a retriever for the catalog side; the query side is open language and gets tolerance (lexicon, fuzzy, provenance) instead of assumptions. Numeric discriminants rule out embeddings as the primary signal. The tie structure of nut and washer queries makes "several compatible SKUs" a normal state, not an error, so it needs its own status. History profiles are clean for four customers and noisy for one, so shrinkage must handle the noisy case without special-casing it.
 
@@ -311,16 +313,18 @@ Each history line is parsed with the same parser (cross-checked with the SKU) an
 w_line   = exp(−age_days / τ),   τ = 180 days
 n_eff    = Σ w_line                                   effective history size
 λ_c      = n_eff / (n_eff + k),   k = 5                shrinkage; λ_c = 0 for an unknown or unselected customer
-P(v | c) = (Σ w_line · [attribute = v] + α) / (n_eff + α · V)     α = 0.5, V = number of catalog values of the attribute
+P(v | c) = (Σ w_line · [attribute = v] + α) / (n_eff + α · V)     α = 1, V = number of catalog values of the attribute
 h_i      ∝ (1 + w_sku · repeat_i) · Π_{a unspecified in the query} P(a_i | c)      normalized over C; w_sku = 2; repeat_i = recency-weighted purchases of SKU i, capped at 1, and at least 0.5 for an active item sharing diameter, type and material family with a discontinued purchased SKU
 q_i      = λ_c · h_i + (1 − λ_c) / |C|                  the prior used in section 5.5
 ```
 
 The prior is a distribution over C: a mixture of the history-derived distribution and the uniform one, weighted by how much history there is. It contains no free scale parameter that could be tuned to promise a label; the only parameters are the recency horizon, the shrinkage constant and the smoothing pseudo-count.
 
-Worked figures for "M8 flat washer" and CUST-002 under these initial parameters, measured by the profile builder over the real file: n_eff 8.29 of 17 lines after recency weighting, λ_c 0.62, material and finish shares for 18-8 SS and plain 0.78, the SS plain washer bought twice gets repeat weight 1. Its posterior comes out near 0.65 to 0.70 and the other six near 0.05. Whether that sits above the High threshold is decided by calibration, not asserted here. Measured over the seven active M8 flat washers, q gives that washer 0.663 against 0.065 for the next one, a margin of 10.2x; for CUST-004, where no washer is alloy, only the finish share acts and the A2 SS black oxide washer reaches 0.544 against 0.076, a margin of 7.2x.
+Worked figures for "M8 flat washer" and CUST-002, measured by the profile builder over the real file at the calibrated α of 1: n_eff 8.29 of 17 lines after recency weighting, λ_c 0.62, material and finish shares for 18-8 SS and plain 0.65, the SS plain washer bought twice gets repeat weight 1. Measured over the seven active M8 flat washers, q gives that washer 0.645 against 0.075 for the next one, a margin of 8.6x, and its posterior comes out at 0.632 against 0.073. For CUST-004, where no washer is alloy, only the finish share acts and the A2 SS black oxide washer reaches 0.457 in q against 0.090 for every other, a posterior of 0.448 against 0.089. Both land in the Medium band under the thresholds calibration measured (0.35 and 0.8); only a `unique` answer reaches High, which is the point of section 5.3.
 
-For CUST-005, n_eff is 2.71 and λ_c 0.35, and the mixture stays close to uniform: q spreads only from 0.188 to 0.105. The single earlier purchase of the 18-8 SS plain washer does not carry it to the top — the brass zinc washer edges it, 0.188 against 0.178 — because two of those six lines are brass and two are zinc against one line of 18-8 SS plain, and at this n_eff the shares outweigh one repeat. That is the shrinkage doing its work, not a defect, and it is why the sparse case is tested for near-uniformity rather than for a winner.
+For CUST-005, n_eff is 2.71 and λ_c 0.35, and the mixture stays close to uniform: q spreads only from 0.178 to 0.114, a 1.1x spread across the seven. The single earlier purchase of the 18-8 SS plain washer does carry it to the top, but by 0.174 against 0.165 in the posterior — a lead of half a point, not a separation. Six lines across four materials and four finishes leave every share near its smoothed floor, so the repeat term is the only thing that moves, and it moves very little. That is the shrinkage doing its work, not a defect, and it is why the sparse case is tested for near-uniformity rather than for a winner.
+
+> 📌 α moved from 0.5 to 1 in calibration (`docs/calibration.md`). At 0.5 this customer's six lines were confident enough about material to rank a brass washer above the one they had actually bought; add-one smoothing flattens a sparse profile and lets the repeat term decide. The figures above are the post-calibration ones; the pre-calibration text quoted a 0.188–0.105 spread.
 
 ## 7.3 Rules
 
@@ -345,7 +349,7 @@ Without a customer, the response carries no matches, status history and the note
 | New or unselected customer | M8 flat washer, no customer | λ_c = 0; identical to the base result |
 | Strong profile with a repeat purchase | M8 flat washer, CUST-002 | 18-8 SS plain washer top-1 with a clear margin; reason "bought 2x, last 2026-04-15" |
 | Profile without a compatible material | M8 flat washer, CUST-004 | No alloy M8 flat washer; only the finish share acts; A2 SS black oxide washer top-1 with a small margin; explanation says material could not be matched |
-| Sparse and conflicting history | M8 flat washer, CUST-005 | Small λ_c; the prior stays close to uniform (q from 0.188 to 0.105) and no item separates from the rest |
+| Sparse and conflicting history | M8 flat washer, CUST-005 | Small λ_c; the prior stays close to uniform (q from 0.178 to 0.114) and no item separates from the rest |
 | Conflict between query and history | brass hex nut 1/2-13, CUST-004 | Brass items only; override shown in the explanation |
 | Explicit standard against a repeat purchase | M8 flat washer DIN 912, CUST-002 | Unique: the DIN 912 washer; the ISO 7380 washer bought twice is outside C and cannot appear above it |
 | Discontinued history item | M16 hex nut, CUST-002 | Inactive SKU excluded; discontinued note; stainless-family nut gets repeat weight 0.5 |
@@ -471,6 +475,8 @@ Demo script for the call: a fully specified query (unique); "M8 flat washer" wit
 - A2 SS is a stainless-family sibling of 18-8, not the same material.
 - Recency is measured from the latest date in the history file, not from the wall clock.
 - Open: whether to show inactive items on explicit request (a toggle) or never; whether the ambiguity banner should offer refinement chips (material, finish) instead of text only; whether alternatives should also be listed under status unique when C has one item but close siblings exist.
+- Open, and reached in practice: which attributes of the referenced order survive a history override (7.4). Read literally the base specification carries its standard and its finish, so "same washers as last time, but brass" returns nothing, because no brass ISO 7380 M8 flat washer exists. The implementation drops the standard and keeps the finish, which returns one washer; the golden label `pers-21` expects both dropped, which returns two. This is the one golden case still failing and it is a specification question, not a defect: the rule has to be stated here before the code can be said to be right.
+- Open: both hand-enumerated vocabularies — the type phrases the catalog does not stock (5.3) and the intent phrases (7.4) — cover what their authors thought of and no paraphrase beyond it. The held-out run found one of each (`square head set screw`, `on the last order`). Section 13 names the production answer: structured extraction for queries that end mostly as residue, measured against these same sets.
 
 # 16. Changes after review (2026-09-17)
 
