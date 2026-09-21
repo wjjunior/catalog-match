@@ -15,7 +15,8 @@ import { LexicalOnlyMatcher, buildIndex, score } from './lexicalFallback';
 
 const CATALOG = new URL('../../../../data/catalog.csv', import.meta.url);
 
-// The fallback never reads `spec`; that is the point of it. PRG-16 fills this in.
+// The fallback scores description text alone, so a parser that returns nothing still
+// exercises it fully.
 const noSpec: DescriptionParser = { parse: () => ({ residue: [], evidence: {}, provenance: {} }) };
 
 const catalogItems = CsvCatalogRepository.fromText(readFileSync(CATALOG, 'utf8'), noSpec).active();
@@ -24,7 +25,7 @@ const bySku = new Map(catalogItems.map((entry) => [entry.sku, entry.description]
 
 const descriptionOf = (entry: ScoredSku): string => bySku.get(entry.sku) ?? '';
 
-/** What the caller hands `score`: normalization plus the typo tolerance of PRG-15. */
+/** What the caller hands `score`: normalization plus fuzzy correction. */
 const queryTokensOf = (query: string): string[] =>
   normalize(query).tokens.map((token) => correct(token.text)?.word ?? token.text);
 

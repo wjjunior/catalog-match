@@ -50,8 +50,8 @@ export function posterior(
 
 export interface ConfidenceLabelling {
   readonly label: ConfidenceLabel;
-  /** True while the thresholds are placeholders: no document or test may promise the
-   * label until PRG-36 measures them. docs/DESIGN.md 5.5. */
+  /** True while the thresholds are unmeasured, when no document or test may promise the
+   * label. docs/DESIGN.md 5.5. */
   readonly provisional: boolean;
 }
 

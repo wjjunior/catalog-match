@@ -1,7 +1,5 @@
-// The shape of one evaluation case, per docs/BRIEF.md 11. Shared by data/eval/golden.jsonl
-// and data/eval/heldout.jsonl so the harness (PRG-33) loads both through one reader.
 // Structure only: which expected sizes go with which status is a property of each set,
-// not of the schema.
+// not of the schema. docs/BRIEF.md 11.
 
 export const MATCH_STATUSES = ['unique', 'ambiguous', 'none', 'history', 'unparsed'] as const;
 

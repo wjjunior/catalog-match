@@ -58,15 +58,14 @@ export interface MatchQueryDeps {
   readonly profile?: (customerId: string) => CustomerProfile | undefined;
 }
 
-/** The response minus what every branch answers the same way. */
 type Answer = Omit<MatchResponse, 'query' | 'parsed' | 'timingsMs'>;
 
 const DEFAULT_LIMIT = 3;
 
 const bySku = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The thresholds are placeholders until PRG-36 measures them, and a response carrying a
- * label promises one. docs/DESIGN.md 5.5. */
+/** A response carrying a label promises one, so an unmeasured threshold must not reach
+ * the caller. docs/DESIGN.md 5.5. */
 function labelled(match: Match, config: MatcherConfig): Match {
   if (config.labels.provisional) return match;
 
@@ -85,7 +84,6 @@ function diagnosis(spec: ParsedSpec, failed: AttributeName): Note {
   return failedConstraintNote(spec, failed);
 }
 
-/** How the query was read, then what failed, then what could not be verified. */
 function notesFor(spec: ParsedSpec, failure: Note | undefined): Note[] {
   const notes: Note[] = [];
 

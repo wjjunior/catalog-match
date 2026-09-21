@@ -51,8 +51,8 @@ describe('a profile with a repeat purchase', () => {
     const response = ask('M8 flat washer', 'CUST-002');
     const [first, second] = response.results;
 
-    // Reported rather than bounded: the threshold that would turn this into a label is
-    // PRG-36's to measure. docs/DESIGN.md 5.5.
+    // Printed, not asserted: this test owns the margin, not the band the confidence
+    // lands in. docs/DESIGN.md 5.5.
     console.log(`CUST-002 M8 flat washer: ${first?.sku ?? '-'} ${String(first?.confidence)}`);
     console.log(`                         ${second?.sku ?? '-'} ${String(second?.confidence)}`);
 

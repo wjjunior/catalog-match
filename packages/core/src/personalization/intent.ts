@@ -1,5 +1,5 @@
-/** The vocabulary of docs/DESIGN.md 7.4, longest first because the query parser scans it
- * in order and claims the first phrase that fits: `last time` must win over `time`. */
+/** The vocabulary of docs/DESIGN.md 7.4. Membership only: `takeIntent` tests it with
+ * `includes`, widest span first, so the order of this array decides nothing. */
 export const INTENT_PHRASES: readonly string[] = [
   'what we always get',
   'previous order',

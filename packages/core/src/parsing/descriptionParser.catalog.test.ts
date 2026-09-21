@@ -168,8 +168,8 @@ describe('uniqueness of the parsed tuple', () => {
     expect(keys.size).toBe(960);
   });
 
-  // docs/DESIGN.md 3.1 and the PRG-16 card both say 10 collisions and 950 distinct. The
-  // data has 11, each a nut or washer pair separated only by its standard.
+  // Each is a nut or washer pair separated only by its standard. This count is why
+  // docs/DESIGN.md 3.1 reads 11 and not the 10 it was first written with.
   it('leaves eleven pairs colliding once the standard is dropped', () => {
     expect(new Set(items.map(key)).size).toBe(949);
   });
