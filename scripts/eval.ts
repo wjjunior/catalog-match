@@ -82,8 +82,14 @@ export function gateFailures(summary: JsonSummary, floor: GateFloor): string[] {
   return failed;
 }
 
+export const HELD_OUT_TITLE = '# Held-out evaluation';
+
+/** `markdown` is the golden report every run rewrites; `heldout` is present only on the one
+ * run that spends the frozen set, and is written beside it rather than into it.
+ * docs/DESIGN.md 10.3 and docs/eval/heldout-policy.md. */
 export function evaluate({ heldout, baseline }: Pick<EvalOptions, 'heldout' | 'baseline'>): {
   markdown: string;
+  heldout?: string;
   summary: JsonSummary;
 } {
   const core = createCore({ dataDir: fileURLToPath(new URL('data', ROOT)) });
@@ -100,24 +106,26 @@ export function evaluate({ heldout, baseline }: Pick<EvalOptions, 'heldout' | 'b
     ...(baseline ? { baseline: runBaseline({ catalog: core.catalog, cases: goldenCases }) } : {}),
   };
 
-  const sections = [
-    golden,
-    ...(heldout
-      ? [evaluateSet('Held-out set', parseEvalJsonl(read('data/eval/heldout.jsonl')))]
-      : []),
-  ];
+  const frozen = heldout
+    ? evaluateSet('Held-out set', parseEvalJsonl(read('data/eval/heldout.jsonl')))
+    : undefined;
 
-  return { markdown: toMarkdown(sections), summary: toJson(sections) };
+  return {
+    markdown: toMarkdown([golden]),
+    ...(frozen === undefined ? {} : { heldout: toMarkdown([frozen], HELD_OUT_TITLE) }),
+    summary: toJson(frozen === undefined ? [golden] : [golden, frozen]),
+  };
 }
 
 function main(argv: readonly string[]): void {
   const options = parseArgs(argv);
-  const { markdown, summary } = evaluate(options);
+  const { markdown, heldout, summary } = evaluate(options);
 
   writeFileSync(new URL('docs/eval-report.md', ROOT), markdown);
+  if (heldout !== undefined) writeFileSync(new URL('docs/eval-heldout.md', ROOT), heldout);
   writeFileSync(new URL('data/eval/last-run.json', ROOT), `${JSON.stringify(summary, null, 2)}\n`);
 
-  process.stdout.write(markdown);
+  process.stdout.write(heldout === undefined ? markdown : `${markdown}\n${heldout}`);
 
   if (options.gate) {
     const floor = JSON.parse(read(options.floor)) as GateFloor;
@@ -135,7 +143,9 @@ function main(argv: readonly string[]): void {
   }
 
   const skipped = [
-    ...(options.heldout ? [] : ['Held-out set not run. Pass --heldout to include it.']),
+    ...(options.heldout
+      ? ['Held-out set written to docs/eval-heldout.md. It may be spent only once.']
+      : ['Held-out set not run. It is reported in docs/eval-heldout.md, from its single run.']),
     ...(options.baseline
       ? []
       : ['Baseline not run. Pass --baseline to compare against the lexical fallback.']),

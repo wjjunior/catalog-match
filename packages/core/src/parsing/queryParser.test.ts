@@ -192,6 +192,45 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a fraction the user closed with the inch mark', () => {
+  it('reads it as the imperial nominal when no other thread token stands in the query', () => {
+    const spec = parse('1/2"');
+
+    expect(spec.diameter).toEqual({ system: 'imperial', nominal: '1/2', mm: 12.7, known: true });
+    expect(spec.pitch).toBe('13');
+    expect(spec.length).toBeUndefined();
+  });
+
+  it('marks it inferred, as it does the millimetre figure it mirrors', () => {
+    expect(parse('1/2"').provenance.diameter).toBe('inferred');
+  });
+
+  it('reads the same query with and without the mark', () => {
+    expect(parse('1/2" hex nut').diameter).toEqual(parse('1/2 hex nut').diameter);
+  });
+
+  it('leaves the token after the separator a length', () => {
+    const spec = parse('1/2" x 3"');
+
+    expect(spec.diameter?.nominal).toBe('1/2');
+    expect(spec.length).toEqual({ value: 3, unit: 'in', mm: 76.2 });
+  });
+
+  it('leaves a query that already states a thread alone', () => {
+    const spec = parse('SHCS 7/16 x 2-1/2"');
+
+    expect(spec.diameter?.nominal).toBe('7/16');
+    expect(spec.length).toEqual({ value: 2.5, unit: 'in', mm: 63.5 });
+  });
+
+  it('leaves an inch figure the catalog has no diameter for a length', () => {
+    const spec = parse('7/8"');
+
+    expect(spec.diameter).toBeUndefined();
+    expect(spec.length).toEqual({ value: 0.875, unit: 'in', mm: 22.225 });
+  });
+});
+
 describe('a type phrase outside the catalog', () => {
   it('marks the phrase unrecognized and quotes it', () => {
     const spec = parse('carriage bolt 3/8');
@@ -225,6 +264,7 @@ describe('a type phrase outside the catalog', () => {
     'square head bolt 3/8',
     'wing nut M8',
     'acorn nut 1/2',
+    'nylon lock nut M8',
   ])('marks %s unrecognized as well', (query) => {
     const spec = parse(query);
 

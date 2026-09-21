@@ -17,7 +17,7 @@
       },
       "status": {
         "cases": 78,
-        "accuracy": 0.9615,
+        "accuracy": 0.9872,
         "matrix": {
           "unique": {
             "unique": 29,
@@ -28,15 +28,15 @@
           },
           "ambiguous": {
             "unique": 1,
-            "ambiguous": 32,
+            "ambiguous": 33,
             "none": 0,
             "history": 0,
-            "unparsed": 1
+            "unparsed": 0
           },
           "none": {
             "unique": 0,
-            "ambiguous": 1,
-            "none": 7,
+            "ambiguous": 0,
+            "none": 8,
             "history": 0,
             "unparsed": 0
           },

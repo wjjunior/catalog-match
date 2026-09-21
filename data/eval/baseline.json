@@ -1,9 +1,9 @@
 {
-  "recordedOn": "2026-09-18",
-  "recordedBy": "PRG-36, see docs/calibration.md",
+  "recordedOn": "2026-09-21",
+  "recordedBy": "PRG-42 and PRG-17 follow-ups, see docs/calibration.md",
   "goldenSet": {
     "cases": 78,
-    "statusAccuracy": 0.9615,
+    "statusAccuracy": 0.9872,
     "constraintViolations": 0
   }
 }

@@ -157,6 +157,7 @@ describe('type phrases the catalog does not carry', () => {
     'square head bolt',
     'wing nut',
     'acorn nut',
+    'lock nut',
   ];
 
   it.each(UNKNOWN)('spans the whole of %s', (phrase) => {

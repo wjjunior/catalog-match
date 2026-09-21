@@ -69,6 +69,19 @@ describe('a run over the real data', () => {
     ).toEqual(['Golden set', 'Held-out set']);
   });
 
+  // The set may be spent once, so the run that spends it must not write its tables into a
+  // file every later `pnpm run eval` overwrites. They go to their own document.
+  it('keeps the held-out tables out of the golden report', () => {
+    const run = evaluate({ heldout: true, baseline: false });
+
+    expect(run.markdown).not.toContain('Held-out set');
+    expect(run.heldout).toContain('Held-out set');
+  });
+
+  it('writes no held-out document when the set was not run', () => {
+    expect(evaluate({ heldout: false, baseline: false }).heldout).toBeUndefined();
+  });
+
   it('writes a report that names both the evidence limits and the circularity', () => {
     const { markdown } = evaluate({ heldout: false, baseline: false });
 

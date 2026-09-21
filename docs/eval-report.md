@@ -33,13 +33,13 @@ itself rather than against any label. See `docs/eval/golden-rationale.md`.
 
 ### Status correctness (78 cases)
 
-Accuracy 0.962.
+Accuracy 0.987.
 
 | expected \ actual | unique | ambiguous | none | history | unparsed |
 |---|---|---|---|---|---|
 | unique | 29 | 0 | 0 | 0 | 0 |
-| ambiguous | 1 | 32 | 0 | 0 | 1 |
-| none | 0 | 1 | 7 | 0 | 0 |
+| ambiguous | 1 | 33 | 0 | 0 | 0 |
+| none | 0 | 0 | 8 | 0 | 0 |
 | history | 0 | 0 | 0 | 6 | 0 |
 | unparsed | 0 | 0 | 0 | 0 | 1 |
 
@@ -77,7 +77,7 @@ Measured at the limit the API serves, and the one number here that moves between
 | percentile | ms |
 |---|---|
 | p50 | 0.1 |
-| p95 | 0.6 |
+| p95 | 0.4 |
 
 ### Baseline comparison
 
@@ -98,7 +98,7 @@ compatible set to cut.
 | Set precision | 1.000 | 0.118 | 30 |
 | Set recall | 0.983 | 0.118 | 30 |
 | Exact-set rate | 0.967 | 0.033 | 30 |
-| Status accuracy | 0.962 | 0.603 | 78 |
+| Status accuracy | 0.987 | 0.603 | 78 |
 
 Where the baseline puts each status, against the same expectations:
 
