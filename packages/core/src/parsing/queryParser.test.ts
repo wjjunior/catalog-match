@@ -192,6 +192,36 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a pitch the user spelled with different zeros', () => {
+  it.each([
+    ['M6-1 x 50mm tap bolt', 'M6', '1.0'],
+    ['M16-2 x 50mm hex bolt', 'M16', '2.0'],
+    ['M8-1.250 x 50mm hex bolt', 'M8', '1.25'],
+  ])('reads %s as the catalog pitch, keeping the diameter known', (query, nominal, pitch) => {
+    const spec = parse(query);
+
+    expect(spec.diameter?.nominal).toBe(nominal);
+    expect(spec.diameter?.known).toBe(true);
+    expect(spec.pitch).toBe(pitch);
+    expect(spec.provenance.pitch).toBe('explicit');
+  });
+
+  it('quotes what the user typed even where the stored pitch is the catalog spelling', () => {
+    expect(parse('M6-1 x 50mm tap bolt').evidence.pitch).toBe('1');
+  });
+
+  it('parses M6-1 and M6-1.0 to the same stored pitch', () => {
+    expect(parse('M6-1 x 50mm tap bolt').pitch).toBe(parse('M6-1.0 x 50mm tap bolt').pitch);
+  });
+
+  it('still rejects a pitch that is a different number', () => {
+    const spec = parse('1/2-20 hex nut');
+
+    expect(spec.diameter?.known).toBe(false);
+    expect(spec.pitch).toBe('20');
+  });
+});
+
 describe('a fraction the user closed with the inch mark', () => {
   it('reads it as the imperial nominal when no other thread token stands in the query', () => {
     const spec = parse('1/2"');

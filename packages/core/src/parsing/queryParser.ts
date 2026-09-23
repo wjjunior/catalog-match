@@ -257,9 +257,13 @@ function readThread(draft: Draft, size: ThreadToken): Thread | undefined {
   draft.evidence.pitch = size.pitch;
   draft.provenance.pitch = 'explicit';
 
+  // M6-1 and M6-1.0 name one pitch; the stored value is the catalog's spelling so that
+  // everything downstream can compare pitches as equals rather than as text.
+  const stated = catalog !== undefined && Number(size.pitch) === Number(catalog);
+
   return {
-    diameter: { ...diameter, known: diameter.known && size.pitch === catalog },
-    pitch: size.pitch,
+    diameter: { ...diameter, known: diameter.known && stated },
+    pitch: stated ? catalog : size.pitch,
   };
 }
 

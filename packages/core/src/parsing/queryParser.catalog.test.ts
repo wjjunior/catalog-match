@@ -12,6 +12,7 @@ import {
   failedConstraint,
 } from '../matching/compatibility';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
+import { core } from '../../test/integration/setup';
 import { descriptionParser } from './descriptionParser';
 import { parseQuery } from './queryParser';
 
@@ -87,4 +88,31 @@ describe('the rows DESIGN 6 keeps ambiguous', () => {
       expect(answer(query).status).toBe('ambiguous');
     },
   );
+});
+
+/** The note was the tell: the catalog does hold M6, so "M6 is not a diameter in this
+ * catalog" was never true — it was the textual pitch comparison flipping `known`. */
+describe('a pitch spelled with a different number of zeros', () => {
+  it.each(['M6-1 x 50mm tap bolt', 'M16-2 x 50mm hex bolt', 'M8-1.250 x 50mm hex bolt'])(
+    'leaves %s a satisfiable diameter',
+    (query) => {
+      const { spec } = parseQuery(query);
+
+      expect(spec.diameter?.known).toBe(true);
+      expect(answer(query).status).not.toBe('none');
+    },
+  );
+
+  it('answers M6-1 x 50mm tap bolt with the SKU the canonical spelling finds', () => {
+    expect(core.matchQuery({ query: 'M6-1 x 50mm tap bolt' }).results.map((m) => m.sku)).toEqual([
+      'PXTAP65088PL0765',
+    ]);
+  });
+
+  it('no longer says M6 is not a diameter in this catalog', () => {
+    const notes = core.matchQuery({ query: 'M6-1 x 50mm tap bolt' }).notes;
+
+    expect(notes.map((n) => n.message)).not.toContain('M6 is not a diameter in this catalog');
+    expect(notes.map((n) => n.code)).not.toContain('unknownDiameter');
+  });
 });
