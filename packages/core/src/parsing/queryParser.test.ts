@@ -192,6 +192,130 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a standard the catalog does not stock', () => {
+  it.each(['M8 x 50mm BHCS DIN 125', 'M8 flat washer DIN 125', 'DIN 125 M8 flat washer'])(
+    'reads the standard of %s instead of leaving it to residue',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.standard).toBe('DIN 125');
+      expect(spec.evidence.standard).toBe('DIN 125');
+      expect(spec.provenance.standard).toBe('explicit');
+      expect(spec.residue).toEqual([]);
+    },
+  );
+
+  it('never binds the designator as a length, whichever side of the diameter it sits', () => {
+    expect(parse('M8 flat washer DIN 125').length).toBeUndefined();
+    expect(values(parse('M8 flat washer DIN 125'))).toEqual(
+      values(parse('DIN 125 M8 flat washer')),
+    );
+  });
+
+  it.each([
+    ['ANSI B18.6.3 M8 hex nut', 'ANSI B18.6.3'],
+    ['M8 hex nut ASTM F593', 'ASTM F593'],
+    ['ISO 4762 M8 socket head cap screw', 'ISO 4762'],
+  ])('reads %s as %s', (query, standard) => {
+    expect(parse(query).standard).toBe(standard);
+  });
+
+  it('still reads the standards the catalog does stock', () => {
+    expect(parse('M8 x 50mm BHCS ISO 7380').standard).toBe('ISO 7380');
+    expect(parse('5/16-18 flat washer ASME B18.2.1').standard).toBe('ASME B18.2.1');
+    expect(parse('1/2-13 hex bolt class 8').standard).toBe('CLASS 8');
+  });
+
+  it('takes no standard from a number without a standards body in front of it', () => {
+    expect(parse('grade 8 1/2-13 hex nut').standard).toBeUndefined();
+    expect(parse('1/2-13 hex nut grade 8').standard).toBeUndefined();
+  });
+
+  it('leaves the diameter alone when a body word stands in front of it', () => {
+    const spec = parse('iso M8 hex nut');
+
+    expect(spec.standard).toBeUndefined();
+    expect(spec.diameter?.nominal).toBe('M8');
+  });
+
+  it('leaves a lone body word in the residue', () => {
+    expect(parse('M8 hex nut din').standard).toBeUndefined();
+    expect(parse('M8 hex nut din').residue).toEqual(['din']);
+  });
+});
+
+describe('an unclaimed word between the diameter and a number', () => {
+  it.each(['grade 8 1/2-13 hex nut', '1/2-13 hex nut grade 8'])(
+    'leaves the 8 of %s out of the length',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.length).toBeUndefined();
+      expect(spec.evidence.length).toBeUndefined();
+      expect(spec.residue).toEqual(['grade', '8']);
+      expect(spec.diameter?.nominal).toBe('1/2');
+    },
+  );
+
+  it('parses both word orders to the same spec', () => {
+    expect(values(parse('grade 8 1/2-13 hex nut'))).toEqual(
+      values(parse('1/2-13 hex nut grade 8')),
+    );
+  });
+
+  it('still reads a length the type phrase alone separates from the diameter', () => {
+    expect(parse('M16 threaded rod 60mm').length).toEqual({ value: 60, unit: 'mm', mm: 60 });
+    expect(parse('3/8 lag screw 1 inch').length).toEqual({ value: 1, unit: 'in', mm: 25.4 });
+  });
+});
+
+describe('a quantity phrase standing beside a length', () => {
+  it.each(['M8 x 50 qty 100 BHCS', 'M8 x 50 BHCS qty 100'])(
+    'reads the 50 of %s as the length and the 100 as the quantity',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.length).toEqual({ value: 50, unit: 'mm', mm: 50 });
+      expect(spec.evidence.length).toBe('50');
+      expect(spec.residue).toEqual([]);
+    },
+  );
+
+  it('parses both word orders to the same spec', () => {
+    expect(values(parse('M8 x 50 qty 100 BHCS'))).toEqual(values(parse('M8 x 50 BHCS qty 100')));
+  });
+});
+
+describe('a pitch the user spelled with different zeros', () => {
+  it.each([
+    ['M6-1 x 50mm tap bolt', 'M6', '1.0'],
+    ['M16-2 x 50mm hex bolt', 'M16', '2.0'],
+    ['M8-1.250 x 50mm hex bolt', 'M8', '1.25'],
+  ])('reads %s as the catalog pitch, keeping the diameter known', (query, nominal, pitch) => {
+    const spec = parse(query);
+
+    expect(spec.diameter?.nominal).toBe(nominal);
+    expect(spec.diameter?.known).toBe(true);
+    expect(spec.pitch).toBe(pitch);
+    expect(spec.provenance.pitch).toBe('explicit');
+  });
+
+  it('quotes what the user typed even where the stored pitch is the catalog spelling', () => {
+    expect(parse('M6-1 x 50mm tap bolt').evidence.pitch).toBe('1');
+  });
+
+  it('parses M6-1 and M6-1.0 to the same stored pitch', () => {
+    expect(parse('M6-1 x 50mm tap bolt').pitch).toBe(parse('M6-1.0 x 50mm tap bolt').pitch);
+  });
+
+  it('still rejects a pitch that is a different number', () => {
+    const spec = parse('1/2-20 hex nut');
+
+    expect(spec.diameter?.known).toBe(false);
+    expect(spec.pitch).toBe('20');
+  });
+});
+
 describe('a fraction the user closed with the inch mark', () => {
   it('reads it as the imperial nominal when no other thread token stands in the query', () => {
     const spec = parse('1/2"');

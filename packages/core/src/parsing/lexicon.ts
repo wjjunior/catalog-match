@@ -229,6 +229,17 @@ const STANDARD_TERMS: ReadonlyArray<readonly [string, Standard]> = [
   ['class 8', 'CLASS 8'],
 ];
 
+/** The bodies queryParser reads a designator after, so that a standard this catalog does
+ * not stock is still parsed as one. docs/DESIGN.md 5.3. */
+export const STANDARD_BODIES: ReadonlySet<string> = new Set([
+  'din',
+  'iso',
+  'asme',
+  'astm',
+  'ansi',
+  'ifi',
+]);
+
 export const LEXICON: ReadonlyMap<string, LexiconEntry> = new Map<string, LexiconEntry>([
   ...TYPE_TERMS.map(([term, values]) => [term, { attribute: 'type', values }] as const),
   ...UNKNOWN_TYPE_TERMS.map((term) => [term, { attribute: 'unknownType', values: [] }] as const),

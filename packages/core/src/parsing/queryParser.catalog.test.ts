@@ -12,6 +12,7 @@ import {
   failedConstraint,
 } from '../matching/compatibility';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
+import { core } from '../../test/integration/setup';
 import { descriptionParser } from './descriptionParser';
 import { parseQuery } from './queryParser';
 
@@ -85,6 +86,111 @@ describe('the rows DESIGN 6 keeps ambiguous', () => {
     'leaves %s ambiguous on a token the catalog has no place for',
     (query) => {
       expect(answer(query).status).toBe('ambiguous');
+    },
+  );
+});
+
+/** The note was the tell: the catalog does hold M6, so "M6 is not a diameter in this
+ * catalog" was never true — it was the textual pitch comparison flipping `known`. */
+describe('a pitch spelled with a different number of zeros', () => {
+  it.each(['M6-1 x 50mm tap bolt', 'M16-2 x 50mm hex bolt', 'M8-1.250 x 50mm hex bolt'])(
+    'leaves %s a satisfiable diameter',
+    (query) => {
+      const { spec } = parseQuery(query);
+
+      expect(spec.diameter?.known).toBe(true);
+      expect(answer(query).status).not.toBe('none');
+    },
+  );
+
+  it('answers M6-1 x 50mm tap bolt with the SKU the canonical spelling finds', () => {
+    expect(core.matchQuery({ query: 'M6-1 x 50mm tap bolt' }).results.map((m) => m.sku)).toEqual([
+      'PXTAP65088PL0765',
+    ]);
+  });
+
+  it('no longer says M6 is not a diameter in this catalog', () => {
+    const notes = core.matchQuery({ query: 'M6-1 x 50mm tap bolt' }).notes;
+
+    expect(notes.map((n) => n.message)).not.toContain('M6 is not a diameter in this catalog');
+    expect(notes.map((n) => n.code)).not.toContain('unknownDiameter');
+  });
+});
+
+describe('a quantity phrase standing beside a length', () => {
+  it.each(['M8 x 50 qty 100 BHCS', 'M8 x 50 BHCS qty 100'])(
+    'answers %s with the 50 mm SKU',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'unique',
+        count: 1,
+        failed: undefined,
+        alternativeCount: 0,
+      });
+      expect(core.matchQuery({ query }).results.map((m) => m.sku)).toEqual(['PXBTN850ALBO0100']);
+    },
+  );
+});
+
+describe('an unclaimed word between the diameter and a number', () => {
+  it.each(['grade 8 1/2-13 hex nut', '1/2-13 hex nut grade 8'])(
+    'answers %s over the five 1/2-13 hex nuts',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'ambiguous',
+        count: 5,
+        failed: undefined,
+        alternativeCount: 0,
+      });
+      expect(core.matchQuery({ query }).notes.map((n) => n.message)).toEqual([
+        'not verifiable: grade, 8',
+      ]);
+    },
+  );
+});
+
+/** docs/DESIGN.md 6 pairs "standard not in catalog" with "length not in catalog" as a
+ * none condition, and makes dropping the standard relaxation step 1. */
+describe('a standard the catalog does not stock', () => {
+  it('empties the compatible set rather than returning a different standard', () => {
+    expect(answer('M8 x 50mm BHCS DIN 125')).toEqual({
+      status: 'none',
+      count: 0,
+      failed: 'standard',
+      alternativeCount: 1,
+    });
+  });
+
+  it('names the standard that failed and offers the ISO item only as an alternative', () => {
+    const response = core.matchQuery({ query: 'M8 x 50mm BHCS DIN 125' });
+
+    expect(response.results).toEqual([]);
+    expect(response.notes.map((n) => n.message)).toEqual([
+      'no M8 button socket cap screw to DIN 125',
+    ]);
+    expect(response.alternatives.map((a) => [a.sku, a.relaxed])).toEqual([
+      ['PXBTN850ALBO0100', ['standard']],
+    ]);
+  });
+
+  it.each(['M8 flat washer DIN 125', 'DIN 125 M8 flat washer'])(
+    'answers %s the same way, with no invented length',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'none',
+        count: 0,
+        failed: 'standard',
+        alternativeCount: 7,
+      });
+
+      const response = core.matchQuery({ query });
+
+      expect(response.notes.map((n) => n.message)).toEqual(['no M8 flat washer to DIN 125']);
+      expect(response.alternatives.map((a) => a.relaxed)).toEqual([
+        ['standard'],
+        ['standard'],
+        ['standard'],
+      ]);
     },
   );
 });

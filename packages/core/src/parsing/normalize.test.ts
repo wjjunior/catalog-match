@@ -227,6 +227,20 @@ describe('stripping quantities and noise', () => {
     expect(normalize('M8 x 50 BHCS').canonical).toBe('m8 x 50 bhcs');
   });
 
+  it('keeps a number the separator already bound, whichever side the quantity word is on', () => {
+    expect(normalize('M8 x 50 qty 100 BHCS').canonical).toBe('m8 x 50 bhcs');
+    expect(normalize('M8 x 50 BHCS qty 100').canonical).toBe('m8 x 50 bhcs');
+  });
+
+  it('still strips the quantity itself in either word order', () => {
+    expect(normalize('M8 x 50 qty 100 BHCS').notes).toEqual(['quantityStripped']);
+    expect(normalize('M8 x 50 BHCS qty 100').notes).toEqual(['quantityStripped']);
+  });
+
+  it('strips a number a quantity word binds on its own, with no separator in front', () => {
+    expect(normalize('100 qty M8 hex nut').canonical).toBe('m8 hex nut');
+  });
+
   it('drops `of` when it sits next to a stripped token', () => {
     expect(normalize('200 pcs of M8').canonical).toBe('m8');
   });
