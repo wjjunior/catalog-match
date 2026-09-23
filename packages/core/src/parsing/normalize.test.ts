@@ -471,6 +471,74 @@ describe('the quantity span crossed with the separator (G3)', () => {
   });
 });
 
+// Round 4: a length carrying a unit or an inch mark is stronger evidence of a dimension
+// than a bare integer, not weaker, so it must count as "another number" too, or a bare
+// quantity beside it looks lonely, survives, and wins the length slot positionally.
+describe('both invariants crossed with a unit on the dimension (G3 round 4)', () => {
+  const DIMENSION_BASES = [
+    { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'bare length' },
+    { tokens: ['m8', 'bhcs', '50mm'], length: '50mm', label: 'length with a unit' },
+    { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'bare length, x-bound' },
+    { tokens: ['m8', 'x', '50mm', 'bhcs'], length: '50mm', label: 'unit length, x-bound' },
+  ] as const;
+
+  // Every insertion position places the phrase both before and after the dimension token
+  // across the sweep, so "before/after" is not a separate parameter here, it falls out of it.
+  describe('a bare quantity word (no number of its own) at every position', () => {
+    const WORDS = ['qty', 'each', 'pcs', 'pieces', 'ea'] as const;
+
+    const CASES = DIMENSION_BASES.flatMap((base) =>
+      WORDS.flatMap((word) =>
+        Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
+          base,
+          word,
+          position,
+        })),
+      ),
+    );
+
+    it.each(CASES)(
+      'keeps $base.length when bare "$word" lands at position $position of $base.label',
+      ({ base, word, position }) => {
+        const words = normalize(insertAt(base.tokens, position, [word])).tokens.map(
+          (token) => token.text,
+        );
+
+        expect(words).toContain(base.length);
+      },
+    );
+  });
+
+  describe('a self-contained numbered phrase at every position', () => {
+    const NUMBERED_PHRASES = [
+      { tokens: ['qty', '100'], number: '100' },
+      { tokens: ['100', 'pcs'], number: '100' },
+      { tokens: ['100', 'pieces'], number: '100' },
+      { tokens: ['100', 'ea'], number: '100' },
+      { tokens: ['100', 'each'], number: '100' },
+    ] as const;
+
+    it('keeps invariant (a) the dimension and (b) the quantity number, together, everywhere', () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...DIMENSION_BASES),
+          fc.constantFrom(...NUMBERED_PHRASES),
+          fc.nat(),
+          (base, phrase, rawPosition) => {
+            const position = rawPosition % (base.tokens.length + 1);
+            const words = normalize(insertAt(base.tokens, position, phrase.tokens)).tokens.map(
+              (token) => token.text,
+            );
+
+            expect(words).toContain(base.length);
+            expect(words).not.toContain(phrase.number);
+          },
+        ),
+      );
+    });
+  });
+});
+
 describe('the acceptance examples of PRG-12', () => {
   it.each([
     ['1/2-13x3"', '1/2-13 x 3"'],
