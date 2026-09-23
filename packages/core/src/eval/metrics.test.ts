@@ -228,16 +228,34 @@ describe('calibration', () => {
     expect(calibration([single('k-4', 1, 'SS')]).bins[9]?.count).toBe(1);
   });
 
-  // A tie query has acceptable answers and no intended one, and a history reference
-  // carries a rank decay rather than a posterior. Neither belongs on this axis.
-  it('leaves out every case whose status is not unique', () => {
+  // A tie query that names one intended SKU is scored by the same posterior as a unique
+  // answer, so excluding it emptied the lower bins by construction rather than by the data.
+  it('keeps a tie query that names the SKU it expects first', () => {
     const outcomes = [
       outcomeOf(caseOf({ id: 'k-5', expectedTop1: 'SS' }), ['SS'], { confidences: [0.9] }),
+    ];
+
+    expect(calibration(outcomes).cases).toBe(1);
+  });
+
+  it('leaves out a tie query whose label names only acceptable answers', () => {
+    const outcomes = [outcomeOf(caseOf({ id: 'k-7' }), ['SS', 'BO'], { confidences: [0.9, 0.1] })];
+
+    expect(calibration(outcomes).cases).toBe(0);
+  });
+
+  // A history answer carries a recency decay rather than a posterior, and five of them sit
+  // on the same value; binning them against empirical precision would measure nothing.
+  it('leaves out an answer scored by recency rather than by the posterior', () => {
+    const outcomes = [
       outcomeOf(
         caseOf({ id: 'k-6', expectedStatus: 'history', expected: ['SS'], expectedTop1: 'SS' }),
         ['SS'],
         { confidences: [0.7] },
       ),
+      outcomeOf(caseOf({ id: 'k-8', expected: ['SS'], expectedStatus: 'unparsed' }), ['SS'], {
+        confidences: [0.4],
+      }),
     ];
 
     expect(calibration(outcomes).cases).toBe(0);

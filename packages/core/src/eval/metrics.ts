@@ -274,12 +274,15 @@ export interface CalibrationMetrics {
 
 const BIN_COUNT = 10;
 
-/** Single-label cases whose status is unique. A tie query mixes "acceptable" with
- * "intended", and a history reference reports a rank decay rather than a posterior;
- * binning either against empirical precision would measure nothing. docs/DESIGN.md 10.2. */
+/** Every case whose label names one intended SKU and whose answer came from the posterior.
+ * Keyed on the answer, not on the expected status: a history reference reports a recency
+ * decay rather than a posterior, and binning two scales together would measure neither. */
 export function calibration(outcomes: readonly CaseOutcome[]): CalibrationMetrics {
   const scored = outcomes.filter(
-    (outcome) => outcome.entry.expectedStatus === 'unique' && outcome.entry.expected.length === 1,
+    (outcome) =>
+      intendedSku(outcome.entry) !== undefined &&
+      outcome.full.status !== 'history' &&
+      outcome.full.status !== 'unparsed',
   );
 
   const buckets = Array.from({ length: BIN_COUNT }, () => ({ count: 0, hits: 0 }));
