@@ -50,6 +50,9 @@ function familyOf(attribute: Shared, value: string): string {
   return isFinish(value) ? finishFamilyOf(value) : value;
 }
 
+const isMember = (attribute: Shared, value: string): boolean =>
+  attribute === 'material' ? isMaterial(value) : isFinish(value);
+
 const valueOf = (spec: ParsedSpec, attribute: Shared): string | undefined =>
   attribute === 'material' ? spec.material?.value : spec.finish?.value;
 
@@ -88,10 +91,12 @@ function preferenceOf(
     value,
     formatted,
     present: candidates.some((item) => valueOf(item.spec, attribute) === value),
+    // A member the query names satisfies the family it belongs to, but a different exact
+    // member never satisfies another exact member, even inside the same family.
     overridden:
       stated !== undefined &&
       stated !== value &&
-      familyOf(attribute, stated) !== familyOf(attribute, value),
+      (isMember(attribute, stated) || familyOf(attribute, stated) !== familyOf(attribute, value)),
   };
 }
 
