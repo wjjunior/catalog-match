@@ -1,3 +1,5 @@
+import { classifySizeToken } from './units';
+
 export interface NormalizedToken {
   text: string;
   /** Offsets into the original input, so evidence can quote what the user wrote. */
@@ -184,11 +186,18 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
 function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
   const isNumberToken = (token: NormalizedToken | undefined): boolean =>
     token !== undefined && /^\d+$/.test(token.text);
-  // A unit or an inch/foot mark is stronger evidence of a dimension than a bare integer,
-  // not weaker: `50mm` and `5/8"` must count as "another number" just as `100` does.
-  const isDimensionLike = (token: NormalizedToken | undefined): boolean =>
-    token !== undefined &&
-    (isNumberToken(token) || /^\d[\d./-]*(?:mm|in|ft|["'])$/.test(token.text));
+  // units.ts is the parser's own definition of a dimension-shaped token, so a spelling it
+  // recognizes (a decimal, a fraction, a mixed number, any of them unit-marked) can never
+  // be a spelling this tally misses. A clean diameter (`m8`, `#10`) or a pitched thread
+  // (`3/4-10`) is excluded; a bare fraction (`3/4`) is not yet distinguishable from either
+  // by shape alone, so it counts, exactly like the bare integer it stands in for here.
+  const isDimensionLike = (token: NormalizedToken | undefined): boolean => {
+    if (token === undefined) return false;
+    const classified = classifySizeToken(token.text);
+    if (classified === undefined) return false;
+    if (classified.kind === 'length') return true;
+    return classified.pitch === undefined && /^\d+\/\d+$/.test(classified.nominal);
+  };
   // `x` binds to `index` only if `x`'s far side is not itself a number: a number sandwiched
   // between `x` and another number (`5 x 50`) is `x`'s pair, not a dimension guarding index.
   const boundBySeparator = (index: number): boolean =>

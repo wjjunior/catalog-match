@@ -402,6 +402,22 @@ describe('the quantity span crossed with the separator (G3)', () => {
     expect(normalize(input).canonical).toBe(expected);
   });
 
+  it.each([
+    ['1/4-20 x qty 100 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 100 pcs 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x qty 5 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 100 each 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 5 ea 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 2 pieces 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['lock washer 1-1/2 qty 100', 'lock washer 1-1/2'],
+    ['lock washer qty 100 1-1/2', 'lock washer 1-1/2'],
+  ])(
+    'does not let the quantity win the length slot from a bare fraction in %s',
+    (input, expected) => {
+      expect(normalize(input).canonical).toBe(expected);
+    },
+  );
+
   // A word with no number of its own must not reach for the query's one stated length, on
   // either side of it, with or without the separator: qty/pcs/pieces/ea risk this exactly
   // as each does, since none of them carry evidence that the length is theirs to claim.
@@ -471,15 +487,24 @@ describe('the quantity span crossed with the separator (G3)', () => {
   });
 });
 
-// Round 4: a length carrying a unit or an inch mark is stronger evidence of a dimension
-// than a bare integer, not weaker, so it must count as "another number" too, or a bare
-// quantity beside it looks lonely, survives, and wins the length slot positionally.
-describe('both invariants crossed with a unit on the dimension (G3 round 4)', () => {
+// Round 4 added a unit or an inch mark as "another number", since it is stronger evidence
+// of a dimension than a bare integer, not weaker. Round 5: a bare fraction (`3/4`) is
+// neither an integer nor unit-marked, so the same tally missed it too; a mixed number
+// (`1-1/2`) is included as the same family's next spelling, and must not regress next.
+describe('both invariants crossed with the dimension in every spelling (G3 round 4-5)', () => {
   const DIMENSION_BASES = [
     { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'bare length' },
     { tokens: ['m8', 'bhcs', '50mm'], length: '50mm', label: 'length with a unit' },
     { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'bare length, x-bound' },
     { tokens: ['m8', 'x', '50mm', 'bhcs'], length: '50mm', label: 'unit length, x-bound' },
+    { tokens: ['m8', 'bhcs', '3/4'], length: '3/4', label: 'bare fraction length' },
+    { tokens: ['m8', 'x', '3/4', 'bhcs'], length: '3/4', label: 'bare fraction length, x-bound' },
+    { tokens: ['m8', 'bhcs', '1-1/2'], length: '1-1/2', label: 'mixed number length' },
+    {
+      tokens: ['m8', 'x', '1-1/2', 'bhcs'],
+      length: '1-1/2',
+      label: 'mixed number length, x-bound',
+    },
   ] as const;
 
   // Every insertion position places the phrase both before and after the dimension token
