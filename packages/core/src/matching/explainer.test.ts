@@ -29,6 +29,7 @@ import {
   formatMaterial,
   formatType,
   historyReferenceNote,
+  unresolvedReferenceNote,
   orderedReason,
   overrideReason,
   preferenceReason,
@@ -778,6 +779,13 @@ describe('note builders', () => {
     });
   });
 
+  it('says a reference named no order, quoting the phrase', () => {
+    expect(unresolvedReferenceNote('same')).toEqual({
+      code: 'historyReference',
+      message: "no earlier order matches 'same'",
+    });
+  });
+
   it('cites the order a history reference was based on', () => {
     expect(historyReferenceNote('2026-04-15', [])).toEqual({
       code: 'historyReference',
@@ -822,6 +830,7 @@ describe('note builders', () => {
       discontinuedNote('PXNUT16888PL0901'),
       customerRequiredNote('last time'),
       historyReferenceNote('2026-04-15', [{ attr: 'material', value: 'brass' }]),
+      unresolvedReferenceNote('what we always get'),
       unverifiedResidueNote(['nylon']),
     ];
 

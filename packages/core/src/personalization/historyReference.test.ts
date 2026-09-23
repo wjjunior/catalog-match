@@ -39,6 +39,9 @@ function pure(lines: readonly HistoryLine[] | undefined, query: string): readonl
   return reference.lines;
 }
 
+const formOf = (lines: readonly HistoryLine[] | undefined, query: string): string =>
+  resolveReference(lines, specOf(query), config).form;
+
 function override(lines: readonly HistoryLine[], query: string) {
   const reference = resolveReference(lines, specOf(query), config);
   if (reference.form !== 'override') throw new Error(`expected an override, got ${reference.form}`);
@@ -76,13 +79,13 @@ describe('selecting the lines a reference names', () => {
   });
 
   it('resolves to nothing when the customer never bought the type', () => {
-    expect(pure(mixed, 'the same rods as last time')).toEqual([]);
+    expect(formOf(mixed, 'the same rods as last time')).toBe('unresolved');
   });
 });
 
 describe('a reference whose query states a thread pitch of its own', () => {
   it('names no order when every line contradicts the pitch the query states', () => {
-    expect(skus(pure(mixed, 'the same M8-1.0 washers as last time'))).toEqual([]);
+    expect(formOf(mixed, 'the same M8-1.0 washers as last time')).toBe('unresolved');
   });
 
   it('still names the orders whose pitch is the one the query states', () => {
@@ -101,10 +104,10 @@ describe('a reference whose query states a thread pitch of its own', () => {
     ]);
   });
 
-  it('falls back to a pure reference rather than overriding a line it cannot name', () => {
+  it('names no order rather than overriding a line it cannot name', () => {
     const asked = specOf('same M8-1.0 washers as last time, but brass');
 
-    expect(resolveReference(mixed, asked, config)).toEqual({ form: 'pure', lines: [] });
+    expect(resolveReference(mixed, asked, config)).toEqual({ form: 'unresolved' });
   });
 
   it('overrides a base that states no pitch without losing the thread the query stated', () => {
@@ -225,7 +228,7 @@ describe('a query without a customer', () => {
   });
 
   it('separates a customer with no history from no customer at all', () => {
-    expect(pure([], 'the same washers as last time')).toEqual([]);
+    expect(formOf([], 'the same washers as last time')).toBe('unresolved');
   });
 });
 

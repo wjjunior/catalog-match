@@ -25,6 +25,7 @@ import {
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
+  unresolvedReferenceNote,
   unverifiedResidueNote,
   withPersonalization,
 } from '../matching/explainer';
@@ -364,18 +365,8 @@ function referencedOrders(
     compatibleCount: 0,
     results,
     alternatives: [],
-    notes: notesFor(spec, lines.length === 0 ? unresolvedReference(spec) : undefined),
+    notes: notesFor(spec, undefined),
   };
-}
-
-/** A reference names orders by diameter, pitch and type (docs/DESIGN.md 7.4), so one that
- * named none failed on a selector the query stated; with none stated there is no failure
- * to report, only a history the query asked nothing of. */
-function unresolvedReference(spec: ParsedSpec): Note | undefined {
-  if (spec.diameter !== undefined) return diagnosis(spec, 'diameter');
-  if (spec.type !== undefined && spec.type.length > 0) return diagnosis(spec, 'type');
-
-  return undefined;
 }
 
 function changeOf(spec: ParsedSpec, attribute: AttributeName): AttributeChange | [] {
@@ -445,6 +436,14 @@ function answerFor(
 
     return attributeAnswer(request.query, reference.spec, deps, config, limit, profile, [
       historyReferenceNote(reference.base.orderDate, changes),
+    ]);
+  }
+
+  // A reference that named no order is not an answer, and the history cannot be held
+  // against the catalog: status comes from C as it does for any other query. 5.3, 7.4.
+  if (reference.form === 'unresolved') {
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, [
+      unresolvedReferenceNote(phrase),
     ]);
   }
 

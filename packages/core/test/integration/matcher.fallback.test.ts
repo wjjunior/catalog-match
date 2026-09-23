@@ -143,12 +143,28 @@ const referenced = createCoreFromRepositories({
 });
 
 describe('a history reference that resolves to no order at all', () => {
-  it('names the attribute no past order satisfies instead of answering mutely', () => {
+  it('answers from the catalog instead of reporting the history as a failed constraint', () => {
     const response = referenced.matchQuery({ query: 'same M8 hex nut', customerId: 'CUST-001' });
 
-    expect(response.status).toBe('history');
-    expect(response.results).toEqual([]);
-    expect(response.notes).toContainEqual({ code: 'failedConstraint', message: 'no M8 hex nut' });
+    expect(response.status).toBe('unique');
+    expect(response.results.map((match) => match.sku)).toEqual([NUT.sku]);
+    expect(response.notes).toContainEqual({
+      code: 'historyReference',
+      message: "no earlier order matches 'same'",
+    });
+  });
+
+  it('names the attribute the catalog cannot satisfy, not the one the history lacks', () => {
+    const response = referenced.matchQuery({
+      query: 'same M8 hex nut in brass',
+      customerId: 'CUST-001',
+    });
+
+    expect(response.status).toBe('none');
+    expect(response.notes).toContainEqual({
+      code: 'failedConstraint',
+      message: 'no M8 hex nut in brass',
+    });
   });
 
   it('stays quiet when the reference does name an order', () => {

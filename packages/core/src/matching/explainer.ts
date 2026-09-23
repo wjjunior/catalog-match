@@ -385,6 +385,10 @@ export function customerRequiredNote(phrase: string): Note {
   return note('customerRequired', `select a customer to resolve '${phrase}'`);
 }
 
+export function unresolvedReferenceNote(phrase: string): Note {
+  return note('historyReference', `no earlier order matches '${phrase}'`);
+}
+
 export interface AttributeChange {
   attr: AttributeName;
   value: string;
