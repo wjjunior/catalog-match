@@ -62,6 +62,7 @@
       },
       "personalization": {
         "cases": 21,
+        "hit1Cases": 21,
         "hit1": 1,
         "hit1WithoutCustomer": 0.1429,
         "margin": 0.3281,

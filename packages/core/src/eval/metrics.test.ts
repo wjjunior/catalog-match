@@ -196,10 +196,27 @@ describe('personalization', () => {
   it('compares Hit@1 with the customer against the same query without one', () => {
     expect(personalization(outcomes)).toEqual({
       cases: 2,
+      hit1Cases: 2,
       hit1: 1,
       hit1WithoutCustomer: expect.closeTo(1 / 2, 10),
       margin: expect.closeTo((0.6 + 0.1) / 2, 10),
       marginCases: 2,
+    });
+  });
+
+  // A personalized case whose label names only acceptable SKUs has no answer that could
+  // score: counting it as a miss reports the metric's ceiling as if it were a measurement.
+  it('leaves a case with no single intended SKU out of the Hit@1 denominator', () => {
+    const unwinnable = outcomeOf(
+      caseOf({ id: 'z-4', customerId: 'CUST-003', expected: ['SS', 'BO', 'BR'] }),
+      ['SS', 'BO', 'BR'],
+      { confidences: [0.7, 0.2, 0.1], without: ['SS', 'BO', 'BR'] },
+    );
+
+    expect(personalization([...outcomes, unwinnable])).toMatchObject({
+      cases: 3,
+      hit1Cases: 2,
+      hit1: 1,
     });
   });
 });

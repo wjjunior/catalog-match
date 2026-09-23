@@ -223,6 +223,9 @@ function brokenBy(id: string, response: MatchResponse, catalog: CatalogRepositor
 
 export interface PersonalizationMetrics {
   cases: number;
+  /** Its own denominator: a case whose label names only acceptable SKUs has no answer that
+   * could rank the intended one first, so scoring it would report a ceiling as a result. */
+  hit1Cases: number;
   hit1: number;
   hit1WithoutCustomer: number;
   /** Mean gap between top-1 and top-2 confidence: how far personalization moved the
@@ -235,12 +238,15 @@ export interface PersonalizationMetrics {
 
 export function personalization(outcomes: readonly CaseOutcome[]): PersonalizationMetrics {
   const scored = outcomes.filter((outcome) => outcome.entry.customerId !== undefined);
+  const eligible = scored.filter((outcome) => intendedSku(outcome.entry) !== undefined);
 
   const top1 = (response: MatchResponse | undefined, intended: string | undefined): number =>
     response !== undefined && intended !== undefined && response.results[0]?.sku === intended
       ? 1
       : 0;
 
+  // Every personalized case, not only the eligible ones: separation between top-1 and
+  // top-2 is well defined whether or not a label names which of them was intended.
   const margins = scored.flatMap((outcome) => {
     const [first, second] = outcome.full.results;
 
@@ -251,8 +257,9 @@ export function personalization(outcomes: readonly CaseOutcome[]): Personalizati
 
   return {
     cases: scored.length,
-    hit1: mean(scored.map((o) => top1(o.full, intendedSku(o.entry)))),
-    hit1WithoutCustomer: mean(scored.map((o) => top1(o.withoutCustomer, intendedSku(o.entry)))),
+    hit1Cases: eligible.length,
+    hit1: mean(eligible.map((o) => top1(o.full, intendedSku(o.entry)))),
+    hit1WithoutCustomer: mean(eligible.map((o) => top1(o.withoutCustomer, intendedSku(o.entry)))),
     margin: mean(margins),
     marginCases: margins.length,
   };
