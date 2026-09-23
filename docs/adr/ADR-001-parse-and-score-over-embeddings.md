@@ -55,14 +55,18 @@ oracle (`packages/core/src/parsing/descriptionParser.catalog.test.ts`).
 Explanations name the attribute that matched and the one that did not, because the
 attributes are real objects rather than a similarity score. Latency is sub-millisecond
 with no network dependency (ADR-004). The cost is the lexicon: a term the catalog uses and
-the lexicon does not know becomes residue, and the two parser defects the golden set
-catches today are of that kind — `nylon lock nut M8` is answered `ambiguous` where `none`
-is expected, and `1/2"` never becomes a diameter.
+the lexicon does not know becomes residue. `nylon lock nut M8` still drops `nylon` into
+residue for exactly that reason. This record once named two defects of that kind as live —
+that query, answered `ambiguous` where `none` was expected, and `1/2"` never becoming a
+diameter. Both have since been fixed: the first is answered `none` and the second parses to
+a diameter and is answered `ambiguous` over 62 compatible items. The cost remains; on the
+golden set it no longer produces a wrong answer.
 
 Status accuracy is 0.987, not 1.000: one of the 78 cases is wrong — `same washers as last
 time, but brass` (pers-21), where the override drops the standard. This record first read
-0.962 over three failures; the other two were parser defects, since fixed. Every number
-here is golden-set evidence; the held-out set has not been run.
+0.962 over three failures; the other two were the parser defects named above, since fixed.
+Every number here is golden-set evidence. The held-out set was spent once, on 2026-09-21,
+and is reported separately in `docs/eval-heldout.md`.
 
 ## Revisit trigger
 

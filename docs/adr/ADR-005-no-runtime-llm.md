@@ -33,9 +33,12 @@ independent oracle
 (`packages/core/src/parsing/descriptionParser.catalog.test.ts`).
 
 On the query side, over the 78 golden cases (`docs/eval-report.md`), Hit@1 is 1.000 on the
-48 single-label cases and status accuracy is 0.987. One case, `1/2"`, falls through to the
-lexical fallback and is reported `unparsed`, which is what its label expects. A runtime model would have to beat that while
-adding non-determinism, latency and an untestable path.
+48 single-label cases and status accuracy is 0.987. One case, `6 ft` (adv-16), reaches
+neither a diameter nor a type and is answered `unparsed` with nothing to show, which is
+what its label expects. An earlier revision of this record named `1/2"` there; that query
+parses to a diameter and is answered `ambiguous` over 62 compatible items, which is what
+adv-15 expects. A runtime model would have to beat that while adding non-determinism,
+latency and an untestable path.
 
 Determinism is itself measured: the same inputs produce byte-identical metrics across runs,
 which is what allows `data/eval/baseline.json` to act as a CI floor at all.

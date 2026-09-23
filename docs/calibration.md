@@ -294,3 +294,9 @@ The held-out set was not re-run. Its calibration table is unaffected by the wide
 held-out case carries an `expectedTop1` — and its personalization Hit@1 was corrected by
 arithmetic over the outcomes of the single 2026-09-21 run. `docs/eval-heldout.md` records
 both, with the numbers that run published.
+
+Two of the four cases tabled above as still failing have since been fixed, so "they still
+fail" should be read as of 2026-09-18: `adv-06` (`nylon lock nut M8`) is now answered
+`none`, and `adv-15` (`1/2"`) now parses to a diameter and is answered `ambiguous` over 62
+compatible items. `pers-21` is the one golden case still wrong. The table is left as it was
+measured.
