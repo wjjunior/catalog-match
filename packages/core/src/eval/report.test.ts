@@ -141,6 +141,33 @@ describe('the personalization table', () => {
     expect(personalized).toMatch(/\| Hit@1 with the customer \| [0-9.]+ \| 2 \|/);
   });
 
+  // The heading counts the personalized cases; the Hit@1 rows count the ones a label made
+  // scorable at all, so a reader can see the gap rather than read a ceiling as a result.
+  it('counts only the cases a single intended SKU made scorable behind Hit@1', () => {
+    const unwinnable = toMarkdown([
+      {
+        name: 'Golden set',
+        report: run({
+          matcher: stubMatcher(ANSWERS).matcher,
+          catalog,
+          cases: [
+            caseOf({ id: 'p-3', customerId: 'CUST-003', expected: ['SS', 'BO', 'BR'] }),
+            caseOf({
+              id: 'p-4',
+              customerId: 'CUST-004',
+              query: 'M16 hex nut',
+              expectedStatus: 'unique',
+              expected: ['NUT'],
+            }),
+          ],
+        }),
+      },
+    ]);
+
+    expect(unwinnable).toContain('### Personalization (2 cases)');
+    expect(unwinnable).toMatch(/\| Hit@1 with the customer \| 1\.000 \| 1 \|/);
+  });
+
   // The second case is answered with one result, so it has no top-2 to measure against.
   it('counts only the cases the margin could be measured on', () => {
     expect(personalized).toMatch(/\| Mean top-1 to top-2 margin \| [0-9.]+ \| 1 \|/);

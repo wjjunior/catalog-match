@@ -17,7 +17,7 @@ import type {
 } from '../domain/spec';
 import { INTENT_PHRASES } from '../personalization/intent';
 import { correct } from './fuzzy';
-import { longestMatch, type LexiconValue } from './lexicon';
+import { STANDARD_BODIES, longestMatch, type LexiconValue } from './lexicon';
 import { normalize } from './normalize';
 import {
   classifySizeToken,
@@ -69,6 +69,9 @@ const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
+/** `125`, `a307`, `b18.2.1`: the designator half of a standard, never a whole standard. */
+const DESIGNATOR = /^[a-z]?\d+(?:\.\d+)*[a-z]?$/;
+
 function read(query: string): Token[] {
   return normalize(query).tokens.map((token) => {
     const fix = correct(token.text);
@@ -99,6 +102,14 @@ function claim(draft: Draft, from: number, to: number): void {
 function free(draft: Draft, from: number, to: number): boolean {
   for (let index = from; index < to; index++) {
     if (draft.claimed.has(index)) return false;
+  }
+
+  return true;
+}
+
+function settled(draft: Draft, from: number, to: number): boolean {
+  for (let index = from; index < to; index++) {
+    if (!draft.claimed.has(index)) return false;
   }
 
   return true;
@@ -173,7 +184,31 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     claim(draft, match.start, match.end);
   }
 
+  if (found.standard === undefined) found.standard = takeStandardCode(draft);
+
   return found;
+}
+
+/** Syntactic, not a lookup: a standard the query states constrains it whether or not the
+ * catalog stocks it (docs/DESIGN.md 5.3, 10.5). The thread guard keeps `iso M8` a size. */
+function takeStandardCode(draft: Draft): string | undefined {
+  for (let index = 0; index < draft.tokens.length - 1; index++) {
+    const body = draft.tokens[index];
+    const designator = draft.tokens[index + 1];
+
+    if (body === undefined || designator === undefined) continue;
+    if (!free(draft, index, index + 2)) continue;
+    if (!STANDARD_BODIES.has(body.text) || !DESIGNATOR.test(designator.text)) continue;
+    if (classifySizeToken(designator.text)?.kind === 'thread') continue;
+
+    draft.evidence.standard = quote(draft, index, index + 2);
+    draft.provenance.standard = 'explicit';
+    claim(draft, index, index + 2);
+
+    return `${body.text.toUpperCase()} ${designator.text.toUpperCase()}`;
+  }
+
+  return undefined;
 }
 
 function takeIntent(draft: Draft): string[] {
@@ -257,9 +292,13 @@ function readThread(draft: Draft, size: ThreadToken): Thread | undefined {
   draft.evidence.pitch = size.pitch;
   draft.provenance.pitch = 'explicit';
 
+  // M6-1 and M6-1.0 name one pitch; the stored value is the catalog's spelling so that
+  // everything downstream can compare pitches as equals rather than as text.
+  const stated = catalog !== undefined && Number(size.pitch) === Number(catalog);
+
   return {
-    diameter: { ...diameter, known: diameter.known && size.pitch === catalog },
-    pitch: size.pitch,
+    diameter: { ...diameter, known: diameter.known && stated },
+    pitch: stated ? catalog : size.pitch,
   };
 }
 
@@ -342,10 +381,13 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
     claim(draft, head.from, head.to);
   }
 
+  const reach = sizes.diameter === undefined ? undefined : head?.to;
+
   // Every documented length sits after the diameter: past the separator, attached to a
-  // unit, or trailing the type phrase. A number before it belongs to something else, as
-  // the 8 of `grade 8 1/2-13 hex nut` does.
+  // unit, or trailing the type phrase. A number the diameter only reaches over ground
+  // nothing has claimed belongs to something else, as the 8 of `1/2-13 hex nut grade 8`.
   for (const slot of thread === undefined ? slots : slots.slice(headAt + 1)) {
+    if (reach !== undefined && !settled(draft, reach, slot.from)) continue;
     const candidate = asLength(slot.size);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;

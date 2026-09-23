@@ -1,5 +1,5 @@
 import type { Finish, Material } from '../domain/attributes';
-import { FINISHES, MATERIALS } from '../domain/attributes';
+import { finishFamilyOf, FINISHES, MATERIALS, materialFamilyOf } from '../domain/attributes';
 import type { CatalogItem, CustomerProfile } from '../domain/catalog';
 import type { PersonalizationExplanation } from '../domain/match';
 import type { AttributeName, ParsedSpec } from '../domain/spec';
@@ -42,6 +42,14 @@ function format(attribute: Shared, value: string): string | undefined {
   return isFinish(value) ? formatFinish(value) : undefined;
 }
 
+/** A value outside its attribute's table (already a family) stands for itself, so a family
+ * term compares equal to the member it names. */
+function familyOf(attribute: Shared, value: string): string {
+  if (attribute === 'material') return isMaterial(value) ? materialFamilyOf(value) : value;
+
+  return isFinish(value) ? finishFamilyOf(value) : value;
+}
+
 const valueOf = (spec: ParsedSpec, attribute: Shared): string | undefined =>
   attribute === 'material' ? spec.material?.value : spec.finish?.value;
 
@@ -80,7 +88,10 @@ function preferenceOf(
     value,
     formatted,
     present: candidates.some((item) => valueOf(item.spec, attribute) === value),
-    overridden: stated !== undefined && stated !== value,
+    overridden:
+      stated !== undefined &&
+      stated !== value &&
+      familyOf(attribute, stated) !== familyOf(attribute, value),
   };
 }
 

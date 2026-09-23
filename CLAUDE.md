@@ -103,7 +103,7 @@ no comment describing what the next line does.
 
 | Command            | What it does                                                       |
 | ------------------ | ------------------------------------------------------------------ |
-| `pnpm install`     | Install the workspace. Node 20 or newer.                           |
+| `pnpm install`     | Install the workspace. Node ≥22.13 (see engines); .nvmrc pins 24.  |
 | `pnpm lint`        | ESLint, including the architecture boundary rules.                 |
 | `pnpm typecheck`   | `tsc --noEmit` at the root and in every package.                   |
 | `pnpm test`        | vitest, once.                                                      |

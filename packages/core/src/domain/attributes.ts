@@ -60,6 +60,20 @@ export const FINISH_FAMILY: Readonly<Record<Finish, FinishFamily>> = {
   black_oxide: 'black_oxide',
 };
 
+export const isMaterial = (value: string): value is Material =>
+  (MATERIALS as readonly string[]).includes(value);
+
+export const isFinish = (value: string): value is Finish =>
+  (FINISHES as readonly string[]).includes(value);
+
+/** A value already naming a family stands for itself, so a family term and the member it
+ * covers compare equal. */
+export const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily =>
+  isMaterial(value) ? MATERIAL_FAMILY[value] : value;
+
+export const finishFamilyOf = (value: Finish | FinishFamily): FinishFamily =>
+  isFinish(value) ? FINISH_FAMILY[value] : value;
+
 /** Assigned independently of product type: DIN 912 appears on washers, ISO 7380 on nuts. */
 export const STANDARDS = [
   'ASME B18.2.1',

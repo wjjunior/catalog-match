@@ -4,9 +4,6 @@ Every assumption taken while implementing a card, tagged with the card key.
 
 ## PRG-8
 
-- **Node 24 in `.nvmrc`, `engines.node >= 20`.** The card asks for Node 20; the brief
-  asks for Node 20+. The workspace was installed and verified on the machine's Node
-  24.15.0, so `.nvmrc` pins 24 and `engines` keeps the floor the brief states.
 - **TypeScript is pinned to `~6.0.3`, not the current latest (7.0.2).** `typescript-eslint`
   8.70 declares `typescript >=4.8.4 <6.1.0`; 6.0.3 is the newest release inside that range.
   Revisit when typescript-eslint supports TypeScript 7.

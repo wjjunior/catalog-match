@@ -343,7 +343,9 @@ describe('the lexical fallback', () => {
     // whole catalog rather than the active part would answer with it.
     const response = wired.matchQuery({ query: 'a2 ss yel zn' });
 
-    expect(response.status).toBe('unparsed');
+    // No active item is left for the recognized attributes to admit, so the fallback
+    // reports the failure rather than ranking. docs/DESIGN.md 5.8.
+    expect(response.status).toBe('none');
     expect(response.results).toEqual([]);
   });
 

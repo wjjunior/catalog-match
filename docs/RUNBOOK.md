@@ -5,7 +5,8 @@
     pnpm install
     pnpm dev
 
-The app serves on http://localhost:3000. Node 20 or newer; pnpm is pinned in `package.json`.
+The app serves on http://localhost:3000. Node 22.13+ (pnpm 11 and vitest 5 both refuse
+older Node — 23.x/25.x are also unsupported); pnpm is pinned in `package.json`.
 
 No environment variables, no `.env`, no network access at runtime. The server finds
 `data/catalog.csv` and `data/order_history.csv` by walking up from its working directory, so

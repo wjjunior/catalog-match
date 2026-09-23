@@ -38,6 +38,14 @@ function statusText(response: MatchResponse): string {
 
   if (response.status === 'none') return 'no compatible item in this catalog';
 
+  // History results are ranked by recency over past orders, not a posterior over a
+  // compatible set, so they must not borrow counted()'s "compatible options" banner.
+  if (response.status === 'history') {
+    return response.results.length > 0
+      ? "items from this customer's order history, most recent first"
+      : 'no history item in this catalog';
+  }
+
   return counted(response);
 }
 

@@ -194,7 +194,40 @@ const HEX_14_ZINC: CatalogItem = {
   }),
 };
 
+// R2 repro fixtures (triage/R2.md): the lexical fallback hands these items, unfiltered,
+// to the explainer alongside a spec whose material/finish/standard contradict them.
+const WASHER_M8_BRASS_PLAIN_DIN933: CatalogItem = {
+  catalogId: 'CAT-0440',
+  sku: 'PXWASH850BRPL0440',
+  description: 'M8-1.25 FLAT WSHR DIN 933 BRASS PLAIN',
+  active: true,
+  spec: spec({
+    diameter: diameter('M8'),
+    pitch: '1.25',
+    type: [{ value: 'flat_washer', strength: 1 }],
+    material: { value: 'brass', strength: 1 },
+    finish: { value: 'plain', strength: 1 },
+    standard: 'DIN 933',
+  }),
+};
+
+const LOCK_5_16_BRASS_YZ_IFI111: CatalogItem = {
+  catalogId: 'CAT-0535',
+  sku: 'PXLOCK5164BRYZ0535',
+  description: '5/16-18 LOCK WASHER IFI 111 BRASS YELLOW ZINC',
+  active: true,
+  spec: spec({
+    diameter: diameter('5/16'),
+    pitch: '18',
+    type: [{ value: 'lock_washer', strength: 1 }],
+    material: { value: 'brass', strength: 1 },
+    finish: { value: 'yellow_zinc', strength: 1 },
+    standard: 'IFI 111',
+  }),
+};
+
 const UNIQUE = { compatibleCount: 1, disambiguateBy: [] };
+const UNPARSED = { compatibleCount: 0, disambiguateBy: [] };
 
 describe('formatDiameter', () => {
   it('names a metric diameter by its nominal alone', () => {
@@ -509,6 +542,98 @@ describe('explainMatch', () => {
       { attr: 'diameter', query: 'M8', item: 'M8', provenance: 'explicit' },
       { attr: 'type', query: 'hex nut', item: 'hex nut', provenance: 'explicit' },
     ]);
+  });
+
+  // PRG-20 / triage R2: the lexical fallback (matchQuery.ts unparsed()) hands the explainer
+  // items C never filtered, so a contradicting attribute must not be reported as agreement.
+  it('drops a contradicting material rather than reporting it as partial (A2 plain DIN 933)', () => {
+    const query = spec({
+      material: { value: 'ss_a2', strength: 1 },
+      finish: { value: 'plain', strength: 1 },
+      standard: 'DIN 933',
+      evidence: { material: 'A2', finish: 'plain', standard: 'DIN 933' },
+      provenance: { material: 'explicit', finish: 'explicit', standard: 'explicit' },
+    });
+
+    const explanation = explainMatch(query, WASHER_M8_BRASS_PLAIN_DIN933, UNPARSED);
+
+    expect(explanation.matched).toEqual([
+      { attr: 'finish', query: 'plain', item: 'plain', provenance: 'explicit' },
+      { attr: 'standard', query: 'DIN 933', item: 'DIN 933', provenance: 'explicit' },
+    ]);
+  });
+
+  it('drops a contradicting material rather than reporting it as partial (brass CLASS 8)', () => {
+    const query = spec({
+      material: { value: 'brass', strength: 1 },
+      standard: 'CLASS 8',
+      evidence: { material: 'brass', standard: 'CLASS 8' },
+      provenance: { material: 'explicit', standard: 'explicit' },
+    });
+
+    const explanation = explainMatch(query, NUT_M12, UNPARSED);
+
+    expect(explanation.matched).toEqual([
+      { attr: 'standard', query: 'CLASS 8', item: 'CLASS 8', provenance: 'explicit' },
+    ]);
+  });
+
+  it('drops a contradicting standard rather than reporting it as exact (brass yellow zinc CLASS 8 -> IFI 111)', () => {
+    const query = spec({
+      material: { value: 'brass', strength: 1 },
+      finish: { value: 'yellow_zinc', strength: 1 },
+      standard: 'CLASS 8',
+      evidence: { material: 'brass', finish: 'yellow zinc', standard: 'CLASS 8' },
+      provenance: { material: 'explicit', finish: 'explicit', standard: 'explicit' },
+    });
+
+    const explanation = explainMatch(query, LOCK_5_16_BRASS_YZ_IFI111, UNPARSED);
+
+    expect(explanation.matched).toEqual([
+      { attr: 'material', query: 'brass', item: 'brass', provenance: 'explicit' },
+      { attr: 'finish', query: 'yellow zinc', item: 'yellow zinc', provenance: 'explicit' },
+    ]);
+    expect(explanation.matched.some((entry) => entry.attr === 'standard')).toBe(false);
+  });
+
+  it('drops a contradicting finish rather than reporting it as partial (hdg vs plain)', () => {
+    const query = spec({
+      diameter: diameter('M8'),
+      type: [{ value: 'flat_washer', strength: 1 }],
+      finish: { value: 'hdg', strength: 1 },
+      evidence: { diameter: 'M8', type: 'flat washer', finish: 'HDG' },
+      provenance: { diameter: 'explicit', type: 'explicit', finish: 'explicit' },
+    });
+
+    const explanation = explainMatch(query, WASHER_M8_18_8, UNPARSED);
+
+    expect(explanation.matched.some((entry) => entry.attr === 'finish')).toBe(false);
+  });
+
+  // Over-reach guard: dropping contradictions must not also drop genuine family agreement.
+  it('still reports a genuine zinc-family finish match as partial (zinc vs mech zinc)', () => {
+    const query = spec({
+      diameter: diameter('3/8'),
+      pitch: '16',
+      length: length(4, 'in'),
+      type: [{ value: 'hex_cap_screw', strength: 1 }],
+      finish: { value: 'zinc', strength: 1 },
+      evidence: { diameter: '3/8-16', length: '4"', type: 'hex cap screw', finish: 'zinc' },
+      provenance: {
+        diameter: 'explicit',
+        length: 'explicit',
+        type: 'explicit',
+        finish: 'explicit',
+      },
+    });
+
+    expect(explainMatch(query, HEX_BRASS, UNIQUE).matched).toContainEqual({
+      attr: 'finish',
+      query: 'zinc',
+      item: 'mech zinc',
+      provenance: 'explicit',
+      partial: true,
+    });
   });
 });
 

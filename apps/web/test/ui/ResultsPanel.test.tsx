@@ -132,7 +132,7 @@ describe('ResultsPanel', () => {
       response({
         query: 'the same washers as last time',
         status: 'history',
-        compatibleCount: 1,
+        compatibleCount: 0,
         results: [
           match({
             explanation: explanation({
@@ -149,7 +149,9 @@ describe('ResultsPanel', () => {
     await userEvent.click(await screen.findByRole('option'));
     await submit('the same washers as last time');
 
-    expect(await screen.findByText('1 match')).toBeDefined();
+    expect(
+      await screen.findByText("items from this customer's order history, most recent first"),
+    ).toBeDefined();
     expect(matchBody()).toEqual({
       query: 'the same washers as last time',
       customerId: 'CUST-003',

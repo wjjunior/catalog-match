@@ -107,8 +107,8 @@ Statuses below were rewritten on 2026-09-21, after calibration (`docs/calibratio
 | Parse-and-score outperforms a normalized lexical baseline on the golden set | **Held** | Golden set, 78 cases: Hit@1 1.000 against 0.167, exact-set rate 0.967 against 0.033, status accuracy 0.987 against 0.603 (section 10.4) |
 | Sub-50 ms p95 in memory | **Held** | p95 0.4 ms over the golden set through the use case; 0.3 ms over the held-out set |
 | Lexicon plus fuzzy matching covers the query classes in the example and adversarial sets | **Held on the tuned sets, and not on the held-out one** | Golden status accuracy 0.987; held-out 0.900, where the two misses are a type phrase and an intent paraphrase neither hand-enumerated list carries (`docs/eval/heldout-policy.md`) |
-| Confidence is calibrated | **Not established** | The golden calibration table is degenerate: 29 of 29 single-label cases land in the top bin at precision 1.000, so only the top band has evidence. The held-out table adds 11 cases across three bins, all at precision 1.000. Neither measures the Medium or Low bands (section 10.2) |
-| Strong history moves the intended SKU to top-1 with a clear margin | **Held** | Personalization Hit@1 1.000 with the customer against 0.143 without, over 21 hand-labeled pairs; mean top-1 to top-2 margin 0.328. Held-out: 1 of 2 |
+| Confidence is calibrated | **Not established** | The golden table bins 43 cases that name one intended SKU and were scored by the posterior: 29 in the top bin, the other 14 spread one to four per bin from 0.1 up, precision 1.000 throughout. The held-out table adds 11 cases across three bins, all at precision 1.000. Medium and Low are measured, but one to four cases deep, which orders the bands without validating a frequency (section 10.2). Published on 2026-09-21 as "29 of 29 … neither measures the Medium or Low bands", from a population that excluded every labelled tie case; corrected 2026-09-23, with no parameter and no answer changed |
+| Strong history moves the intended SKU to top-1 with a clear margin | **Held** | Personalization Hit@1 1.000 with the customer against 0.143 without, over 21 hand-labeled pairs; mean top-1 to top-2 margin 0.328. Held-out: 1 of 1 eligible, published on 2026-09-21 as 1 of 2 and corrected 2026-09-23 — the second held-out personalized case names three acceptable SKUs and no intended one, so no answer could score it |
 
 > 💡 **Implications.** A closed grammar justifies a parser over a retriever for the catalog side; the query side is open language and gets tolerance (lexicon, fuzzy, provenance) instead of assumptions. Numeric discriminants rule out embeddings as the primary signal. The tie structure of nut and washer queries makes "several compatible SKUs" a normal state, not an error, so it needs its own status. History profiles are clean for four customers and noisy for one, so shrinkage must handle the noisy case without special-casing it.
 
@@ -236,7 +236,7 @@ Status is decided by C and by the parse, before any number is computed:
 | ambiguous | C has two or more items | Top 3 of C by posterior; size of C and the attributes that vary inside C; personalization reorders C |
 | none | C is empty (unknown diameter or type, length or standard not in catalog, contradictory combination) | No confidence; the failed constraint named; up to 3 alternatives from backoff (section 5.6), each with the relaxed constraint stated |
 | history | Intent detector fires (section 7.4) | History-derived candidates, or a prompt to select a customer |
-| unparsed | Neither diameter nor type recognized | Lexical fallback, confidence capped at 0.4, status shown |
+| unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none |
 
 This is what makes "explicit attributes always win" a structural guarantee rather than a weighting: nothing outside C is ever ranked with C, and personalization only sees C.
 
@@ -282,7 +282,7 @@ Every match returns: the status; matched attributes with query value, item value
 
 ## 5.8 Lexical fallback and baseline
 
-When the parser finds neither a diameter nor a type, candidates are scored by token overlap over normalized description tokens (an in-repo BM25-lite) with confidence capped at 0.4 and status unparsed. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4).
+When the parser finds neither a diameter nor a type, the attributes it did recognize still constrain: the candidates are the compatible set C, and token overlap over normalized description tokens (an in-repo BM25-lite) only orders them, with confidence capped at 0.4 for the best item the pool admits and status unparsed. When those attributes admit nothing, there is no honest lexical answer and the query falls through to the backoff of section 5.6: status none, the failed constraint named, alternatives carrying closeness rather than a confidence. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4); the baseline scores the whole active catalog unfiltered, because what it exists to measure is what pure lexical matching achieves.
 
 # 6. Behavior across the challenge's edge cases
 
@@ -335,7 +335,7 @@ For CUST-005, n_eff is 2.71 and λ_c 0.35, and the mixture stays close to unifor
 
 ## 7.4 Intent: history references
 
-Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get, previous order. With a customer selected, the referenced order lines are those customer's most recent lines whose type or diameter matches any such words in the query ("washers" covers flat and lock washers). Two forms:
+Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get, previous order. With a customer selected, the referenced order lines are those customer's most recent lines whose type, diameter or pitch matches any such words in the query ("washers" covers flat and lock washers). Two forms:
 
 - Pure reference ("the same washers as last time"): status history; candidates are the referenced lines ranked by recency, confidence 0.7 for the most recent decaying by rank, with the order date and quantity in the explanation.
 - Reference with an override ("same washers as last time, but brass"): the referenced line's parsed attributes become the base specification, the query's explicit attributes overwrite it (material becomes brass), and the merged specification runs through the normal pipeline with status derived from C; the note says "based on your 2026-04-15 order, material changed to brass".
@@ -405,7 +405,7 @@ Single page: free-text input (Enter submits), searchable customer combobox (id, 
 | Status correctness | Confusion matrix over unique, ambiguous, none, history, unparsed | All queries |
 | Constraint preservation | Number of returned matches contradicting an explicit attribute; must be 0, also as a property test over generated queries | All queries, with and without a customer |
 | Personalization | Hit@1 with vs without a customer; margin between top-1 and top-2 | Hand-labeled (query, customer) pairs |
-| Calibration | Bins of top-1 confidence vs empirical top-1 precision, with the count per bin | Single-label queries only; never tie queries, where "acceptable" and "intended" are different events |
+| Calibration | Bins of top-1 confidence vs empirical top-1 precision, with the count per bin | Every case carrying an intended-SKU label whose answer the posterior scored; history and unparsed answers stay out, scoring on a different scale |
 
 ## 10.3 Reporting
 
