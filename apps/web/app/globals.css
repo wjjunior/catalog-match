@@ -1,66 +1,176 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted-surface);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-surface);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-ok-surface: var(--ok-surface);
+  --color-warn: var(--warn);
+  --color-warn-surface: var(--warn-surface);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --radius: 0.5rem;
   --background: #ffffff;
   --foreground: #16181d;
-  --muted: #5b6472;
-  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #16181d;
+  --popover: #ffffff;
+  --popover-foreground: #16181d;
+  --primary: #1f4fd8;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f6;
+  --secondary-foreground: #16181d;
+  --muted-surface: #eef1f6; /* was --muted */
+  --muted-foreground: #5b6472;
+  --accent-surface: #eef1f6; /* was --accent */
+  --accent-foreground: #16181d;
+  --destructive: #b3261e;
   --border: #d8dee7;
-  --chip: #eef1f6;
-  --accent: #1f4fd8;
-  --accent-contrast: #ffffff;
+  --input: #d8dee7;
+  --ring: #1f4fd8;
   --ok: #10714a;
   --ok-surface: #e2f5ec;
   --warn: #8a5300;
   --warn-surface: #fdf0dc;
+
+  /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+     block together with the last stylesheet. */
+  --muted: #5b6472;
+  --surface: #ffffff;
+  --chip: #eef1f6;
+  --accent: #1f4fd8;
+  --accent-contrast: #ffffff;
 }
 
+/* The app has no theme toggle and follows the OS, so the values swap here. The `.dark`
+   block below keeps the class working if a toggle is ever added. */
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --background: #16181d;
     --foreground: #f2f4f7;
-    --muted: #9aa4b2;
-    --surface: #1e2129;
+    --card: #1e2129;
+    --card-foreground: #f2f4f7;
+    --popover: #1e2129;
+    --popover-foreground: #f2f4f7;
+    --primary: #6f95ff;
+    --primary-foreground: #10131a;
+    --secondary: #262b35;
+    --secondary-foreground: #f2f4f7;
+    --muted-surface: #262b35; /* was --muted */
+    --muted-foreground: #9aa4b2;
+    --accent-surface: #262b35; /* was --accent */
+    --accent-foreground: #f2f4f7;
+    --destructive: #e5716a;
     --border: #333947;
-    --chip: #262b35;
-    --accent: #6f95ff;
-    --accent-contrast: #10131a;
+    --input: #333947;
+    --ring: #6f95ff;
     --ok: #6fd3a5;
     --ok-surface: #16302a;
     --warn: #e5b169;
     --warn-surface: #33281a;
+
+    /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+       block together with the last stylesheet. */
+    --muted: #9aa4b2;
+    --surface: #1e2129;
+    --chip: #262b35;
+    --accent: #6f95ff;
+    --accent-contrast: #10131a;
   }
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  color-scheme: dark;
+  --background: #16181d;
+  --foreground: #f2f4f7;
+  --card: #1e2129;
+  --card-foreground: #f2f4f7;
+  --popover: #1e2129;
+  --popover-foreground: #f2f4f7;
+  --primary: #6f95ff;
+  --primary-foreground: #10131a;
+  --secondary: #262b35;
+  --secondary-foreground: #f2f4f7;
+  --muted-surface: #262b35; /* was --muted */
+  --muted-foreground: #9aa4b2;
+  --accent-surface: #262b35; /* was --accent */
+  --accent-foreground: #f2f4f7;
+  --destructive: #e5716a;
+  --border: #333947;
+  --input: #333947;
+  --ring: #6f95ff;
+  --ok: #6fd3a5;
+  --ok-surface: #16302a;
+  --warn: #e5b169;
+  --warn-surface: #33281a;
+
+  /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+     block together with the last stylesheet. */
+  --muted: #9aa4b2;
+  --surface: #1e2129;
+  --chip: #262b35;
+  --accent: #6f95ff;
+  --accent-contrast: #10131a;
 }
 
-body {
-  margin: 0;
-  padding: 3rem 1rem;
-  background: var(--background);
-  color: var(--foreground);
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
-  line-height: 1.5;
-}
+/* The element rules the CSS Modules still rely on. Task 6 moves these onto the elements
+   and deletes this layer. */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-main {
-  margin: 0 auto;
-  max-width: 44rem;
-}
+  body {
+    margin: 0;
+    padding: 3rem 1rem;
+    background: var(--background);
+    color: var(--foreground);
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+    line-height: 1.5;
+  }
 
-h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.75rem;
-  letter-spacing: -0.02em;
-}
+  main {
+    margin: 0 auto;
+    max-width: 44rem;
+  }
 
-p {
-  margin: 0;
-  color: var(--muted);
+  h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    margin: 0;
+    color: var(--muted-foreground);
+  }
 }
