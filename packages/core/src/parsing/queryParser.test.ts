@@ -192,6 +192,23 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a quantity phrase standing beside a length', () => {
+  it.each(['M8 x 50 qty 100 BHCS', 'M8 x 50 BHCS qty 100'])(
+    'reads the 50 of %s as the length and the 100 as the quantity',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.length).toEqual({ value: 50, unit: 'mm', mm: 50 });
+      expect(spec.evidence.length).toBe('50');
+      expect(spec.residue).toEqual([]);
+    },
+  );
+
+  it('parses both word orders to the same spec', () => {
+    expect(values(parse('M8 x 50 qty 100 BHCS'))).toEqual(values(parse('M8 x 50 BHCS qty 100')));
+  });
+});
+
 describe('a pitch the user spelled with different zeros', () => {
   it.each([
     ['M6-1 x 50mm tap bolt', 'M6', '1.0'],

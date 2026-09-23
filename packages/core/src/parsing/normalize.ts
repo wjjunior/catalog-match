@@ -181,10 +181,11 @@ function stripQuantitiesAndNoise(tokens: NormalizedToken[]): NormalizedText {
   const dropped = tokens.map((token, index) => {
     if (QUANTITY_WORDS.has(token.text)) return 'quantityStripped' as const;
     if (NOISE_WORDS.has(token.text)) return 'noiseStripped' as const;
-    // A bare integer is a quantity only when a quantity word binds it: the 50 of
-    // `m8 x 50` must survive.
+    // A bare integer is a quantity only when a quantity word binds it, and only when the
+    // separator has not bound it first: the 50 of `m8 x 50 qty 100` must survive.
     if (
       /^\d+$/.test(token.text) &&
+      tokens[index - 1]?.text !== 'x' &&
       (isQuantityWord(tokens[index - 1]) || isQuantityWord(tokens[index + 1]))
     ) {
       return 'quantityStripped' as const;

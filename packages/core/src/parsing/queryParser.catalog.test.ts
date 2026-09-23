@@ -116,3 +116,18 @@ describe('a pitch spelled with a different number of zeros', () => {
     expect(notes.map((n) => n.code)).not.toContain('unknownDiameter');
   });
 });
+
+describe('a quantity phrase standing beside a length', () => {
+  it.each(['M8 x 50 qty 100 BHCS', 'M8 x 50 BHCS qty 100'])(
+    'answers %s with the 50 mm SKU',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'unique',
+        count: 1,
+        failed: undefined,
+        alternativeCount: 0,
+      });
+      expect(core.matchQuery({ query }).results.map((m) => m.sku)).toEqual(['PXBTN850ALBO0100']);
+    },
+  );
+});
