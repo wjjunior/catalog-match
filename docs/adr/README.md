@@ -5,8 +5,9 @@ the alternatives considered and the consequences. Numbers are never reused; a de
 that is replaced is superseded by a new record rather than edited.
 
 Every number in these records is measured, and cites `docs/eval-report.md` or
-`docs/calibration.md` for where it comes from. All of it is golden-set evidence: the
-held-out set has not been run.
+`docs/calibration.md` for where it comes from. All of it is golden-set evidence. The
+held-out set was spent once, on 2026-09-21, after these records were written; it is
+reported separately in `docs/eval-heldout.md` and none of the numbers here come from it.
 
 | ADR                                                              | Decision                                               | Status   | Date       |
 | ---------------------------------------------------------------- | ------------------------------------------------------ | -------- | ---------- |

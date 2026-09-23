@@ -373,6 +373,197 @@ describe('the quantity span (F4)', () => {
   });
 });
 
+// G3: a quantity word must not eat a stated dimension, whether that dimension is bound by
+// `x` or stands as the query's only number. Bare forms (`each`, `ea` with no number of
+// their own) and numbered forms (`qty 100`, `100 pcs`) fail independently, so they are
+// crossed and asserted separately, per the re-review's diagnosis of what round 2 missed.
+describe('the quantity span crossed with the separator (G3)', () => {
+  it.each([
+    ['M8 x 50 qty 100 BHCS', 'm8 x 50 bhcs'],
+    ['M8 x 50 BHCS qty 100', 'm8 x 50 bhcs'],
+    ['M8 BHCS 50 qty 100', 'm8 bhcs 50'],
+    ['M8 BHCS x 50mm each', 'm8 bhcs x 50mm'],
+    ['200 pcs of M8', 'm8'],
+    ['box of M8', 'box of m8'],
+  ])('pins %s, unmoved by this round', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  it.each([
+    ['M8 BHCS x 50 each', 'm8 bhcs x 50'],
+    ['M8 BHCS x each 50', 'm8 bhcs x 50'],
+    ['M8 BHCS 50 each', 'm8 bhcs 50'],
+    ['M8 BHCS each 50', 'm8 bhcs 50'],
+    ['M8 BHCS 50 ea', 'm8 bhcs 50'],
+    ['M8 BHCS ea 50', 'm8 bhcs 50'],
+    ['M8 BHCS 50 pcs', 'm8 bhcs 50'],
+    ['M8 BHCS pcs 50', 'm8 bhcs 50'],
+  ])('no longer loses the dimension in %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  it.each([
+    ['1/4-20 x qty 100 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 100 pcs 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x qty 5 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 100 each 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 5 ea 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 2 pieces 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['lock washer 1-1/2 qty 100', 'lock washer 1-1/2'],
+    ['lock washer qty 100 1-1/2', 'lock washer 1-1/2'],
+  ])(
+    'does not let the quantity win the length slot from a bare fraction in %s',
+    (input, expected) => {
+      expect(normalize(input).canonical).toBe(expected);
+    },
+  );
+
+  // A word with no number of its own must not reach for the query's one stated length, on
+  // either side of it, with or without the separator: qty/pcs/pieces/ea risk this exactly
+  // as each does, since none of them carry evidence that the length is theirs to claim.
+  describe('a bare quantity word next to the only number in the query', () => {
+    const WORDS = ['qty', 'each', 'pcs', 'pieces', 'ea'] as const;
+
+    const CASES = BASE_QUERIES.flatMap((base) =>
+      WORDS.flatMap((word) =>
+        Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
+          base,
+          word,
+          position,
+        })),
+      ),
+    );
+
+    it.each(CASES)(
+      'keeps the length when bare "$word" lands at position $position of $base.label',
+      ({ base, word, position }) => {
+        const words = normalize(insertAt(base.tokens, position, [word])).tokens.map(
+          (token) => token.text,
+        );
+
+        expect(words).toContain(base.length);
+        expect(words).not.toContain(word);
+      },
+    );
+  });
+
+  // A word carrying its own number is a different claim: it must still strip that number
+  // wherever it lands, including glued to the separator, and must still leave the base
+  // length untouched. `each`/`ea` take the number before them; `qty` takes the one after.
+  describe('a self-contained quantity phrase inserted at every position', () => {
+    const PHRASES = [
+      { tokens: ['qty', '100'], number: '100' },
+      { tokens: ['100', 'pcs'], number: '100' },
+      { tokens: ['100', 'pieces'], number: '100' },
+      { tokens: ['100', 'ea'], number: '100' },
+      { tokens: ['100', 'each'], number: '100' },
+    ] as const;
+
+    it('never loses the base length and never keeps the phrase number, at any position', () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...BASE_QUERIES),
+          fc.constantFrom(...PHRASES),
+          fc.nat(),
+          (base, phrase, rawPosition) => {
+            const position = rawPosition % (base.tokens.length + 1);
+            const query = insertAt(base.tokens, position, phrase.tokens);
+            const words = normalize(query).tokens.map((token) => token.text);
+
+            expect(words).toContain(base.length);
+            expect(words).not.toContain(phrase.number);
+          },
+        ),
+      );
+    });
+
+    it.each([
+      ['M8 BHCS 50mm each', 'm8 bhcs 50mm'],
+      ['M8 x 50mm BHCS each', 'm8 x 50mm bhcs'],
+      ['M8 BHCS 50mm ea', 'm8 bhcs 50mm'],
+    ])('leaves a unit-attached length alone in %s', (input, expected) => {
+      expect(normalize(input).canonical).toBe(expected);
+    });
+  });
+});
+
+// Round 4 added a unit or an inch mark as "another number", since it is stronger evidence
+// of a dimension than a bare integer, not weaker. Round 5: a bare fraction (`3/4`) is
+// neither an integer nor unit-marked, so the same tally missed it too; a mixed number
+// (`1-1/2`) is included as the same family's next spelling, and must not regress next.
+describe('both invariants crossed with the dimension in every spelling (G3 round 4-5)', () => {
+  const DIMENSION_BASES = [
+    { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'bare length' },
+    { tokens: ['m8', 'bhcs', '50mm'], length: '50mm', label: 'length with a unit' },
+    { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'bare length, x-bound' },
+    { tokens: ['m8', 'x', '50mm', 'bhcs'], length: '50mm', label: 'unit length, x-bound' },
+    { tokens: ['m8', 'bhcs', '3/4'], length: '3/4', label: 'bare fraction length' },
+    { tokens: ['m8', 'x', '3/4', 'bhcs'], length: '3/4', label: 'bare fraction length, x-bound' },
+    { tokens: ['m8', 'bhcs', '1-1/2'], length: '1-1/2', label: 'mixed number length' },
+    {
+      tokens: ['m8', 'x', '1-1/2', 'bhcs'],
+      length: '1-1/2',
+      label: 'mixed number length, x-bound',
+    },
+  ] as const;
+
+  // Every insertion position places the phrase both before and after the dimension token
+  // across the sweep, so "before/after" is not a separate parameter here, it falls out of it.
+  describe('a bare quantity word (no number of its own) at every position', () => {
+    const WORDS = ['qty', 'each', 'pcs', 'pieces', 'ea'] as const;
+
+    const CASES = DIMENSION_BASES.flatMap((base) =>
+      WORDS.flatMap((word) =>
+        Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
+          base,
+          word,
+          position,
+        })),
+      ),
+    );
+
+    it.each(CASES)(
+      'keeps $base.length when bare "$word" lands at position $position of $base.label',
+      ({ base, word, position }) => {
+        const words = normalize(insertAt(base.tokens, position, [word])).tokens.map(
+          (token) => token.text,
+        );
+
+        expect(words).toContain(base.length);
+      },
+    );
+  });
+
+  describe('a self-contained numbered phrase at every position', () => {
+    const NUMBERED_PHRASES = [
+      { tokens: ['qty', '100'], number: '100' },
+      { tokens: ['100', 'pcs'], number: '100' },
+      { tokens: ['100', 'pieces'], number: '100' },
+      { tokens: ['100', 'ea'], number: '100' },
+      { tokens: ['100', 'each'], number: '100' },
+    ] as const;
+
+    it('keeps invariant (a) the dimension and (b) the quantity number, together, everywhere', () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...DIMENSION_BASES),
+          fc.constantFrom(...NUMBERED_PHRASES),
+          fc.nat(),
+          (base, phrase, rawPosition) => {
+            const position = rawPosition % (base.tokens.length + 1);
+            const words = normalize(insertAt(base.tokens, position, phrase.tokens)).tokens.map(
+              (token) => token.text,
+            );
+
+            expect(words).toContain(base.length);
+            expect(words).not.toContain(phrase.number);
+          },
+        ),
+      );
+    });
+  });
+});
+
 describe('the acceptance examples of PRG-12', () => {
   it.each([
     ['1/2-13x3"', '1/2-13 x 3"'],

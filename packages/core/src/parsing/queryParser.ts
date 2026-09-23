@@ -11,6 +11,7 @@ import type {
   AttributeName,
   Diameter,
   Length,
+  LengthUnit,
   ParsedSpec,
   Provenance,
   Weighted,
@@ -51,6 +52,9 @@ interface SizeSlot {
   size: SizeToken;
   from: number;
   to: number;
+  /** The unit the slot consumed as a token of its own. A fraction keeps its thread shape,
+   * so without this the unit beside it would be swallowed with the token and lost. */
+  unit?: LengthUnit;
 }
 
 interface Draft {
@@ -200,13 +204,13 @@ interface StandardCode {
   to: number;
 }
 
-/** `DIN125` and `DIN 125` are one expression spelled two ways; whether the catalog stocks
- * the standard decides nothing here, so neither may depend on a space. */
+/** `DIN125` and `DIN 125` are one expression spelled two ways, so neither may depend on a
+ * space; the body is the user's own spelling, as a correction into these six invents one. */
 function readStandardCode(draft: Draft, index: number): StandardCode | undefined {
   const token = draft.tokens[index];
   if (token === undefined) return undefined;
 
-  const compact = COMPACT_STANDARD.exec(token.text);
+  const compact = COMPACT_STANDARD.exec(token.original);
   if (compact) {
     const [, body = '', designator = ''] = compact;
 
@@ -215,9 +219,9 @@ function readStandardCode(draft: Draft, index: number): StandardCode | undefined
 
   const next = draft.tokens[index + 1];
   if (next === undefined) return undefined;
-  if (!STANDARD_BODIES.has(token.text) || !DESIGNATOR.test(next.text)) return undefined;
+  if (!STANDARD_BODIES.has(token.original) || !DESIGNATOR.test(next.original)) return undefined;
 
-  return { body: token.text, designator: next.text, to: index + 2 };
+  return { body: token.original, designator: next.original, to: index + 2 };
 }
 
 /** Syntactic, not a lookup, and read before the lexicon so `DIN 316` cannot be halved into
@@ -272,6 +276,14 @@ function takeIntent(draft: Draft): string[] {
   return candidates;
 }
 
+/** The unit the user stated, whether it was glued to the number or stood beside it as a
+ * token of its own. */
+function statedUnit(size: SizeToken, united: SizeToken | undefined): LengthUnit | undefined {
+  if (size.kind === 'length') return size.unit;
+
+  return united?.kind === 'length' ? united.unit : undefined;
+}
+
 /** A unit standing on its own annotates the size token before it; a token that already
  * has the shape of a thread keeps it, which is what makes `1/2 inch` a diameter and
  * `12 mm` a length. */
@@ -296,7 +308,7 @@ function sizeSlots(draft: Draft): SizeSlot[] {
     if (size === undefined) continue;
 
     const to = unit && (united !== undefined || bare?.kind === 'thread') ? index + 2 : index + 1;
-    slots.push({ size, from: index, to });
+    slots.push({ size, from: index, to, unit: statedUnit(size, united) });
     index = to - 1;
   }
 
@@ -368,13 +380,14 @@ function readInches(draft: Draft, size: SizeToken): Thread | undefined {
 
 /** After the diameter, every remaining size token is read as a length: `3/4-10 tap bolt
  * 5/8` and `#10-24 x 1/2` both put a thread-shaped token where the length belongs. */
-function asLength(size: SizeToken): SizeToken | undefined {
+function asLength(slot: SizeSlot): SizeToken | undefined {
+  const { size } = slot;
   if (size.kind === 'length') return size;
   if (size.pitch !== undefined) return undefined;
 
   const value = parseNumber(size.nominal);
 
-  return value === undefined ? undefined : { kind: 'length', value };
+  return value === undefined ? undefined : { kind: 'length', value, unit: slot.unit };
 }
 
 interface Thread {
@@ -391,7 +404,7 @@ interface Sizes {
 /** A dimension the query sets apart itself: it carries its own unit, or it stands where
  * the separator put it. Either says dimension without help from the words in between. */
 function delimited(draft: Draft, slot: SizeSlot): boolean {
-  if (slot.size.kind === 'length' && slot.size.unit !== undefined) return true;
+  if (slot.unit !== undefined) return true;
 
   return draft.tokens[slot.from - 1]?.text === SEPARATOR;
 }
@@ -426,7 +439,7 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
     if (reach !== undefined && !delimited(draft, slot) && !settled(draft, reach, slot.from)) {
       continue;
     }
-    const candidate = asLength(slot.size);
+    const candidate = asLength(slot);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;
 
@@ -449,8 +462,10 @@ export function parseQuery(query: string): QueryParse {
     provenance: {},
   };
 
-  const attributes = takeAttributes(draft);
+  // Intent first, so a phrase the user wrote is claimed before the corrected spelling of it
+  // can be read as anything else; the standard scan then still precedes the lexicon.
   const intentCandidates = takeIntent(draft);
+  const attributes = takeAttributes(draft);
   const sizes = takeSizes(draft, sizeSlots(draft));
 
   const residue = draft.tokens

@@ -57,7 +57,8 @@ not by accident.
 
 One golden case remains wrong, a history reference with an override; `docs/DESIGN.md` 7.4
 does not say which attributes of the referenced order survive, and no parameter value
-reaches it. Every number here is golden-set evidence; the held-out set has not been run.
+reaches it. Every number here is golden-set evidence; the held-out set, spent once on
+2026-09-21, is reported separately in `docs/eval-heldout.md`.
 
 ## Revisit trigger
 
