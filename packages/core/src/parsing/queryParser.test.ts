@@ -192,6 +192,58 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('a standard the catalog does not stock', () => {
+  it.each(['M8 x 50mm BHCS DIN 125', 'M8 flat washer DIN 125', 'DIN 125 M8 flat washer'])(
+    'reads the standard of %s instead of leaving it to residue',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.standard).toBe('DIN 125');
+      expect(spec.evidence.standard).toBe('DIN 125');
+      expect(spec.provenance.standard).toBe('explicit');
+      expect(spec.residue).toEqual([]);
+    },
+  );
+
+  it('never binds the designator as a length, whichever side of the diameter it sits', () => {
+    expect(parse('M8 flat washer DIN 125').length).toBeUndefined();
+    expect(values(parse('M8 flat washer DIN 125'))).toEqual(
+      values(parse('DIN 125 M8 flat washer')),
+    );
+  });
+
+  it.each([
+    ['ANSI B18.6.3 M8 hex nut', 'ANSI B18.6.3'],
+    ['M8 hex nut ASTM F593', 'ASTM F593'],
+    ['ISO 4762 M8 socket head cap screw', 'ISO 4762'],
+  ])('reads %s as %s', (query, standard) => {
+    expect(parse(query).standard).toBe(standard);
+  });
+
+  it('still reads the standards the catalog does stock', () => {
+    expect(parse('M8 x 50mm BHCS ISO 7380').standard).toBe('ISO 7380');
+    expect(parse('5/16-18 flat washer ASME B18.2.1').standard).toBe('ASME B18.2.1');
+    expect(parse('1/2-13 hex bolt class 8').standard).toBe('CLASS 8');
+  });
+
+  it('takes no standard from a number without a standards body in front of it', () => {
+    expect(parse('grade 8 1/2-13 hex nut').standard).toBeUndefined();
+    expect(parse('1/2-13 hex nut grade 8').standard).toBeUndefined();
+  });
+
+  it('leaves the diameter alone when a body word stands in front of it', () => {
+    const spec = parse('iso M8 hex nut');
+
+    expect(spec.standard).toBeUndefined();
+    expect(spec.diameter?.nominal).toBe('M8');
+  });
+
+  it('leaves a lone body word in the residue', () => {
+    expect(parse('M8 hex nut din').standard).toBeUndefined();
+    expect(parse('M8 hex nut din').residue).toEqual(['din']);
+  });
+});
+
 describe('an unclaimed word between the diameter and a number', () => {
   it.each(['grade 8 1/2-13 hex nut', '1/2-13 hex nut grade 8'])(
     'leaves the 8 of %s out of the length',

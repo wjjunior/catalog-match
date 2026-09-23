@@ -17,7 +17,7 @@ import type {
 } from '../domain/spec';
 import { INTENT_PHRASES } from '../personalization/intent';
 import { correct } from './fuzzy';
-import { longestMatch, type LexiconValue } from './lexicon';
+import { STANDARD_BODIES, longestMatch, type LexiconValue } from './lexicon';
 import { normalize } from './normalize';
 import {
   classifySizeToken,
@@ -68,6 +68,9 @@ const SEPARATOR = 'x';
 const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
+
+/** `125`, `a307`, `b18.2.1`: the designator half of a standard, never a whole standard. */
+const DESIGNATOR = /^[a-z]?\d+(?:\.\d+)*[a-z]?$/;
 
 function read(query: string): Token[] {
   return normalize(query).tokens.map((token) => {
@@ -181,7 +184,31 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     claim(draft, match.start, match.end);
   }
 
+  if (found.standard === undefined) found.standard = takeStandardCode(draft);
+
   return found;
+}
+
+/** Syntactic, not a lookup: a standard the query states constrains it whether or not the
+ * catalog stocks it (docs/DESIGN.md 5.3, 10.5). The thread guard keeps `iso M8` a size. */
+function takeStandardCode(draft: Draft): string | undefined {
+  for (let index = 0; index < draft.tokens.length - 1; index++) {
+    const body = draft.tokens[index];
+    const designator = draft.tokens[index + 1];
+
+    if (body === undefined || designator === undefined) continue;
+    if (!free(draft, index, index + 2)) continue;
+    if (!STANDARD_BODIES.has(body.text) || !DESIGNATOR.test(designator.text)) continue;
+    if (classifySizeToken(designator.text)?.kind === 'thread') continue;
+
+    draft.evidence.standard = quote(draft, index, index + 2);
+    draft.provenance.standard = 'explicit';
+    claim(draft, index, index + 2);
+
+    return `${body.text.toUpperCase()} ${designator.text.toUpperCase()}`;
+  }
+
+  return undefined;
 }
 
 function takeIntent(draft: Draft): string[] {

@@ -148,3 +148,49 @@ describe('an unclaimed word between the diameter and a number', () => {
     },
   );
 });
+
+/** docs/DESIGN.md 6 pairs "standard not in catalog" with "length not in catalog" as a
+ * none condition, and makes dropping the standard relaxation step 1. */
+describe('a standard the catalog does not stock', () => {
+  it('empties the compatible set rather than returning a different standard', () => {
+    expect(answer('M8 x 50mm BHCS DIN 125')).toEqual({
+      status: 'none',
+      count: 0,
+      failed: 'standard',
+      alternativeCount: 1,
+    });
+  });
+
+  it('names the standard that failed and offers the ISO item only as an alternative', () => {
+    const response = core.matchQuery({ query: 'M8 x 50mm BHCS DIN 125' });
+
+    expect(response.results).toEqual([]);
+    expect(response.notes.map((n) => n.message)).toEqual([
+      'no M8 button socket cap screw to DIN 125',
+    ]);
+    expect(response.alternatives.map((a) => [a.sku, a.relaxed])).toEqual([
+      ['PXBTN850ALBO0100', ['standard']],
+    ]);
+  });
+
+  it.each(['M8 flat washer DIN 125', 'DIN 125 M8 flat washer'])(
+    'answers %s the same way, with no invented length',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'none',
+        count: 0,
+        failed: 'standard',
+        alternativeCount: 7,
+      });
+
+      const response = core.matchQuery({ query });
+
+      expect(response.notes.map((n) => n.message)).toEqual(['no M8 flat washer to DIN 125']);
+      expect(response.alternatives.map((a) => a.relaxed)).toEqual([
+        ['standard'],
+        ['standard'],
+        ['standard'],
+      ]);
+    },
+  );
+});
