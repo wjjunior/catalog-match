@@ -60,7 +60,9 @@ function explain(
 }
 
 const M8_WASHER = queryParser.parse('M8 flat washer');
+const STAINLESS_M8_WASHER = queryParser.parse('stainless M8 washer');
 const BRASS_NUT = queryParser.parse('brass hex nut 1/2-13');
+const ZINC_NUT = queryParser.parse('zinc hex nut 1/2-13');
 const M16_NUT = queryParser.parse('M16 hex nut');
 
 const WASHERS = [
@@ -72,6 +74,8 @@ const BRASS_NUTS = [
   item('N1', '1/2-13 HEX NUT ISO 7380 BRASS ZINC'),
   item('N2', '1/2-13 HEX NUT DIN 933 BRASS ZINC'),
 ];
+
+const YELLOW_ZINC_NUTS = [item('YZ', '1/2-13 HEX NUT DIN 933 STEEL YELLOW ZINC')];
 
 const M16_NUTS = [
   item('A2', 'M16-2.0 HEX NUT ASTM A307 A2 SS HDG'),
@@ -176,6 +180,68 @@ describe('the attributes the query overrode', () => {
     const explanation = explain(preferring('alloy', 'black_oxide'), M8_WASHER, WASHERS, 'BO');
 
     expect(explanation.overriddenBy).toBeUndefined();
+  });
+});
+
+describe('a stated family that agrees with the preferred member', () => {
+  it('does not report the material as overridden when the query states its family', () => {
+    const profile = profileOf({
+      shares: {
+        material: only(MATERIALS, 'ss_18_8'),
+        finish: only(FINISHES, 'plain'),
+        threadSystem: evenly(THREAD_SYSTEMS),
+      },
+    });
+
+    const explanation = explain(profile, STAINLESS_M8_WASHER, WASHERS, 'SS');
+
+    expect(explanation.reason).toBe('history prefers 18-8 SS plain');
+    expect(explanation.overriddenBy).toBeUndefined();
+  });
+
+  it('holds for every compatible item, not only the top result', () => {
+    const profile = profileOf({
+      shares: {
+        material: only(MATERIALS, 'ss_18_8'),
+        finish: only(FINISHES, 'plain'),
+        threadSystem: evenly(THREAD_SYSTEMS),
+      },
+    });
+
+    for (const sku of ['SS', 'BO']) {
+      const overriddenBy = explain(profile, STAINLESS_M8_WASHER, WASHERS, sku).overriddenBy;
+      expect(overriddenBy).toBeUndefined();
+    }
+  });
+
+  it('does not report the finish as overridden when the query states a sibling in the same family', () => {
+    const profile = profileOf({
+      shares: {
+        material: only(MATERIALS, 'steel'),
+        finish: only(FINISHES, 'yellow_zinc'),
+        threadSystem: evenly(THREAD_SYSTEMS),
+      },
+    });
+
+    const explanation = explain(profile, ZINC_NUT, YELLOW_ZINC_NUTS, 'YZ');
+
+    expect(explanation.reason).toBe('history prefers steel yellow zinc');
+    expect(explanation.overriddenBy).toBeUndefined();
+  });
+
+  it('still reports an override when the stated family differs from the preferred one', () => {
+    const profile = profileOf({
+      shares: {
+        material: only(MATERIALS, 'alloy'),
+        finish: only(FINISHES, 'black_oxide'),
+        threadSystem: evenly(THREAD_SYSTEMS),
+      },
+    });
+
+    const explanation = explain(profile, BRASS_NUT, BRASS_NUTS, 'N1');
+
+    expect(explanation.reason).toBe('history prefers alloy black oxide; overridden by the query');
+    expect(explanation.overriddenBy).toEqual(['material']);
   });
 });
 
