@@ -11,8 +11,6 @@ import { useMatchQuery } from '../../features/match-query/useMatchQuery';
 import { CustomerCombobox } from '../../features/select-customer/CustomerCombobox';
 import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
 
-import styles from './ResultsPanel.module.css';
-
 function Results({ response }: { response: MatchResponse }) {
   // The status line already speaks for the notes it promotes; the rest belong in the list.
   const notes = response.notes.filter((entry) => !isHeadlineNote(entry.code));
@@ -22,11 +20,14 @@ function Results({ response }: { response: MatchResponse }) {
       <StatusLine response={response} />
 
       {response.results.length > 0 && (
-        <section className={styles.section} aria-labelledby="matches">
-          <h2 className={styles.sectionTitle} id="matches">
+        <section className="flex flex-col gap-2.5" aria-labelledby="matches">
+          <h2
+            className="m-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"
+            id="matches"
+          >
             Matches
           </h2>
-          <div className={styles.cards}>
+          <div className="flex flex-col gap-3">
             {response.results.map((result) => (
               <MatchCard key={result.sku} match={result} />
             ))}
@@ -35,11 +36,14 @@ function Results({ response }: { response: MatchResponse }) {
       )}
 
       {response.alternatives.length > 0 && (
-        <section className={styles.section} aria-labelledby="alternatives">
-          <h2 className={styles.sectionTitle} id="alternatives">
+        <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
+          <h2
+            className="m-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"
+            id="alternatives"
+          >
             Alternatives
           </h2>
-          <div className={styles.cards}>
+          <div className="flex flex-col gap-3">
             {response.alternatives.map((option) => (
               <AlternativeCard key={option.sku} alternative={option} />
             ))}
@@ -48,7 +52,10 @@ function Results({ response }: { response: MatchResponse }) {
       )}
 
       {notes.length > 0 && (
-        <ul className={styles.notes} aria-label="notes">
+        <ul
+          className="m-0 flex flex-col gap-1.5 pl-[1.125rem] text-sm text-muted-foreground"
+          aria-label="notes"
+        >
           {notes.map((entry, index) => (
             <li key={`${entry.code}-${String(index)}`}>{entry.message}</li>
           ))}
@@ -63,7 +70,11 @@ function Results({ response }: { response: MatchResponse }) {
  * matching/config.ts; naming them here would be a second home for a tunable. */
 function ConfidenceSemantics() {
   return (
-    <aside className={styles.semantics} role="note" aria-label="what confidence means">
+    <aside
+      className="mt-8 border-t border-border pt-4 text-[0.8125rem] leading-normal text-muted-foreground"
+      role="note"
+      aria-label="what confidence means"
+    >
       <strong>Confidence</strong> is the model&rsquo;s estimate that this SKU is the intended one,
       given the query, the selected customer and an explicit set of assumptions. It is not a
       measured frequency, and it is comparable within one answer rather than across answers. High,
@@ -80,10 +91,10 @@ export function ResultsPanel() {
   const { state, run } = useMatchQuery();
 
   return (
-    <main className={styles.panel}>
-      <h1 className={styles.title}>Catalog Match</h1>
+    <main className="mx-auto flex max-w-2xl flex-col gap-5">
+      <h1 className="mb-2 text-3xl tracking-tight">Catalog Match</h1>
 
-      <div className={styles.controls}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr] sm:items-start">
         <QueryForm
           value={query}
           onChange={setQuery}
@@ -102,17 +113,19 @@ export function ResultsPanel() {
         }}
       />
 
-      <div className={styles.results}>
+      <div className="flex flex-col gap-4">
         {state.phase === 'idle' && (
-          <p className={styles.hint}>Type a fastener description, or pick an example query.</p>
+          <p className="m-0 text-muted-foreground">
+            Type a fastener description, or pick an example query.
+          </p>
         )}
         {state.phase === 'loading' && (
-          <p className={styles.hint} role="status">
+          <p className="m-0 text-muted-foreground" role="status">
             Matching…
           </p>
         )}
         {state.phase === 'failed' && (
-          <p className={styles.error} role="alert">
+          <p className="m-0 rounded-lg bg-warn-surface px-3.5 py-2.5 text-warn" role="alert">
             {state.message}
           </p>
         )}

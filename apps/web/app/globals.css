@@ -56,7 +56,7 @@
   --warn: #8a5300;
   --warn-surface: #fdf0dc;
 
-  /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+  /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
      block together with the last stylesheet. */
   --muted: #5b6472;
   --surface: #ffffff;
@@ -93,7 +93,7 @@
     --warn: #e5b169;
     --warn-surface: #33281a;
 
-    /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+    /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
        block together with the last stylesheet. */
     --muted: #9aa4b2;
     --surface: #1e2129;
@@ -128,7 +128,7 @@
   --warn: #e5b169;
   --warn-surface: #33281a;
 
-  /* Legacy tokens the remaining .module.css files still read. Task 6 deletes this
+  /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
      block together with the last stylesheet. */
   --muted: #9aa4b2;
   --surface: #1e2129;
@@ -137,40 +137,8 @@
   --accent-contrast: #10131a;
 }
 
-/* The element rules the CSS Modules still rely on. Task 6 moves these onto the elements
-   and deletes this layer. */
 @layer base {
   * {
     box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    padding: 3rem 1rem;
-    background: var(--background);
-    color: var(--foreground);
-    font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      'Segoe UI',
-      sans-serif;
-    line-height: 1.5;
-  }
-
-  main {
-    margin: 0 auto;
-    max-width: 44rem;
-  }
-
-  h1 {
-    margin: 0 0 0.5rem;
-    font-size: 1.75rem;
-    letter-spacing: -0.02em;
-  }
-
-  p {
-    margin: 0;
-    color: var(--muted-foreground);
   }
 }
