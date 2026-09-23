@@ -647,3 +647,61 @@ describe('a bare number an unrecognized word carries', () => {
     );
   });
 });
+
+const BODIES = [...STANDARD_BODIES];
+
+/** Designators the catalog stocks, designators it does not, and designators that collide
+ * with an attribute term the lexicon also reads. */
+const DESIGNATORS = ['912', '933', '7380', '111', 'b18.2.1', 'a307', '125', '4762', '316', '304'];
+
+describe('a standard spelled with and without the space', () => {
+  it.each(BODIES)(
+    'parses a compact %s standard exactly as it parses the spaced spelling',
+    (body) => {
+      for (const designator of DESIGNATORS) {
+        const spaced = parse(`M8 flat washer ${body} ${designator}`);
+        const compact = parse(`M8 flat washer ${body}${designator}`);
+
+        expect(values(compact)).toEqual(values(spaced));
+        expect(spaced.standard).toBe(`${body.toUpperCase()} ${designator.toUpperCase()}`);
+        expect(compact.standard).toBe(spaced.standard);
+      }
+    },
+  );
+
+  it.each(BODIES)('quotes what the user wrote for %s either way', (body) => {
+    expect(parse(`M8 flat washer ${body} 125`).evidence.standard).toBe(`${body} 125`);
+    expect(parse(`M8 flat washer ${body}125`).evidence.standard).toBe(`${body}125`);
+  });
+});
+
+/** A material term that is also a standard's designator: the standard is the whole
+ * expression, so it is read before its halves can be read as attributes of their own. */
+const COLLIDING = ['316', '304', 'a4', 'a2', 'a307', 'b18.2.1'];
+
+describe('a standard whose designator is also an attribute term', () => {
+  it.each(BODIES)('reads %s <term> as the standard and invents no material', (body) => {
+    for (const designator of COLLIDING) {
+      for (const query of [
+        `M8 flat washer ${body} ${designator}`,
+        `M8 flat washer ${body}${designator}`,
+      ]) {
+        const spec = parse(query);
+
+        expect(spec.standard).toBe(`${body.toUpperCase()} ${designator.toUpperCase()}`);
+        expect(spec.material).toBeUndefined();
+        expect(spec.residue).toEqual([]);
+      }
+    }
+  });
+
+  it('still reads the term as a material where no standards body claims it', () => {
+    expect(parse('M8 flat washer 316').material).toEqual({ value: 'ss_316', strength: 1 });
+    expect(parse('M8 flat washer 304').material).toEqual({ value: 'ss_18_8', strength: 1 });
+  });
+
+  it('leaves the body word in the residue when nothing follows it', () => {
+    expect(parse('M8 flat washer 316 din').standard).toBeUndefined();
+    expect(parse('M8 flat washer 316 din').residue).toEqual(['din']);
+  });
+});
