@@ -236,7 +236,7 @@ Status is decided by C and by the parse, before any number is computed:
 | ambiguous | C has two or more items | Top 3 of C by posterior; size of C and the attributes that vary inside C; personalization reorders C |
 | none | C is empty (unknown diameter or type, length or standard not in catalog, contradictory combination) | No confidence; the failed constraint named; up to 3 alternatives from backoff (section 5.6), each with the relaxed constraint stated |
 | history | Intent detector fires (section 7.4) | History-derived candidates, or a prompt to select a customer |
-| unparsed | Neither diameter nor type recognized | Lexical fallback, confidence capped at 0.4, status shown |
+| unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none |
 
 This is what makes "explicit attributes always win" a structural guarantee rather than a weighting: nothing outside C is ever ranked with C, and personalization only sees C.
 
