@@ -177,24 +177,45 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
 }
 
 // A quantity word governs one adjacent number, never both: `50 qty 100` is a length and a
-// complete quantity, not two candidates for the same rule to strip.
+// complete quantity, not two candidates for the same rule to strip. With a number on each
+// side, the governed direction already resolves which is which, no further check needed;
+// a word with only one adjacent number risks reaching for a stated dimension instead, so
+// that single candidate must clear the checks below or be left unclaimed.
 function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
-  const isNumber = (token: NormalizedToken | undefined): boolean =>
+  const isNumberToken = (token: NormalizedToken | undefined): boolean =>
     token !== undefined && /^\d+$/.test(token.text);
+  // `x` binds to `index` only if `x`'s far side is not itself a number: a number sandwiched
+  // between `x` and another number (`5 x 50`) is `x`'s pair, not a dimension guarding index.
+  const boundBySeparator = (index: number): boolean =>
+    (tokens[index - 1]?.text === 'x' && !isNumberToken(tokens[index - 2])) ||
+    (tokens[index + 1]?.text === 'x' && !isNumberToken(tokens[index + 2]));
+  // Nothing but a noise word precedes the pair: a leading "200 pcs" is unambiguous even
+  // as the query's only number, unlike one reached for after the item is already named.
+  const isLeadingPair = (from: number): boolean =>
+    tokens.slice(0, from).every((token) => NOISE_WORDS.has(token.text));
+
+  const totalNumbers = tokens.filter(isNumberToken).length;
+
+  // With another number elsewhere in the query, that other number can carry the
+  // dimension, so a single adjacent number is safe to claim on the strength of the word
+  // alone; only the query's one and only number needs the checks below.
+  const isProtected = (wordIndex: number, numberIndex: number): boolean =>
+    totalNumbers === 1 &&
+    (boundBySeparator(numberIndex) || !isLeadingPair(Math.min(wordIndex, numberIndex)));
 
   const claimed = new Set<number>();
 
   tokens.forEach((token, index) => {
     if (!QUANTITY_WORDS.has(token.text)) return;
 
-    const hasBefore = isNumber(tokens[index - 1]);
-    const hasAfter = isNumber(tokens[index + 1]);
+    const hasBefore = isNumberToken(tokens[index - 1]);
+    const hasAfter = isNumberToken(tokens[index + 1]);
 
     if (hasBefore && hasAfter) {
       claimed.add(QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER.has(token.text) ? index + 1 : index - 1);
-    } else if (hasBefore) {
+    } else if (hasBefore && !isProtected(index, index - 1)) {
       claimed.add(index - 1);
-    } else if (hasAfter) {
+    } else if (hasAfter && !isProtected(index, index + 1)) {
       claimed.add(index + 1);
     }
   });
