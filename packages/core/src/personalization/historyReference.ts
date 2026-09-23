@@ -18,6 +18,9 @@ export interface ReferencedLine {
 
 export type HistoryReference =
   | { form: 'needsCustomer' }
+  /** The selectors reached no past order, so `pure` names at least one and this form
+   * names none: an answer for it can only come from what the query itself states. */
+  | { form: 'unresolved' }
   | { form: 'pure'; lines: readonly ReferencedLine[] }
   | {
       form: 'override';
@@ -189,7 +192,9 @@ export function resolveReference(
   const selected = select(lines, spec);
   const base = selected[0];
 
-  if (base === undefined || !statesOverride(spec)) {
+  if (base === undefined) return { form: 'unresolved' };
+
+  if (!statesOverride(spec)) {
     return { form: 'pure', lines: selected.map((entry, rank) => referenced(entry, rank, config)) };
   }
 
