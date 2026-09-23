@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import styles from './Chip.module.css';
+import { cn } from '../lib/utils';
 
 interface ChipProps {
   children: ReactNode;
@@ -8,17 +8,30 @@ interface ChipProps {
   onClick?: () => void;
 }
 
+const TONES: Record<NonNullable<ChipProps['tone']>, string> = {
+  neutral: 'border-transparent bg-secondary text-foreground',
+  matched: 'border-transparent bg-secondary text-foreground',
+  unspecified: 'border-dashed border-border bg-transparent text-muted-foreground',
+  unverified: 'border-transparent bg-warn-surface text-warn',
+};
+
+const BASE = 'inline-flex items-baseline gap-1.5 rounded-md border px-2.5 py-1 text-left text-sm';
+
 export function Chip({ children, tone = 'neutral', onClick }: ChipProps) {
   if (onClick === undefined) {
-    return (
-      <span className={styles.chip} data-tone={tone}>
-        {children}
-      </span>
-    );
+    return <span className={cn(BASE, TONES[tone])}>{children}</span>;
   }
 
   return (
-    <button type="button" className={styles.chip} data-tone={tone} onClick={onClick}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        BASE,
+        TONES[tone],
+        'cursor-pointer hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      )}
+    >
       {children}
     </button>
   );
