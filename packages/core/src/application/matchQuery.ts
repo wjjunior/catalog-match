@@ -394,7 +394,9 @@ function attributeAnswer(
   config: MatcherConfig,
   limit: number,
   profile: CustomerProfile | undefined,
-  carried: readonly Note[],
+  // A lifted length is only known after bindLength, and the history note must not announce
+  // a change to an attribute that then took no part in the match.
+  carriedFor: (unbound: Length | undefined) => readonly Note[],
 ): Answer {
   const items = deps.catalog.active();
   // A length no type the query names can carry is lifted before C is taken, so the filter,
@@ -412,7 +414,11 @@ function attributeAnswer(
         ? unparsed(query, spec, compatible, deps, config, limit)
         : ranked(status, spec, compatible, config, limit, profile);
 
-  const added = [...unboundNotes(spec, unbound), ...carried, ...discontinuedNotes(profile, spec)];
+  const added = [
+    ...unboundNotes(spec, unbound),
+    ...carriedFor(unbound),
+    ...discontinuedNotes(profile, spec),
+  ];
 
   return added.length === 0 ? answer : { ...answer, notes: [...answer.notes, ...added] };
 }
@@ -429,7 +435,7 @@ function answerFor(
 
   const { phrase } = detectIntent(intentCandidates);
   if (phrase === undefined) {
-    return attributeAnswer(request.query, spec, deps, config, limit, profile, []);
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, () => []);
   }
 
   const lines =
@@ -444,17 +450,28 @@ function answerFor(
   );
 
   if (reference.form === 'override') {
-    const changes = reference.changed.flatMap((attribute) => changeOf(reference.spec, attribute));
-
-    return attributeAnswer(request.query, reference.spec, deps, config, limit, profile, [
-      historyReferenceNote(reference.base.orderDate, changes),
-    ]);
+    return attributeAnswer(
+      request.query,
+      reference.spec,
+      deps,
+      config,
+      limit,
+      profile,
+      (unbound) => [
+        historyReferenceNote(
+          reference.base.orderDate,
+          reference.changed
+            .filter((attribute) => attribute !== 'length' || unbound === undefined)
+            .flatMap((attribute) => changeOf(reference.spec, attribute)),
+        ),
+      ],
+    );
   }
 
   // A reference that named no order is not an answer, and the history cannot be held
   // against the catalog: status comes from C as it does for any other query. 5.3, 7.4.
   if (reference.form === 'unresolved') {
-    return attributeAnswer(request.query, spec, deps, config, limit, profile, [
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, () => [
       unresolvedReferenceNote(phrase),
     ]);
   }
@@ -467,7 +484,7 @@ function answerFor(
   // change still has attributes the pipeline can answer. docs/DESIGN.md 7.4.
   const prompt = customerRequiredNote(phrase);
   if (statesOverride(spec)) {
-    return attributeAnswer(request.query, spec, deps, config, limit, profile, [prompt]);
+    return attributeAnswer(request.query, spec, deps, config, limit, profile, () => [prompt]);
   }
 
   return {

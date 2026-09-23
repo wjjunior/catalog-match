@@ -212,3 +212,52 @@ describe('the reported query, over the delivered data', () => {
     },
   );
 });
+
+describe('an override whose length the merged type cannot carry', () => {
+  /** Announced and ignored are the two halves that must never both be true of one
+   * attribute: whatever the answer lifted, the history note cannot claim to have changed. */
+  const announced = (response: MatchResponse, attr: string): boolean =>
+    response.notes.some(
+      (note) => note.code === 'historyReference' && note.message.includes(`${attr} changed`),
+    );
+  const lifted = (response: MatchResponse): boolean =>
+    response.notes.some((note) => note.code === 'unboundLength');
+
+  it.each(INTENT_PHRASES)(`never announces a length it lifted, after '%s'`, (phrase) => {
+    const response = ask(over(NUT), `${phrase} M8 hex nut x 40mm`);
+
+    expect(lifted(response)).toBe(true);
+    expect(announced(response, 'length')).toBe(false);
+  });
+
+  it.each(INTENT_PHRASES)(`still announces a length that bound, after '%s'`, (phrase) => {
+    const response = ask(over(SCREW_50), `${phrase} M8 socket head cap screw x 40mm`);
+
+    expect(lifted(response)).toBe(false);
+    expect(announced(response, 'length')).toBe(true);
+  });
+
+  it('keeps the changes that did take part alongside the one it lifted', () => {
+    const response = ask(over(NUT), 'same M8 hex nut x 40mm in brass');
+
+    expect(lifted(response)).toBe(true);
+    expect(announced(response, 'length')).toBe(false);
+    expect(announced(response, 'material')).toBe(true);
+  });
+
+  it('drops the contradiction the reported query showed, over the delivered data', () => {
+    const response = liveCore.matchQuery({
+      query: 'same M8 washer as last time 60mm',
+      customerId: CUSTOMER,
+    });
+
+    expect(response.notes).toContainEqual({
+      code: 'unboundLength',
+      message: 'a flat washer carries no length; 60 mm ignored',
+    });
+    expect(response.notes).toContainEqual({
+      code: 'historyReference',
+      message: 'based on your 2026-04-08 order',
+    });
+  });
+});

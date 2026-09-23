@@ -211,6 +211,24 @@ sequenceDiagram
 
 Lowercase; collapse whitespace; unify quote characters to the inch mark; ASCII fractions for unicode ones; unit aliases (inch, in to `in`; foot, feet, ft to `ft`; millimeter, millimetre to `mm`); `#`, `no.` and `number` before a digit to `#`; separators X or x with or without spaces to a canonical separator; singularize type nouns; strip quantities and noise tokens (pcs, qty, each, please, quote).
 
+Stripping a quantity has to decide which number belongs to the marker, and the rule is that
+evidence is local to the number itself. A quantity word claims one number on the side it
+governs (`qty` and `quantity` the number after, `pcs`, `pieces`, `ea` and `each` the number
+before), and it does not claim one that carries its own dimension evidence: a preceding `x`
+separator, or a unit. `x` is also ordinary ordering shorthand for a count, so an explicit
+count noun (`pcs`, `pc`, `pieces`, `piece`, `qty`) overrides a preceding `x` and a
+distributive adverb (`ea`, `each`) does not — `hex nut x 100 pcs` is a hundred nuts,
+`x 50 each` is a fifty-millimetre screw ordered individually.
+
+Nothing here consults the rest of the query. An earlier design counted the dimension-shaped
+tokens in the whole query and protected the only one; that made a standard's designator
+(`ISO 7380`) change whether a distant length survived, and made the same query parse
+differently for the sake of one space. The cost of the local rule is a genuine ambiguity it
+cannot resolve: `M8 x 5 ea 50mm BHCS` reads `5` as the length, because `x 50 each` must keep
+its length and the two are identical in every token a local rule can inspect. Quantity
+phrases at the head or the tail of a query, which is where they are actually written, carry
+no such ambiguity.
+
 ## 5.2 Parsing
 
 The catalog parser and the query parser share the lexicon but differ in tolerance: the catalog parser is strict and must reach 100% coverage (tested against the SKU encoding); the query parser is permissive and records, for every attribute, how it was obtained.
@@ -239,6 +257,22 @@ Status is decided by C and by the parse, before any number is computed:
 | unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none |
 
 This is what makes "explicit attributes always win" a structural guarantee rather than a weighting: nothing outside C is ever ranked with C, and personalization only sees C.
+
+## 5.3a Attributes the catalog does not carry
+
+A constraint no item could satisfy because the attribute does not exist for that product
+type is not a failed constraint; it is a constraint that never applies. The catalog holds
+61 hex nuts and 104 flat washers and none of them carries a length, so `M8 hex nut 100mm`
+answered status none said "no M8 hex nut at 100 mm", which reads as though nuts have lengths
+and this one is out of stock.
+
+Which types bear a length is read off the catalog rather than declared, so it is a fact about
+the file and changes when the file does. A length stated against a type that never carries
+one is lifted off the specification before the compatible set is taken — so the filter, the
+ranker and the explanation all see the same constraints — and the answer says the attribute
+was ignored rather than unmet. A history override that changed only that attribute therefore
+announces no change at all, because announcing one it then lifted would contradict the note
+beside it.
 
 ## 5.4 Ranking inside the compatible set
 
