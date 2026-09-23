@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
@@ -21,6 +23,13 @@ export default defineConfig({
       },
       {
         plugins: [react()],
+        // shadcn's generated components import their `cn` helper as `@/shared/lib/utils`,
+        // the alias apps/web/tsconfig.json resolves for the Next build; Vite needs it too.
+        resolve: {
+          alias: {
+            '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
+          },
+        },
         test: {
           name: 'ui',
           environment: 'jsdom',
