@@ -87,7 +87,7 @@ export const RESPONSE_BY_STATUS: Readonly<Record<MatchStatus, MatchResponse>> = 
     query: 'same bolt as last time',
     parsed: { ...parsed, residue: ['last time'] },
     status: 'history',
-    compatibleCount: 3,
+    compatibleCount: 0,
     results: [
       {
         ...match,
