@@ -15,22 +15,28 @@ const MIXED = /^(\d+)-(\d+)\/(\d+)$/;
 const FRACTION = /^(\d+)\/(\d+)$/;
 const PLAIN = /^\d+(?:\.\d+)?$/;
 
+/** A digit run long enough to overflow Number.MAX_VALUE parses "successfully" to
+ * Infinity (or NaN once divided); undefined for that the same as undefined for `1/0`. */
 export function parseNumber(text: string): number | undefined {
   const mixed = MIXED.exec(text);
   if (mixed) {
     const [, whole = '', numerator = '', denominator = ''] = mixed;
-    return Number(denominator) === 0
-      ? undefined
-      : Number(whole) + Number(numerator) / Number(denominator);
+    if (Number(denominator) === 0) return undefined;
+    const value = Number(whole) + Number(numerator) / Number(denominator);
+    return Number.isFinite(value) ? value : undefined;
   }
 
   const fraction = FRACTION.exec(text);
   if (fraction) {
     const [, numerator = '', denominator = ''] = fraction;
-    return Number(denominator) === 0 ? undefined : Number(numerator) / Number(denominator);
+    if (Number(denominator) === 0) return undefined;
+    const value = Number(numerator) / Number(denominator);
+    return Number.isFinite(value) ? value : undefined;
   }
 
-  return PLAIN.test(text) ? Number(text) : undefined;
+  if (!PLAIN.test(text)) return undefined;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 export type SizeToken =
@@ -125,7 +131,7 @@ export function resolveDiameter(nominal: string): Diameter | undefined {
 
   const system = systemOf(token.nominal);
   const mm = diameterMm(token.nominal, system);
-  if (mm === undefined) return undefined;
+  if (mm === undefined || !Number.isFinite(mm)) return undefined;
 
   return {
     system,
@@ -168,8 +174,10 @@ export function resolveLength(token: SizeToken, diameter?: Diameter): ResolvedLe
   if (token.kind !== 'length') return undefined;
 
   if (token.unit !== undefined) {
+    const mm = toMm(token.value, token.unit);
+    if (!Number.isFinite(token.value) || !Number.isFinite(mm)) return undefined;
     return {
-      length: { value: token.value, unit: token.unit, mm: toMm(token.value, token.unit) },
+      length: { value: token.value, unit: token.unit, mm },
       provenance: 'explicit',
     };
   }
@@ -177,8 +185,11 @@ export function resolveLength(token: SizeToken, diameter?: Diameter): ResolvedLe
   const unit = inferUnit(token.value, diameter);
   if (unit === undefined) return undefined;
 
+  const mm = toMm(token.value, unit);
+  if (!Number.isFinite(token.value) || !Number.isFinite(mm)) return undefined;
+
   return {
-    length: { value: token.value, unit, mm: toMm(token.value, unit) },
+    length: { value: token.value, unit, mm },
     provenance: 'inferred',
   };
 }
