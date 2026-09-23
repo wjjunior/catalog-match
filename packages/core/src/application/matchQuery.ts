@@ -72,6 +72,54 @@ function labelled(match: Match, config: MatcherConfig): Match {
   return { ...match, label: labelFor(match.confidence, config).label };
 }
 
+/** What qualifies a product rather than identifies it, in the probe order of
+ * `buildConstraints`, which is the order a failure note reads in. */
+const QUALIFIERS = ['length', 'standard', 'material', 'finish'] as const;
+
+type Qualifier = (typeof QUALIFIERS)[number];
+
+const PREPOSITION: Readonly<Record<Qualifier, string>> = {
+  length: 'at',
+  standard: 'to',
+  material: 'in',
+  finish: 'in',
+};
+
+const isQualifier = (attribute: AttributeName): attribute is Qualifier =>
+  (QUALIFIERS as readonly AttributeName[]).includes(attribute);
+
+function statedValue(spec: ParsedSpec, attribute: Qualifier): string | undefined {
+  switch (attribute) {
+    case 'length':
+      return spec.length && formatLength(spec.length);
+    case 'standard':
+      return spec.standard;
+    case 'material':
+      return spec.material && formatMaterial(spec.material.value);
+    case 'finish':
+      return spec.finish && formatFinish(spec.finish.value);
+  }
+}
+
+/** `failedConstraintNote` names the product by its diameter and type, and a query that
+ * reached the lexical fallback has neither; the qualifiers that held stand in for it. */
+function qualifierOnlyNote(spec: ParsedSpec, failed: Qualifier): Note | undefined {
+  const value = statedValue(spec, failed);
+  if (value === undefined) return undefined;
+
+  const held = QUALIFIERS.slice(0, QUALIFIERS.indexOf(failed))
+    .map((attribute) => statedValue(spec, attribute))
+    .filter((stated) => stated !== undefined);
+
+  return {
+    code: 'failedConstraint',
+    message: `no ${[...held, 'item'].join(' ')} ${PREPOSITION[failed]} ${value}`,
+  };
+}
+
+const namesNoProduct = (spec: ParsedSpec): boolean =>
+  spec.diameter === undefined && (spec.type === undefined || spec.type.length === 0);
+
 function diagnosis(spec: ParsedSpec, failed: AttributeName): Note {
   if (failed === 'diameter' && spec.diameter?.known === false) {
     return unknownDiameterNote(spec.diameter.nominal);
@@ -79,6 +127,10 @@ function diagnosis(spec: ParsedSpec, failed: AttributeName): Note {
 
   if (failed === 'type' && spec.provenance.type === 'unrecognized') {
     return unknownTypeNote(spec.evidence.type ?? '');
+  }
+
+  if (isQualifier(failed) && namesNoProduct(spec)) {
+    return qualifierOnlyNote(spec, failed) ?? failedConstraintNote(spec, failed);
   }
 
   return failedConstraintNote(spec, failed);
@@ -213,10 +265,12 @@ function none(
 }
 
 /** docs/DESIGN.md 5.8. There is no compatible set to report: the constraints the parser
- * did find are too weak to name one, which is what `unparsed` says. */
+ * did find are too weak to name one, which is what `unparsed` says. They still rule out
+ * what contradicts them, so token overlap only orders the pool they leave. */
 function unparsed(
   query: string,
   spec: ParsedSpec,
+  pool: readonly CatalogItem[],
   deps: MatchQueryDeps,
   config: MatcherConfig,
   limit: number,
@@ -225,29 +279,35 @@ function unparsed(
   // of docs/DESIGN.md 10.4 stays one of parsing against scoring, not of two tokenizers.
   const tokens = normalize(query).tokens.map((token) => correct(token.text)?.word ?? token.text);
   const meta: ExplanationMeta = { compatibleCount: 0, disambiguateBy: [] };
+  const admitted = new Set(pool.map((item) => item.sku));
 
-  const results = score(deps.index, tokens)
-    .slice(0, limit)
-    .flatMap((entry) => {
-      const item = deps.catalog.bySku(entry.sku);
-      if (item === undefined) return [];
+  const candidates = score(deps.index, tokens).filter((entry) => admitted.has(entry.sku));
+  // `score` divides by the best hit in the whole index, and an item the attributes ruled
+  // out must not be what the best surviving overlap is measured against.
+  const best = candidates[0]?.score ?? 1;
 
-      return [
-        labelled(
-          {
-            sku: item.sku,
-            catalogId: item.catalogId,
-            description: item.description,
-            active: item.active,
-            confidence: config.lexicalCap * entry.score,
-            explanation: explainMatch(spec, item, meta),
-            // Token overlap is all the evidence there is, and no customer is known yet.
-            components: { compatibility: entry.score, prior: 1 },
-          },
-          config,
-        ),
-      ];
-    });
+  const results = candidates.slice(0, limit).flatMap((entry) => {
+    const item = deps.catalog.bySku(entry.sku);
+    if (item === undefined) return [];
+
+    const overlap = entry.score / best;
+
+    return [
+      labelled(
+        {
+          sku: item.sku,
+          catalogId: item.catalogId,
+          description: item.description,
+          active: item.active,
+          confidence: config.lexicalCap * overlap,
+          explanation: explainMatch(spec, item, meta),
+          // Token overlap is all the evidence there is, and no customer is known yet.
+          components: { compatibility: overlap, prior: 1 },
+        },
+        config,
+      ),
+    ];
+  });
 
   return {
     status: 'unparsed',
@@ -309,16 +369,9 @@ function referencedOrders(
 }
 
 function changeOf(spec: ParsedSpec, attribute: AttributeName): AttributeChange | [] {
-  const value =
-    attribute === 'material'
-      ? spec.material && formatMaterial(spec.material.value)
-      : attribute === 'finish'
-        ? spec.finish && formatFinish(spec.finish.value)
-        : attribute === 'standard'
-          ? spec.standard
-          : attribute === 'length'
-            ? spec.length && formatLength(spec.length)
-            : undefined;
+  if (!isQualifier(attribute)) return [];
+
+  const value = statedValue(spec, attribute);
 
   return value === undefined ? [] : { attr: attribute, value };
 }
@@ -337,11 +390,13 @@ function attributeAnswer(
   const compatible = compatibleSet(spec, items);
   const status = deriveStatus(spec, compatible);
 
+  // A recognized attribute that admits nothing is a failed constraint, not a licence to
+  // rank the catalog it just excluded: the fallback takes the backoff of 5.6 instead.
   const answer =
-    status === 'unparsed'
-      ? unparsed(query, spec, deps, config, limit)
-      : status === 'none'
-        ? none(spec, items, config, limit)
+    compatible.length === 0
+      ? none(spec, items, config, limit)
+      : status === 'unparsed'
+        ? unparsed(query, spec, compatible, deps, config, limit)
         : ranked(status, spec, compatible, config, limit, profile);
 
   const added = [...carried, ...discontinuedNotes(profile, spec)];

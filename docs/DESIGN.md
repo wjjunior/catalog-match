@@ -282,7 +282,7 @@ Every match returns: the status; matched attributes with query value, item value
 
 ## 5.8 Lexical fallback and baseline
 
-When the parser finds neither a diameter nor a type, candidates are scored by token overlap over normalized description tokens (an in-repo BM25-lite) with confidence capped at 0.4 and status unparsed. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4).
+When the parser finds neither a diameter nor a type, the attributes it did recognize still constrain: the candidates are the compatible set C, and token overlap over normalized description tokens (an in-repo BM25-lite) only orders them, with confidence capped at 0.4 for the best item the pool admits and status unparsed. When those attributes admit nothing, there is no honest lexical answer and the query falls through to the backoff of section 5.6: status none, the failed constraint named, alternatives carrying closeness rather than a confidence. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4); the baseline scores the whole active catalog unfiltered, because what it exists to measure is what pure lexical matching achieves.
 
 # 6. Behavior across the challenge's edge cases
 
