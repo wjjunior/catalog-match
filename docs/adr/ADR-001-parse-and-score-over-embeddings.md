@@ -38,7 +38,7 @@ Both columns are the same 78 golden cases through the same loader and metrics
 | MRR             | 1.000  | 0.268            | 48    |
 | Set precision   | 1.000  | 0.118            | 30    |
 | Exact-set rate  | 0.967  | 0.033            | 30    |
-| Status accuracy | 0.962  | 0.603            | 78    |
+| Status accuracy | 0.987  | 0.603            | 78    |
 
 The control is not handicapped. Its own `lexicalUniqueGap` was swept to the value that
 maximizes its status accuracy, which raised it from 0.462 to 0.603
@@ -59,9 +59,10 @@ the lexicon does not know becomes residue, and the two parser defects the golden
 catches today are of that kind — `nylon lock nut M8` is answered `ambiguous` where `none`
 is expected, and `1/2"` never becomes a diameter.
 
-Status accuracy is 0.962, not 1.000: three of the 78 cases are wrong, and they are listed
-in `docs/calibration.md`. Every number here is golden-set evidence; the held-out set has
-not been run.
+Status accuracy is 0.987, not 1.000: one of the 78 cases is wrong — `same washers as last
+time, but brass` (pers-21), where the override drops the standard. This record first read
+0.962 over three failures; the other two were parser defects, since fixed. Every number
+here is golden-set evidence; the held-out set has not been run.
 
 ## Revisit trigger
 

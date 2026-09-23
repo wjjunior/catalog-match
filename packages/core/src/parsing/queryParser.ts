@@ -70,7 +70,11 @@ const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
 /** `125`, `a307`, `b18.2.1`: the designator half of a standard, never a whole standard. */
-const DESIGNATOR = /^[a-z]?\d+(?:\.\d+)*[a-z]?$/;
+const DESIGNATOR_SHAPE = '[a-z]?\\d+(?:\\.\\d+)*[a-z]?';
+
+const DESIGNATOR = new RegExp(`^${DESIGNATOR_SHAPE}$`);
+
+const COMPACT_STANDARD = new RegExp(`^(${[...STANDARD_BODIES].join('|')})(${DESIGNATOR_SHAPE})$`);
 
 function read(query: string): Token[] {
   return normalize(query).tokens.map((token) => {
@@ -144,9 +148,12 @@ interface LexiconAttributes {
 /** First match per attribute wins; a second reading of an attribute already stated is
  * left unclaimed and becomes residue. */
 function takeAttributes(draft: Draft): LexiconAttributes {
-  const found: LexiconAttributes = {};
+  const found: LexiconAttributes = { standard: takeStandardCode(draft) };
 
-  for (const match of longestMatch(draft.tokens.map((token) => token.text))) {
+  for (const match of longestMatch(
+    draft.tokens.map((token) => token.text),
+    draft.claimed,
+  )) {
     // A phrase naming a product the catalog does not carry. It is claimed rather than
     // left to the residue, which docs/DESIGN.md 5.3 forbids from emptying C.
     if (match.attribute === 'unknownType') {
@@ -184,28 +191,50 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     claim(draft, match.start, match.end);
   }
 
-  if (found.standard === undefined) found.standard = takeStandardCode(draft);
-
   return found;
 }
 
-/** Syntactic, not a lookup: a standard the query states constrains it whether or not the
- * catalog stocks it (docs/DESIGN.md 5.3, 10.5). The thread guard keeps `iso M8` a size. */
+interface StandardCode {
+  body: string;
+  designator: string;
+  to: number;
+}
+
+/** `DIN125` and `DIN 125` are one expression spelled two ways; whether the catalog stocks
+ * the standard decides nothing here, so neither may depend on a space. */
+function readStandardCode(draft: Draft, index: number): StandardCode | undefined {
+  const token = draft.tokens[index];
+  if (token === undefined) return undefined;
+
+  const compact = COMPACT_STANDARD.exec(token.text);
+  if (compact) {
+    const [, body = '', designator = ''] = compact;
+
+    return { body, designator, to: index + 1 };
+  }
+
+  const next = draft.tokens[index + 1];
+  if (next === undefined) return undefined;
+  if (!STANDARD_BODIES.has(token.text) || !DESIGNATOR.test(next.text)) return undefined;
+
+  return { body: token.text, designator: next.text, to: index + 2 };
+}
+
+/** Syntactic, not a lookup, and read before the lexicon so `DIN 316` cannot be halved into
+ * a material (docs/DESIGN.md 5.3, 10.5). The thread guard keeps `iso M8` a size. */
 function takeStandardCode(draft: Draft): string | undefined {
-  for (let index = 0; index < draft.tokens.length - 1; index++) {
-    const body = draft.tokens[index];
-    const designator = draft.tokens[index + 1];
+  for (let index = 0; index < draft.tokens.length; index++) {
+    const code = readStandardCode(draft, index);
 
-    if (body === undefined || designator === undefined) continue;
-    if (!free(draft, index, index + 2)) continue;
-    if (!STANDARD_BODIES.has(body.text) || !DESIGNATOR.test(designator.text)) continue;
-    if (classifySizeToken(designator.text)?.kind === 'thread') continue;
+    if (code === undefined) continue;
+    if (!free(draft, index, code.to)) continue;
+    if (classifySizeToken(code.designator)?.kind === 'thread') continue;
 
-    draft.evidence.standard = quote(draft, index, index + 2);
+    draft.evidence.standard = quote(draft, index, code.to);
     draft.provenance.standard = 'explicit';
-    claim(draft, index, index + 2);
+    claim(draft, index, code.to);
 
-    return `${body.text.toUpperCase()} ${designator.text.toUpperCase()}`;
+    return `${code.body.toUpperCase()} ${code.designator.toUpperCase()}`;
   }
 
   return undefined;
@@ -359,6 +388,14 @@ interface Sizes {
   length?: Length;
 }
 
+/** A dimension the query sets apart itself: it carries its own unit, or it stands where
+ * the separator put it. Either says dimension without help from the words in between. */
+function delimited(draft: Draft, slot: SizeSlot): boolean {
+  if (slot.size.kind === 'length' && slot.size.unit !== undefined) return true;
+
+  return draft.tokens[slot.from - 1]?.text === SEPARATOR;
+}
+
 function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
   const sizes: Sizes = {};
   const threadAt = slots.findIndex((slot) => slot.size.kind === 'thread');
@@ -383,11 +420,12 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
 
   const reach = sizes.diameter === undefined ? undefined : head?.to;
 
-  // Every documented length sits after the diameter: past the separator, attached to a
-  // unit, or trailing the type phrase. A number the diameter only reaches over ground
-  // nothing has claimed belongs to something else, as the 8 of `1/2-13 hex nut grade 8`.
+  // A number the diameter reaches only over unclaimed ground belongs to something else,
+  // as the 8 of `1/2-13 hex nut grade 8`; one the query delimits is a dimension regardless.
   for (const slot of thread === undefined ? slots : slots.slice(headAt + 1)) {
-    if (reach !== undefined && !settled(draft, reach, slot.from)) continue;
+    if (reach !== undefined && !delimited(draft, slot) && !settled(draft, reach, slot.from)) {
+      continue;
+    }
     const candidate = asLength(slot.size);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { normalize } from './normalize';
@@ -265,6 +266,110 @@ describe('stripping quantities and noise', () => {
       'quantityStripped',
       'noiseStripped',
     ]);
+  });
+});
+
+// F4: a quantity word governs one adjacent number, not both neighbours. `BASE_QUERIES`
+// carry a length the quantity phrase must never touch; `QUANTITY_PHRASES` cover both
+// directions a real quantity word binds (`qty 100`, `100 pcs`, `qty 5`) plus a control
+// that looks like a phrase but is not one (`x 100`, since `x` is never a quantity word).
+interface BaseQuery {
+  tokens: readonly string[];
+  length: string;
+  label: string;
+}
+
+interface QuantityPhrase {
+  tokens: readonly string[];
+  number: string;
+  isQuantity: boolean;
+  label: string;
+}
+
+const BASE_QUERIES: readonly BaseQuery[] = [
+  { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'a bare length after the type' },
+  { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'a length bound by the separator' },
+];
+
+const QUANTITY_PHRASES: readonly QuantityPhrase[] = [
+  { tokens: ['qty', '100'], number: '100', isQuantity: true, label: 'qty 100' },
+  { tokens: ['100', 'pcs'], number: '100', isQuantity: true, label: '100 pcs' },
+  { tokens: ['qty', '5'], number: '5', isQuantity: true, label: 'qty 5' },
+  { tokens: ['x', '100'], number: '100', isQuantity: false, label: 'x 100, not a quantity phrase' },
+];
+
+function insertAt(tokens: readonly string[], index: number, insert: readonly string[]): string {
+  return [...tokens.slice(0, index), ...insert, ...tokens.slice(index)].join(' ');
+}
+
+// Every insertion point the phrase can occupy in a base query: before the diameter, before
+// the type, after the type, and at the end, generated from the base's own length rather than
+// hand-picked one at a time.
+const QUANTITY_INSERTION_CASES = BASE_QUERIES.flatMap((base) => {
+  const baseCanonical = normalize(base.tokens.join(' ')).canonical;
+
+  return QUANTITY_PHRASES.flatMap((phrase) =>
+    Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
+      base,
+      phrase,
+      position,
+      baseCanonical,
+      query: insertAt(base.tokens, position, phrase.tokens),
+    })),
+  );
+});
+
+describe('the quantity span (F4)', () => {
+  it.each(QUANTITY_INSERTION_CASES)(
+    'inserting $phrase.label into $base.label at position $position leaves the rest as if it were absent',
+    ({ query, phrase, baseCanonical }) => {
+      const { tokens } = normalize(query);
+      const words = tokens.map((token) => token.text);
+
+      if (phrase.isQuantity) {
+        expect(normalize(query).canonical).toBe(baseCanonical);
+        expect(words).not.toContain(phrase.number);
+      } else {
+        expect(words).toContain(phrase.number);
+      }
+    },
+  );
+
+  it('agrees on the canonical output whether the quantity phrase sits before or after the type', () => {
+    expect(normalize('M8 x 50 qty 100 BHCS').canonical).toBe(
+      normalize('M8 x 50 BHCS qty 100').canonical,
+    );
+  });
+
+  it('keeps the length and drops only the quantity number with an unrelated word between them', () => {
+    const fillerWords = ['black', 'oxide', 'zzq'] as const;
+    const realPhrases = QUANTITY_PHRASES.filter((phrase) => phrase.isQuantity);
+
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...BASE_QUERIES),
+        fc.constantFrom(...realPhrases),
+        fc.constantFrom(...fillerWords),
+        fc.nat(),
+        fc.nat(),
+        (base, phrase, filler, rawFillerPosition, rawPhrasePosition) => {
+          const withFiller = insertAt(base.tokens, rawFillerPosition % (base.tokens.length + 1), [
+            filler,
+          ]).split(' ');
+          const query = insertAt(
+            withFiller,
+            rawPhrasePosition % (withFiller.length + 1),
+            phrase.tokens,
+          );
+
+          const words = normalize(query).tokens.map((token) => token.text);
+
+          expect(words).toContain(base.length);
+          expect(words).toContain(filler);
+          expect(words).not.toContain(phrase.number);
+        },
+      ),
+    );
   });
 });
 

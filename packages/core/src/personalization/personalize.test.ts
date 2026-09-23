@@ -1,6 +1,16 @@
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
-import { FINISHES, MATERIALS, THREAD_SYSTEMS } from '../domain/attributes';
+import { createCore } from '../application/createCore';
+import {
+  FINISH_FAMILY,
+  FINISHES,
+  MATERIAL_FAMILY,
+  MATERIALS,
+  THREAD_SYSTEMS,
+} from '../domain/attributes';
+import type { Finish, FinishFamily, Material, MaterialFamily } from '../domain/attributes';
 import type { CatalogItem, CustomerProfile } from '../domain/catalog';
 import type { PersonalizationExplanation } from '../domain/match';
 import type { ParsedSpec } from '../domain/spec';
@@ -214,7 +224,7 @@ describe('a stated family that agrees with the preferred member', () => {
     }
   });
 
-  it('does not report the finish as overridden when the query states a sibling in the same family', () => {
+  it('reports the finish as overridden when the query states a different exact sibling in the same family', () => {
     const profile = profileOf({
       shares: {
         material: only(MATERIALS, 'steel'),
@@ -225,8 +235,8 @@ describe('a stated family that agrees with the preferred member', () => {
 
     const explanation = explain(profile, ZINC_NUT, YELLOW_ZINC_NUTS, 'YZ');
 
-    expect(explanation.reason).toBe('history prefers steel yellow zinc');
-    expect(explanation.overriddenBy).toBeUndefined();
+    expect(explanation.reason).toBe('history prefers steel yellow zinc; overridden by the query');
+    expect(explanation.overriddenBy).toEqual(['finish']);
   });
 
   it('still reports an override when the stated family differs from the preferred one', () => {
@@ -242,6 +252,126 @@ describe('a stated family that agrees with the preferred member', () => {
 
     expect(explanation.reason).toBe('history prefers alloy black oxide; overridden by the query');
     expect(explanation.overriddenBy).toEqual(['material']);
+  });
+});
+
+function overriddenForMaterial(stated: Material | MaterialFamily, preferred: Material): boolean {
+  const spec: ParsedSpec = {
+    residue: [],
+    evidence: {},
+    provenance: {},
+    material: { value: stated, strength: 1 },
+  };
+  const profile = profileOf({
+    shares: {
+      material: only(MATERIALS, preferred),
+      finish: evenly(FINISHES),
+      threadSystem: evenly(THREAD_SYSTEMS),
+    },
+  });
+
+  return explain(profile, spec, WASHERS, 'SS').overriddenBy?.includes('material') ?? false;
+}
+
+function overriddenForFinish(stated: Finish | FinishFamily, preferred: Finish): boolean {
+  const spec: ParsedSpec = {
+    residue: [],
+    evidence: {},
+    provenance: {},
+    finish: { value: stated, strength: 1 },
+  };
+  const profile = profileOf({
+    shares: {
+      material: evenly(MATERIALS),
+      finish: only(FINISHES, preferred),
+      threadSystem: evenly(THREAD_SYSTEMS),
+    },
+  });
+
+  return explain(profile, spec, WASHERS, 'SS').overriddenBy?.includes('finish') ?? false;
+}
+
+describe('the family comparison is directional', () => {
+  it('agrees for every (family, member) pair the material and finish tables derive', () => {
+    for (const member of MATERIALS) {
+      expect(overriddenForMaterial(MATERIAL_FAMILY[member], member)).toBe(false);
+    }
+    for (const member of FINISHES) {
+      expect(overriddenForFinish(FINISH_FAMILY[member], member)).toBe(false);
+    }
+  });
+
+  it('overrides for every pair of distinct exact members that share a family', () => {
+    for (const stated of MATERIALS) {
+      for (const preferred of MATERIALS) {
+        if (stated === preferred || MATERIAL_FAMILY[stated] !== MATERIAL_FAMILY[preferred])
+          continue;
+        expect(overriddenForMaterial(stated, preferred)).toBe(true);
+      }
+    }
+    for (const stated of FINISHES) {
+      for (const preferred of FINISHES) {
+        if (stated === preferred || FINISH_FAMILY[stated] !== FINISH_FAMILY[preferred]) continue;
+        expect(overriddenForFinish(stated, preferred)).toBe(true);
+      }
+    }
+  });
+
+  it('never overrides when the stated exact value equals the preference', () => {
+    for (const value of MATERIALS) expect(overriddenForMaterial(value, value)).toBe(false);
+    for (const value of FINISHES) expect(overriddenForFinish(value, value)).toBe(false);
+  });
+
+  it('always overrides when the stated member and the preference sit in different families', () => {
+    for (const stated of MATERIALS) {
+      for (const preferred of MATERIALS) {
+        if (MATERIAL_FAMILY[stated] === MATERIAL_FAMILY[preferred]) continue;
+        expect(overriddenForMaterial(stated, preferred)).toBe(true);
+      }
+    }
+    for (const stated of FINISHES) {
+      for (const preferred of FINISHES) {
+        if (FINISH_FAMILY[stated] === FINISH_FAMILY[preferred]) continue;
+        expect(overriddenForFinish(stated, preferred)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('the pipeline against the real catalog and history', () => {
+  const core = createCore({ dataDir: fileURLToPath(new URL('../../../../data', import.meta.url)) });
+
+  const personalizationsOf = (query: string, customerId: string): PersonalizationExplanation[] =>
+    core
+      .matchQuery({ query, customerId })
+      .results.flatMap((result) => result.explanation.personalization ?? []);
+
+  it('does not override for "stainless M8 washer" against CUST-002, whose history prefers 18-8 SS', () => {
+    const explanations = personalizationsOf('stainless M8 washer', 'CUST-002');
+
+    expect(explanations.length).toBeGreaterThan(0);
+    for (const explanation of explanations) expect(explanation.overriddenBy).toBeUndefined();
+  });
+
+  it('overrides material for "316 SS M8 washer" against CUST-002, a different exact member of the same family', () => {
+    const explanations = personalizationsOf('316 SS M8 washer', 'CUST-002');
+
+    expect(explanations.length).toBeGreaterThan(0);
+    for (const explanation of explanations) expect(explanation.overriddenBy).toEqual(['material']);
+  });
+
+  it('overrides material for "brass hex nut 1/2-13" against CUST-004, per docs/DESIGN.md 7.3', () => {
+    const explanations = personalizationsOf('brass hex nut 1/2-13', 'CUST-004');
+
+    expect(explanations.length).toBeGreaterThan(0);
+    for (const explanation of explanations) expect(explanation.overriddenBy).toEqual(['material']);
+  });
+
+  it('overrides finish for "yellow zinc M8 flat washer" against CUST-001, a different exact member of the same family', () => {
+    const explanations = personalizationsOf('yellow zinc M8 flat washer', 'CUST-001');
+
+    expect(explanations.length).toBeGreaterThan(0);
+    for (const explanation of explanations) expect(explanation.overriddenBy).toEqual(['finish']);
   });
 });
 

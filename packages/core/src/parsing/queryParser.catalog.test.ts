@@ -194,3 +194,54 @@ describe('a standard the catalog does not stock', () => {
     },
   );
 });
+
+const GAP_WORDS = ['length', 'red', 'approx', 'zorbulon'];
+
+const GAP_TEMPLATES = [
+  'M8 {gap} x 50mm BHCS',
+  'M8 SHCS {gap} 30mm',
+  'M16 threaded rod {gap} 60mm',
+  '3/8 lag screw {gap} 1 inch',
+  'M8 {gap} x 50 BHCS',
+];
+
+const fill = (template: string, word: string): string =>
+  template.replace('{gap}', word).replace(/\s+/g, ' ').trim();
+
+/** Residue lowers confidence; it never decides which items are compatible
+ * (docs/DESIGN.md 5.3), so a word the parser cannot place cannot change the answer. */
+describe('a word the catalog has no place for', () => {
+  it.each(GAP_TEMPLATES)('leaves the answer to %s as it was', (template) => {
+    const base = answer(fill(template, ''));
+
+    for (const word of GAP_WORDS) expect(answer(fill(template, word))).toEqual(base);
+  });
+});
+
+const BODIES = ['din', 'iso', 'asme', 'astm', 'ansi', 'ifi'];
+const DESIGNATORS = ['912', '933', '7380', '111', 'b18.2.1', 'a307', '125', '4762', '316', '304'];
+
+const STOCKED = new Set(items.map((item) => item.spec.standard));
+
+describe('a standard spelled with and without the space', () => {
+  it.each(BODIES)('answers %s<n> exactly as it answers the spaced spelling', (body) => {
+    for (const designator of DESIGNATORS) {
+      expect(answer(`M8 flat washer ${body}${designator}`)).toEqual(
+        answer(`M8 flat washer ${body} ${designator}`),
+      );
+    }
+  });
+
+  /** The catalog decides: a standard no row states cannot be satisfied, whichever way the
+   * user spelled it, and the failure names the constraint rather than dropping it. */
+  it.each(BODIES)('fails on the standard for a %s designator no row states', (body) => {
+    for (const designator of DESIGNATORS) {
+      const canonical = `${body.toUpperCase()} ${designator.toUpperCase()}`;
+      if (STOCKED.has(canonical)) continue;
+
+      for (const spelling of [`${body} ${designator}`, `${body}${designator}`]) {
+        expect(answer(`M8 flat washer ${spelling}`)).toEqual(answer('M8 flat washer DIN 125'));
+      }
+    }
+  });
+});
