@@ -282,7 +282,7 @@ Every match returns: the status; matched attributes with query value, item value
 
 ## 5.8 Lexical fallback and baseline
 
-When the parser finds neither a diameter nor a type, candidates are scored by token overlap over normalized description tokens (an in-repo BM25-lite) with confidence capped at 0.4 and status unparsed. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4).
+When the parser finds neither a diameter nor a type, the attributes it did recognize still constrain: the candidates are the compatible set C, and token overlap over normalized description tokens (an in-repo BM25-lite) only orders them, with confidence capped at 0.4 for the best item the pool admits and status unparsed. When those attributes admit nothing, there is no honest lexical answer and the query falls through to the backoff of section 5.6: status none, the failed constraint named, alternatives carrying closeness rather than a confidence. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4); the baseline scores the whole active catalog unfiltered, because what it exists to measure is what pure lexical matching achieves.
 
 # 6. Behavior across the challenge's edge cases
 
@@ -335,7 +335,7 @@ For CUST-005, n_eff is 2.71 and λ_c 0.35, and the mixture stays close to unifor
 
 ## 7.4 Intent: history references
 
-Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get, previous order. With a customer selected, the referenced order lines are those customer's most recent lines whose type or diameter matches any such words in the query ("washers" covers flat and lock washers). Two forms:
+Triggers on phrases such as same, last time, usual, again, reorder, like before, what we always get, previous order. With a customer selected, the referenced order lines are those customer's most recent lines whose type, diameter or pitch matches any such words in the query ("washers" covers flat and lock washers). Two forms:
 
 - Pure reference ("the same washers as last time"): status history; candidates are the referenced lines ranked by recency, confidence 0.7 for the most recent decaying by rank, with the order date and quantity in the explanation.
 - Reference with an override ("same washers as last time, but brass"): the referenced line's parsed attributes become the base specification, the query's explicit attributes overwrite it (material becomes brass), and the merged specification runs through the normal pipeline with status derived from C; the note says "based on your 2026-04-15 order, material changed to brass".
