@@ -72,6 +72,9 @@ const SINGULARS: Readonly<Record<string, string>> = {
 const QUANTITY_WORDS = new Set(['pcs', 'pc', 'pieces', 'piece', 'ea', 'each', 'qty']);
 // qty precedes its number ("qty 100"); every other quantity word follows theirs ("100 pcs").
 const QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER = new Set(['qty']);
+// Adverbs, not count nouns: `each` says how a count is distributed, so it is too weak to
+// take a number the separator has already bound. Every other quantity word names a count.
+const DISTRIBUTIVE_WORDS = new Set(['ea', 'each']);
 const NOISE_WORDS = new Set(['please', 'quote', 'need', 'want']);
 const NOTE_ORDER: readonly NormalizationNote[] = ['quantityStripped', 'noiseStripped'];
 
@@ -184,10 +187,13 @@ function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
   const isNumberToken = (token: NormalizedToken | undefined): boolean =>
     token !== undefined && /^\d+$/.test(token.text);
 
-  const boundByPrevious = (index: number): boolean => {
+  // `x` is ordering shorthand as often as it is a size separator, so `hex nut x 100 pcs` is
+  // a count twice over; only the adverbs leave it standing as a dimension.
+  const boundByPrevious = (index: number, word: string): boolean => {
     const previous = tokens[index - 1]?.text;
+    if (previous === undefined) return false;
 
-    return previous !== undefined && (previous === 'x' || STANDARD_BODIES.has(previous));
+    return STANDARD_BODIES.has(previous) || (previous === 'x' && DISTRIBUTIVE_WORDS.has(word));
   };
 
   const claimed = new Set<number>();
@@ -203,10 +209,10 @@ function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
       return;
     }
 
-    // What speaks for a lone number is local to it: the token in front. The separator binds
-    // a dimension, a standard body binds its designator; neither is the word's to take.
+    // What speaks for a lone number is local to it: the token in front, weighed against the
+    // kind of word reaching for it. A standard body binds its designator against them all.
     const lone = hasBefore ? index - 1 : hasAfter ? index + 1 : undefined;
-    if (lone !== undefined && !boundByPrevious(lone)) claimed.add(lone);
+    if (lone !== undefined && !boundByPrevious(lone, token.text)) claimed.add(lone);
   });
 
   return claimed;
