@@ -194,3 +194,26 @@ describe('a standard the catalog does not stock', () => {
     },
   );
 });
+
+const GAP_WORDS = ['length', 'red', 'approx', 'zorbulon'];
+
+const GAP_TEMPLATES = [
+  'M8 {gap} x 50mm BHCS',
+  'M8 SHCS {gap} 30mm',
+  'M16 threaded rod {gap} 60mm',
+  '3/8 lag screw {gap} 1 inch',
+  'M8 {gap} x 50 BHCS',
+];
+
+const fill = (template: string, word: string): string =>
+  template.replace('{gap}', word).replace(/\s+/g, ' ').trim();
+
+/** Residue lowers confidence; it never decides which items are compatible
+ * (docs/DESIGN.md 5.3), so a word the parser cannot place cannot change the answer. */
+describe('a word the catalog has no place for', () => {
+  it.each(GAP_TEMPLATES)('leaves the answer to %s as it was', (template) => {
+    const base = answer(fill(template, ''));
+
+    for (const word of GAP_WORDS) expect(answer(fill(template, word))).toEqual(base);
+  });
+});

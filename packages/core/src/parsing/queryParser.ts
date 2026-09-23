@@ -359,6 +359,14 @@ interface Sizes {
   length?: Length;
 }
 
+/** A dimension the query sets apart itself: it carries its own unit, or it stands where
+ * the separator put it. Either says dimension without help from the words in between. */
+function delimited(draft: Draft, slot: SizeSlot): boolean {
+  if (slot.size.kind === 'length' && slot.size.unit !== undefined) return true;
+
+  return draft.tokens[slot.from - 1]?.text === SEPARATOR;
+}
+
 function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
   const sizes: Sizes = {};
   const threadAt = slots.findIndex((slot) => slot.size.kind === 'thread');
@@ -383,11 +391,12 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
 
   const reach = sizes.diameter === undefined ? undefined : head?.to;
 
-  // Every documented length sits after the diameter: past the separator, attached to a
-  // unit, or trailing the type phrase. A number the diameter only reaches over ground
-  // nothing has claimed belongs to something else, as the 8 of `1/2-13 hex nut grade 8`.
+  // A number the diameter reaches only over unclaimed ground belongs to something else,
+  // as the 8 of `1/2-13 hex nut grade 8`; one the query delimits is a dimension regardless.
   for (const slot of thread === undefined ? slots : slots.slice(headAt + 1)) {
-    if (reach !== undefined && !settled(draft, reach, slot.from)) continue;
+    if (reach !== undefined && !delimited(draft, slot) && !settled(draft, reach, slot.from)) {
+      continue;
+    }
     const candidate = asLength(slot.size);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;

@@ -1,13 +1,18 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import type { QueryParser } from '../domain/contracts';
-import type { ParsedSpec } from '../domain/spec';
+import type { Length, ParsedSpec } from '../domain/spec';
+import { INTENT_PHRASES } from '../personalization/intent';
 import { ADVERSARIAL_QUERIES } from '../../test/fixtures/adversarial-queries';
 import {
   EXAMPLE_QUERIES,
   type QueryFixture,
   type SpecValues,
 } from '../../test/fixtures/example-queries';
+import { correct, VOCABULARY } from './fuzzy';
+import { STANDARD_BODIES } from './lexicon';
+import { normalize } from './normalize';
 import { unitMismatch } from './units';
 import { parseQuery, queryParser } from './queryParser';
 
@@ -462,5 +467,183 @@ describe('cost', () => {
     durations.sort((a, b) => a - b);
 
     expect(durations[Math.floor(durations.length * P95)] ?? Infinity).toBeLessThan(BUDGET_MS);
+  });
+});
+
+const GAP_WORDS = ['length', 'red', 'approx', 'zorbulon'] as const;
+
+const LETTERS = [...'abcdefghijklmnopqrstuvwxyz'];
+
+/** The family is "a word the parser recognises nothing in", so membership is a
+ * precondition on the generator, never the expectation of a test. */
+const unrecognized = (word: string): boolean =>
+  !VOCABULARY.has(word) &&
+  !STANDARD_BODIES.has(word) &&
+  !INTENT_PHRASES.includes(word) &&
+  correct(word) === null &&
+  normalize(word).canonical === word;
+
+const unrecognizedWord = fc
+  .array(fc.constantFrom(...LETTERS), { minLength: 3, maxLength: 8 })
+  .map((letters) => letters.join(''))
+  .filter(unrecognized);
+
+const fill = (template: string, word: string): string =>
+  template.replace('{gap}', word).replace(/\s+/g, ' ').trim();
+
+function apartFromResidue(spec: ParsedSpec): Record<string, unknown> {
+  return {
+    ...values(spec),
+    residue: undefined,
+    evidence: spec.evidence,
+    provenance: spec.provenance,
+  };
+}
+
+/** Every template states its dimension with a unit or behind the separator, so the
+ * dimension is the query's whatever stands next to it. */
+const GAP_TEMPLATES = [
+  'M8 {gap} x 50mm BHCS',
+  'M8 x 50mm {gap} BHCS',
+  'M8 SHCS {gap} 30mm',
+  'M8 {gap} SHCS 30mm',
+  'M16 threaded rod {gap} 60mm',
+  'M16 {gap} threaded rod 60mm',
+  '3/8 lag screw {gap} 1 inch',
+  '1/2-13 {gap} x 2" hex cap screw',
+  'M8 {gap} x 50 BHCS',
+  '1/2-13 {gap} x 2 hex cap screw',
+];
+
+describe('a word the parser does not recognise', () => {
+  it.each(GAP_WORDS)('is unrecognized, which is what makes %s a member of the family', (word) => {
+    expect(unrecognized(word)).toBe(true);
+  });
+
+  it.each(GAP_TEMPLATES)('changes nothing but the residue of %s', (template) => {
+    const base = parse(fill(template, ''));
+
+    for (const word of GAP_WORDS) {
+      const widened = parse(fill(template, word));
+
+      expect(apartFromResidue(widened)).toEqual(apartFromResidue(base));
+      expect(widened.residue.filter((token) => token !== word)).toEqual(base.residue);
+      expect(widened.residue).toContain(word);
+    }
+  });
+
+  it('changes nothing but the residue for any such word', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...GAP_TEMPLATES), unrecognizedWord, (template, word) => {
+        const base = parse(fill(template, ''));
+        const widened = parse(fill(template, word));
+
+        expect(apartFromResidue(widened)).toEqual(apartFromResidue(base));
+        expect(widened.residue.filter((token) => token !== word)).toEqual(base.residue);
+      }),
+    );
+  });
+});
+
+/** The value comes from the literal the query states and from 25.4 mm to the inch, not
+ * from asking the parser what it made of it. */
+const DIMENSIONS: ReadonlyArray<readonly [string, Length]> = [
+  ['30mm', { value: 30, unit: 'mm', mm: 30 }],
+  ['50mm', { value: 50, unit: 'mm', mm: 50 }],
+  ['12 mm', { value: 12, unit: 'mm', mm: 12 }],
+  ['20 millimeters', { value: 20, unit: 'mm', mm: 20 }],
+];
+
+const INCH_DIMENSIONS: ReadonlyArray<readonly [string, Length]> = [
+  ['2"', { value: 2, unit: 'in', mm: 50.8 }],
+  ['1 inch', { value: 1, unit: 'in', mm: 25.4 }],
+  ['1/2"', { value: 0.5, unit: 'in', mm: 12.7 }],
+];
+
+describe('a dimension the query delimits', () => {
+  it.each(DIMENSIONS)('reads %s whatever unrecognized word precedes it', (literal, length) => {
+    for (const word of GAP_WORDS) {
+      expect(parse(`M8 ${word} ${literal} SHCS`).length).toEqual(length);
+      expect(parse(`M8 SHCS ${word} ${literal}`).length).toEqual(length);
+    }
+  });
+
+  it.each(INCH_DIMENSIONS)('reads %s whatever unrecognized word precedes it', (literal, length) => {
+    for (const word of GAP_WORDS) {
+      expect(parse(`1/2-13 ${word} ${literal} hex cap screw`).length).toEqual(length);
+    }
+  });
+
+  // A unit the separator makes unnecessary: the system of the diameter supplies it.
+  it.each(GAP_WORDS)('reads a bare number behind the separator across %s', (word) => {
+    expect(parse(`M8 ${word} x 50 BHCS`).length).toEqual({ value: 50, unit: 'mm', mm: 50 });
+    expect(parse(`1/2-13 ${word} x 2 hex cap screw`).length).toEqual({
+      value: 2,
+      unit: 'in',
+      mm: 50.8,
+    });
+  });
+
+  it('reads it behind any unrecognized word at all', () => {
+    fc.assert(
+      fc.property(unrecognizedWord, (word) => {
+        expect(parse(`M8 ${word} x 50mm BHCS`).length).toEqual({ value: 50, unit: 'mm', mm: 50 });
+        expect(parse(`M8 ${word} x 50 BHCS`).length).toEqual({ value: 50, unit: 'mm', mm: 50 });
+      }),
+    );
+  });
+});
+
+const GRADE_PHRASES = ['grade 8', 'grade 5', 'class 10', 'lot 12', 'batch 3'];
+
+/** Split where the query's own phrases end, so an insertion can be read as a word the
+ * user added and not as one that cut a type phrase in half. */
+const GRADE_BASES: ReadonlyArray<readonly [string, string]> = [
+  ['1/2-13', 'hex nut'],
+  ['M8', 'flat washer'],
+  ['M8', 'SHCS'],
+  ['M16', 'threaded rod'],
+];
+
+function insertions(base: string, phrase: string): string[] {
+  const words = base.split(' ');
+
+  return words
+    .map((_word, index) => [...words.slice(0, index), phrase, ...words.slice(index)].join(' '))
+    .concat(`${base} ${phrase}`);
+}
+
+function betweenPhrases([head, tail]: readonly [string, string], phrase: string): string[] {
+  return [`${phrase} ${head} ${tail}`, `${head} ${phrase} ${tail}`, `${head} ${tail} ${phrase}`];
+}
+
+/** The guard the previous round put in for the 8 of `1/2-13 hex nut grade 8`. Nothing
+ * delimits that number, in any word position, so it is never a dimension. */
+describe('a bare number an unrecognized word carries', () => {
+  it.each(GRADE_BASES)('never becomes the length of %s %s, in any word position', (...base) => {
+    for (const phrase of GRADE_PHRASES) {
+      for (const query of insertions(base.join(' '), phrase)) {
+        const spec = parse(query);
+
+        expect(spec.length).toBeUndefined();
+        expect(spec.evidence.length).toBeUndefined();
+      }
+    }
+  });
+
+  it.each(GRADE_BASES)('reports the pair it could not verify in %s %s', (...base) => {
+    for (const query of betweenPhrases(base as [string, string], 'grade 8')) {
+      expect(parse(query).residue).toEqual(['grade', '8']);
+    }
+  });
+
+  it('never becomes a length for any unrecognized word in front of it', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...GRADE_BASES), unrecognizedWord, (base, word) => {
+        for (const query of insertions(base.join(' '), `${word} 8`)) {
+          expect(parse(query).length).toBeUndefined();
+        }
+      }),
+    );
   });
 });
