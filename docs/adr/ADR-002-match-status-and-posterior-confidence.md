@@ -28,17 +28,22 @@ Measured values: epsilon 0.02, kappa 3, label thresholds High at 0.8 and Medium 
 
 ## Evidence
 
-Status correctness over all 78 golden cases is 0.962 (`docs/eval-report.md`). The three
-errors are `nylon lock nut M8` and `1/2"`, both parser defects, and one history-override
-case; none is a confidence failure.
+Status correctness over all 78 golden cases is 0.987 (`docs/eval-report.md`). The single
+error is `same washers as last time, but brass` (pers-21), a history-override case; the two
+parser defects this section once also counted have since been fixed. Neither then nor now
+is any of them a confidence failure.
 
-Calibration is measured on single-label cases only, because on a tie query "acceptable"
-and "intended" are different events. All 29 such cases land in the top bin, 0.9 to 1.0,
-at empirical top-1 precision 1.000.
+Calibration is measured on every case carrying an intended-SKU label whose answer the
+posterior scored, 43 of them. History and unparsed answers stay out: their confidence is a
+recency decay and a normalized overlap, and binning either against a posterior would measure
+neither. Nine of the ten bins are populated, at empirical top-1 precision 1.000 throughout.
 
-**That is the whole of the precision evidence.** No single-label case lands below 0.9, so
-the Medium and Low bands are ordered by the model and not validated against observed
-frequency. The thresholds were therefore placed at gaps in the measured distribution:
+**That is the whole of the precision evidence, and outside the top bin it is thin.** An
+earlier revision of this record read "all 29 such cases land in the top bin"; that described
+a filter rather than the data, and the population was corrected to 43 on 2026-09-23
+(`docs/calibration.md`). Cases do land below 0.9 — one to four per bin — which orders the
+Medium and Low bands by the model without validating them against observed frequency. The
+thresholds were placed at gaps in the measured distribution:
 0.8 is the widest gap there is (0.706 to 0.845) and is exactly the line between a `unique`
 answer and everything else, and 0.35 falls in the empty band between the wide ties and the
 constrained answers (`docs/calibration.md`).

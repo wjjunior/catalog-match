@@ -33,8 +33,8 @@ independent oracle
 (`packages/core/src/parsing/descriptionParser.catalog.test.ts`).
 
 On the query side, over the 78 golden cases (`docs/eval-report.md`), Hit@1 is 1.000 on the
-48 single-label cases and status accuracy is 0.962. One case, `1/2"`, falls through to the
-lexical fallback and is reported `unparsed`. A runtime model would have to beat that while
+48 single-label cases and status accuracy is 0.987. One case, `1/2"`, falls through to the
+lexical fallback and is reported `unparsed`, which is what its label expects. A runtime model would have to beat that while
 adding non-determinism, latency and an untestable path.
 
 Determinism is itself measured: the same inputs produce byte-identical metrics across runs,
