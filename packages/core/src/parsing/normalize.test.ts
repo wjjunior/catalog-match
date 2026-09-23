@@ -274,9 +274,10 @@ describe('stripping quantities and noise', () => {
 // Round 4 rebuilt `claimedQuantityNumbers` on a single rule: a quantity word takes the
 // number beside it — the governed side when both sides are numbers — and gives up a lone
 // neighbour only when the token in front of that number already binds it, which is the
-// separator `x` or the body of a standard. There is no tally of the rest of the query and
-// no position rule. The round-3 demand that `M8 BHCS 50 each` keep its 50 is withdrawn:
-// protecting a bare number by where it sat is what read `qty 100` as a 100-inch length.
+// separator `x` or the body of a standard, and `x` only holds against the adverbs. There is
+// no tally of the rest of the query and no position rule. The round-3 demand that
+// `M8 BHCS 50 each` keep its 50 is withdrawn: protecting a bare number by where it sat is
+// what read `qty 100` as a 100-inch length.
 
 interface Dimension {
   token: string;
@@ -315,19 +316,25 @@ const STANDARDS: readonly Standard[] = [
 interface NumberedPhrase {
   tokens: readonly string[];
   number: string;
+  word: string;
   label: string;
 }
 
 const NUMBERED_PHRASES: readonly NumberedPhrase[] = [
-  { tokens: ['qty', '100'], number: '100', label: 'qty 100' },
-  { tokens: ['qty', '5'], number: '5', label: 'qty 5' },
-  { tokens: ['100', 'pcs'], number: '100', label: '100 pcs' },
-  { tokens: ['100', 'pieces'], number: '100', label: '100 pieces' },
-  { tokens: ['5', 'ea'], number: '5', label: '5 ea' },
-  { tokens: ['5', 'each'], number: '5', label: '5 each' },
+  { tokens: ['qty', '100'], number: '100', word: 'qty', label: 'qty 100' },
+  { tokens: ['qty', '5'], number: '5', word: 'qty', label: 'qty 5' },
+  { tokens: ['100', 'pcs'], number: '100', word: 'pcs', label: '100 pcs' },
+  { tokens: ['100', 'pieces'], number: '100', word: 'pieces', label: '100 pieces' },
+  { tokens: ['5', 'ea'], number: '5', word: 'ea', label: '5 ea' },
+  { tokens: ['5', 'each'], number: '5', word: 'each', label: '5 each' },
 ];
 
 const BARE_WORDS = ['qty', 'pcs', 'pieces', 'ea', 'each'] as const;
+
+// The whole of `QUANTITY_WORDS` is `pcs pc pieces piece ea each qty`: two adverbs that say
+// how a count is spread, and five nouns that name one. Restated from the word list itself,
+// so a word moving between the two halves has to be moved here as well.
+const DISTRIBUTIVE_WORDS = new Set(['ea', 'each']);
 
 const QUANTITY_RUNS: readonly (readonly string[])[] = [
   ...NUMBERED_PHRASES.map((phrase) => phrase.tokens),
@@ -415,14 +422,15 @@ describe('a dimension the number itself vouches for survives', () => {
   });
 });
 
-// The collision the round names: `x` binds the number and a quantity word governs it.
-// `M8 BHCS x 50 each` must keep its 50, and these queries are identical to it in the only
-// place the rule looks, so they keep theirs. Pinned here rather than left to be discovered.
-describe('the separator wins the number the quantity word also reaches for', () => {
+// The collision that is left once the count nouns are out of it: an adverb reaching for a
+// number `x` has bound. `M8 BHCS x 50 each` must keep its 50, and these queries are
+// identical to it in every token the rule reads, so they keep theirs too.
+describe('the separator wins the number only an adverb reaches for', () => {
   it.each([
     ['M8 x 5 ea 50mm BHCS', 'm8 x 5 50mm bhcs'],
-    ['1/4-20 x 100 pcs 3/4 hex cap screw', '1/4-20 x 100 3/4 hex cap screw'],
     ['1/4-20 x 5 ea 3/4 hex cap screw', '1/4-20 x 5 3/4 hex cap screw'],
+    ['1/4-20 x 100 each 3/4 hex cap screw', '1/4-20 x 100 3/4 hex cap screw'],
+    ['M8 BHCS x 100 each', 'm8 bhcs x 100'],
   ])('keeps the separator-bound number in %s', (input, expected) => {
     expect(normalize(input).canonical).toBe(expected);
   });
@@ -534,9 +542,90 @@ describe('both invariants at the positions a person writes', () => {
   );
 });
 
+// `x` is ordering shorthand as often as it is a size separator: `hex nut x 100 pcs` is a
+// count said twice over, and a query a person writes, so it is asserted here rather than
+// among the contrived indexes. The adverbs are the half that must not follow.
+interface Shorthand {
+  tokens: readonly string[];
+  number: string;
+  counts: boolean;
+  label: string;
+}
+
+const SHORTHAND_RUNS: readonly Shorthand[] = [
+  { tokens: ['x', '100', 'pcs'], number: '100', counts: true, label: 'x 100 pcs' },
+  { tokens: ['x', '100', 'pc'], number: '100', counts: true, label: 'x 100 pc' },
+  { tokens: ['x', '2', 'pieces'], number: '2', counts: true, label: 'x 2 pieces' },
+  { tokens: ['x', '2', 'piece'], number: '2', counts: true, label: 'x 2 piece' },
+  { tokens: ['x', '100', 'qty'], number: '100', counts: true, label: 'x 100 qty' },
+  { tokens: ['x', 'qty', '100'], number: '100', counts: true, label: 'x qty 100' },
+  { tokens: ['x', '100', 'each'], number: '100', counts: false, label: 'x 100 each' },
+  { tokens: ['x', '5', 'ea'], number: '5', counts: false, label: 'x 5 ea' },
+];
+
+// Ordering shorthand trails the item or follows the type; nobody opens a request with it.
+const SHORTHAND_PLACEMENTS = ['trailing', 'afterProduct'] as const satisfies readonly Placement[];
+
+// Following the type puts the run in front of a loose bare integer, where the word has a
+// number on each side and the governed direction decides instead. That is the two-number
+// case, pinned on its own below, not order shorthand.
+const isShorthand = (dimension: Dimension, xBound: boolean, placement: Placement): boolean =>
+  placement !== 'afterProduct' || xBound || !dimension.bare;
+
+describe('the order shorthand `x <n> <word>` at the positions a person writes', () => {
+  it.each([
+    ['M8 hex nut x 100 pcs', 'm8 hex nut x'],
+    ['M8 BHCS x 100 pcs', 'm8 bhcs x'],
+    ['M8 x 100 pcs 50mm BHCS', 'm8 x 50mm bhcs'],
+    ['M8 x 2 pieces 50mm BHCS', 'm8 x 50mm bhcs'],
+    ['1/4-20 x 100 pcs 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['1/4-20 x 2 pieces 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  it.each(
+    DIMENSIONS.flatMap((dimension) =>
+      [false, true].flatMap((xBound) =>
+        STANDARDS.flatMap((standard) =>
+          SHORTHAND_RUNS.flatMap((run) =>
+            SHORTHAND_PLACEMENTS.filter((placement) =>
+              isShorthand(dimension, xBound, placement),
+            ).map((placement) => ({ dimension, xBound, standard, run, placement })),
+          ),
+        ),
+      ),
+    ),
+  )(
+    '$run.label on $dimension.label with the $standard.label standard, $placement, x-bound $xBound',
+    ({ dimension, xBound, standard, run, placement }) => {
+      const base = baseTokens(dimension.token, xBound);
+      const words = wordsOf(assemble(base, standard.tokens, run.tokens, placement));
+
+      expect(words).toContain(dimension.token);
+      for (const token of standard.tokens) expect(words).toContain(token);
+      if (run.counts) expect(words).not.toContain(run.number);
+      else expect(words).toContain(run.number);
+    },
+  );
+
+  it.each([
+    ['M8 BHCS x 100 qty 50', 'm8 bhcs x 100'],
+    ['M8 BHCS x 100 each 50', 'm8 bhcs x 50'],
+    ['M8 BHCS x 5 ea 50', 'm8 bhcs x 50'],
+    ['M8 BHCS x 100 pcs 50', 'm8 bhcs x 50'],
+  ])(
+    'lets the governed direction decide in %s, where both sides are numbers',
+    (input, expected) => {
+      expect(normalize(input).canonical).toBe(expected);
+    },
+  );
+});
+
 // At an index nobody would write, only the weaker invariant is owed: the quantity number
-// must not survive as a dimension. It is unavailable where the number lands behind the
-// separator or a standard body, which is the collision pinned above, so those are skipped.
+// must not survive as a dimension. It is unavailable where the number lands behind a
+// standard body, or behind the separator with an adverb reaching for it, so those are
+// skipped; a count noun behind the separator is asserted like any other.
 describe('the weaker invariant at every index, contrived ones included', () => {
   it('never lets a quantity number survive an insertion the separator does not bind', () => {
     fc.assert(
@@ -552,7 +641,10 @@ describe('the weaker invariant at every index, contrived ones included', () => {
           const assembled = [...carrier.slice(0, index), ...phrase.tokens, ...carrier.slice(index)];
           const inFront = assembled[index + phrase.tokens.indexOf(phrase.number) - 1];
 
-          fc.pre(inFront !== 'x' && !STANDARD_BODIES.has(inFront ?? ''));
+          fc.pre(
+            !STANDARD_BODIES.has(inFront ?? '') &&
+              !(inFront === 'x' && DISTRIBUTIVE_WORDS.has(phrase.word)),
+          );
 
           expect(wordsOf(assembled.join(' '))).not.toContain(phrase.number);
         },
