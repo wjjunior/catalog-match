@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { InMemoryCatalogRepository } from '../../src/adapters/memory/inMemoryCatalogRepository';
+import { InMemoryOrderHistoryRepository } from '../../src/adapters/memory/inMemoryOrderHistoryRepository';
+import { createCoreFromRepositories } from '../../src/application/createCore';
+import type { CatalogItem, HistoryLine } from '../../src/domain/catalog';
 import type { MatchResponse } from '../../src/domain/match';
 import { runBaseline } from '../../src/eval/baseline';
 import type { EvalCase } from '../../src/eval/loader';
 import { compatibleSet } from '../../src/matching/compatibility';
 import { buildIndex, LexicalOnlyMatcher } from '../../src/matching/lexicalFallback';
+import { descriptionParser } from '../../src/parsing/descriptionParser';
 import { parseQuery } from '../../src/parsing/queryParser';
 import { core } from './setup';
 
@@ -109,5 +114,51 @@ describe('the baseline of docs/DESIGN.md 10.4 scores unfiltered', () => {
       recall: 1,
       precision: 1,
     });
+  });
+});
+
+const item = (sku: string, description: string): CatalogItem => ({
+  catalogId: sku,
+  sku,
+  description,
+  active: true,
+  spec: descriptionParser.parse(description),
+});
+
+const SOCKET = item('SOC', 'M4-0.7 X 16MM SOCKET HEAD CAP SCREW DIN 912 18-8 SS PLAIN');
+const NUT = item('NUT', 'M8-1.25 HEX NUT DIN 934 18-8 SS PLAIN');
+
+const ordered: HistoryLine = {
+  customerId: 'CUST-001',
+  customerName: 'Midwest Industrial Supply',
+  orderDate: '2026-04-15',
+  sku: SOCKET.sku,
+  description: SOCKET.description,
+  quantity: 40,
+};
+
+const referenced = createCoreFromRepositories({
+  catalog: new InMemoryCatalogRepository([SOCKET, NUT]),
+  history: new InMemoryOrderHistoryRepository([ordered]),
+});
+
+describe('a history reference that resolves to no order at all', () => {
+  it('names the attribute no past order satisfies instead of answering mutely', () => {
+    const response = referenced.matchQuery({ query: 'same M8 hex nut', customerId: 'CUST-001' });
+
+    expect(response.status).toBe('history');
+    expect(response.results).toEqual([]);
+    expect(response.notes).toContainEqual({ code: 'failedConstraint', message: 'no M8 hex nut' });
+  });
+
+  it('stays quiet when the reference does name an order', () => {
+    const response = referenced.matchQuery({
+      query: 'the same socket head cap screws as last time',
+      customerId: 'CUST-001',
+    });
+
+    expect(response.status).toBe('history');
+    expect(response.results.map((match) => match.sku)).toEqual(['SOC']);
+    expect(response.notes.map((note) => note.code)).not.toContain('failedConstraint');
   });
 });

@@ -364,8 +364,18 @@ function referencedOrders(
     compatibleCount: 0,
     results,
     alternatives: [],
-    notes: notesFor(spec, undefined),
+    notes: notesFor(spec, lines.length === 0 ? unresolvedReference(spec) : undefined),
   };
+}
+
+/** A reference names orders by diameter, pitch and type (docs/DESIGN.md 7.4), so one that
+ * named none failed on a selector the query stated; with none stated there is no failure
+ * to report, only a history the query asked nothing of. */
+function unresolvedReference(spec: ParsedSpec): Note | undefined {
+  if (spec.diameter !== undefined) return diagnosis(spec, 'diameter');
+  if (spec.type !== undefined && spec.type.length > 0) return diagnosis(spec, 'type');
+
+  return undefined;
 }
 
 function changeOf(spec: ParsedSpec, attribute: AttributeName): AttributeChange | [] {
