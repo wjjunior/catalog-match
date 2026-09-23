@@ -51,9 +51,20 @@ Accuracy 0.900.
 
 | metric | value | cases |
 |---|---|---|
-| Hit@1 with the customer | 0.500 | 2 |
-| Hit@1 without the customer | 0.000 | 2 |
+| Hit@1 with the customer | 1.000 | 1 |
+| Hit@1 without the customer | 0.000 | 1 |
 | Mean top-1 to top-2 margin | 0.000 | 1 |
+
+Corrected on 2026-09-23, without re-running the set. The run of 2026-09-21 reported
+`0.500 | 2` and `0.000 | 2` from a denominator that held every case naming a customer.
+One of the two, HO-19, names three acceptable SKUs and no single intended one, so no
+answer of any kind could have scored it: it could only ever be a miss. The two Hit@1
+rates now run over the one case a label made scorable, HO-20, which the run ranked first
+with the customer and not without. This is arithmetic over the outcomes that single run
+already produced — the matcher was not re-run, no parameter moved, and no case was added,
+removed or relabelled. The margin row is unchanged: it never depended on a unique label
+and still averages HO-19, the only held-out personalized case answered with a second
+result.
 
 ### Calibration (11 cases)
 
@@ -69,6 +80,12 @@ Accuracy 0.900.
 | 0.7–0.8 | 0 | — |
 | 0.8–0.9 | 0 | — |
 | 0.9–1.0 | 8 | 1.000 |
+
+The calibration population was widened on 2026-09-23, from cases labelled `unique` to
+every case naming one intended SKU whose answer the posterior scored. This table is
+unaffected: no held-out case carries an `expectedTop1`, the 11 cases naming one SKU are
+exactly the 11 labelled `unique`, and the status matrix above shows all 11 answered
+`unique`. The numbers stand as the run of 2026-09-21 produced them.
 
 ### Latency (20 cases)
 
