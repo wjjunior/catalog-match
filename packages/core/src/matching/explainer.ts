@@ -6,7 +6,7 @@ import type {
   ProductType,
   ThreadSystem,
 } from '../domain/attributes';
-import { FINISHES, FINISH_FAMILY, MATERIALS, MATERIAL_FAMILY } from '../domain/attributes';
+import { finishFamilyOf, materialFamilyOf } from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type {
   Explanation,
@@ -129,18 +129,6 @@ function has(spec: ParsedSpec, attr: AttributeName): boolean {
       return spec.standard !== undefined;
   }
 }
-
-const isMaterial = (value: Material | MaterialFamily): value is Material =>
-  (MATERIALS as readonly string[]).includes(value);
-
-const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily =>
-  isMaterial(value) ? MATERIAL_FAMILY[value] : value;
-
-const isFinish = (value: Finish | FinishFamily): value is Finish =>
-  (FINISHES as readonly string[]).includes(value);
-
-const finishFamilyOf = (value: Finish | FinishFamily): FinishFamily =>
-  isFinish(value) ? FINISH_FAMILY[value] : value;
 
 /** Describes agreement; it never decides it. Items outside C never reach the explainer,
  * so where this and `compatibility` could differ, C has already had the last word.

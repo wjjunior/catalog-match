@@ -1,5 +1,14 @@
-import type { Finish, FinishFamily, Material, MaterialFamily } from '../domain/attributes';
-import { FINISHES, FINISH_FAMILY, MATERIALS, MATERIAL_FAMILY } from '../domain/attributes';
+import type { Finish, Material } from '../domain/attributes';
+import {
+  FINISHES,
+  FINISH_FAMILY,
+  finishFamilyOf,
+  isFinish,
+  isMaterial,
+  MATERIALS,
+  MATERIAL_FAMILY,
+  materialFamilyOf,
+} from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type { MatchStatus } from '../domain/match';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
@@ -27,23 +36,11 @@ const mmKey = (mm: number): number => Math.round(mm * 1000);
  * and ranking then refuses, which is a throw, not a low score. */
 export const sameLength = (a: number, b: number): boolean => mmKey(a) === mmKey(b);
 
-const isMaterial = (value: string): value is Material =>
-  (MATERIALS as readonly string[]).includes(value);
-
-const isFinish = (value: string): value is Finish =>
-  (FINISHES as readonly string[]).includes(value);
-
 const widensMaterial = (value: Material): boolean =>
   MATERIALS.some((m) => m !== value && MATERIAL_FAMILY[m] === MATERIAL_FAMILY[value]);
 
 const widensFinish = (value: Finish): boolean =>
   FINISHES.some((f) => f !== value && FINISH_FAMILY[f] === FINISH_FAMILY[value]);
-
-const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily =>
-  isMaterial(value) ? MATERIAL_FAMILY[value] : value;
-
-const finishFamilyOf = (value: Finish | FinishFamily): FinishFamily =>
-  isFinish(value) ? FINISH_FAMILY[value] : value;
 
 function diameterConstraint(spec: ParsedSpec): Constraint | undefined {
   const q = spec.diameter;
