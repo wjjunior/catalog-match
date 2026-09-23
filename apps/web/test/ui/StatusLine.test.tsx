@@ -71,16 +71,30 @@ describe('StatusLine', () => {
     ).toBe("select a customer to resolve 'last time'");
   });
 
-  it('counts the result once history has resolved the query', () => {
+  it('names history results without borrowing the compatible-set banner', () => {
+    const text = lineFor({
+      status: 'history',
+      compatibleCount: 0,
+      query: 'the same washers as last time',
+      results: [match(), match(), match()],
+      notes: [note('unverifiedResidue', 'not verifiable: the, as')],
+    });
+
+    expect(text).not.toContain('compatible options');
+    expect(text).not.toMatch(/^\d/);
+    expect(text).toBe("items from this customer's order history, most recent first");
+  });
+
+  it('says so when none of the referenced order lines are in the catalog', () => {
     expect(
       lineFor({
         status: 'history',
-        compatibleCount: 1,
+        compatibleCount: 0,
         query: 'the same washers as last time',
-        results: [match()],
-        notes: [note('historyReference', 'based on your 2025-08-12 order')],
+        results: [],
+        notes: [note('unverifiedResidue', 'not verifiable: the, as')],
       }),
-    ).toBe('1 match');
+    ).toBe('no history item in this catalog');
   });
 
   it('says the query could not be parsed, and that the cards come from text alone', () => {
