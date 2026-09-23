@@ -189,17 +189,17 @@ above are reported because the process surfaced them, not because it was asked t
 
 ## Commands
 
-| Command            | What it does                                                           |
-| ------------------ | ---------------------------------------------------------------------- |
-| `pnpm install`     | Install the workspace. Node 20 or newer.                               |
-| `pnpm dev`         | Development server for the web app.                                    |
-| `pnpm build`       | Production build.                                                      |
-| `pnpm lint`        | ESLint, including the architecture boundary rules.                     |
-| `pnpm typecheck`   | `tsc --noEmit` at the root and in every package.                       |
-| `pnpm test`        | vitest, once.                                                          |
-| `pnpm run demo`    | The scripted demo of `docs/DEMO.md`, through the real core.            |
-| `pnpm run eval`    | Golden set; `--baseline` adds the control, `--heldout` the frozen set. |
-| `pnpm run profile` | Reproduces the data findings of `docs/DESIGN.md` 3.                    |
+| Command            | What it does                                                             |
+| ------------------ | ------------------------------------------------------------------------ |
+| `pnpm install`     | Install the workspace. Node 20 or newer.                                 |
+| `pnpm dev`         | Development server for the web app.                                      |
+| `pnpm build`       | Production build.                                                        |
+| `pnpm lint`        | ESLint, including the architecture boundary rules.                       |
+| `pnpm typecheck`   | `tsc --noEmit` at the root and in every package.                         |
+| `pnpm test`        | vitest, once.                                                            |
+| `pnpm run demo`    | The scripted demo of `docs/DEMO.md`, through the real core.              |
+| `pnpm run eval`    | Golden set against the lexical control; `--heldout` adds the frozen set. |
+| `pnpm run profile` | Reproduces the data findings of `docs/DESIGN.md` 3.                      |
 
 `eval`, `profile` and `demo` need `pnpm run`: `pnpm profile` resolves to pnpm's own built-in
 command instead of the workspace script.

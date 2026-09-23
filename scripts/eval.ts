@@ -16,7 +16,6 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), 'utf8')
 
 export interface EvalOptions {
   readonly heldout: boolean;
-  readonly baseline: boolean;
   readonly gate: boolean;
   /** Where the floor is read from, relative to the repository root or absolute. CI passes
    * the copy on main, so a regression cannot lower the bar in the commit that causes it. */
@@ -41,7 +40,6 @@ const floorIn = (argv: readonly string[]): string => {
  * cannot quietly tune against it. docs/DESIGN.md 10.1. */
 export const parseArgs = (argv: readonly string[]): EvalOptions => ({
   heldout: argv.includes('--heldout'),
-  baseline: argv.includes('--baseline'),
   gate: argv.includes('--gate'),
   floor: floorIn(argv),
 });
@@ -87,7 +85,7 @@ export const HELD_OUT_TITLE = '# Held-out evaluation';
 /** `markdown` is the golden report every run rewrites; `heldout` is present only on the one
  * run that spends the frozen set, and is written beside it rather than into it.
  * docs/DESIGN.md 10.3 and docs/eval/heldout-policy.md. */
-export function evaluate({ heldout, baseline }: Pick<EvalOptions, 'heldout' | 'baseline'>): {
+export function evaluate({ heldout }: Pick<EvalOptions, 'heldout'>): {
   markdown: string;
   heldout?: string;
   summary: JsonSummary;
@@ -99,11 +97,11 @@ export function evaluate({ heldout, baseline }: Pick<EvalOptions, 'heldout' | 'b
   });
 
   const goldenCases = parseEvalJsonl(read('data/eval/golden.jsonl'));
+  // The golden set only. The held-out cases are read once, at the end, to report the
+  // parser; a control scored against them would spend them for nothing.
   const golden: EvalSection = {
     ...evaluateSet('Golden set', goldenCases),
-    // The golden set only. The held-out cases are read once, at the end, to report the
-    // parser; a control scored against them would spend them for nothing.
-    ...(baseline ? { baseline: runBaseline({ catalog: core.catalog, cases: goldenCases }) } : {}),
+    baseline: runBaseline({ catalog: core.catalog, cases: goldenCases }),
   };
 
   const frozen = heldout
@@ -142,15 +140,11 @@ function main(argv: readonly string[]): void {
     );
   }
 
-  const skipped = [
-    ...(options.heldout
-      ? ['Held-out set written to docs/eval-heldout.md. It may be spent only once.']
-      : ['Held-out set not run. It is reported in docs/eval-heldout.md, from its single run.']),
-    ...(options.baseline
-      ? []
-      : ['Baseline not run. Pass --baseline to compare against the lexical fallback.']),
-  ];
-  if (skipped.length > 0) process.stdout.write(`\n${skipped.join('\n')}\n`);
+  process.stdout.write(
+    options.heldout
+      ? '\nHeld-out set written to docs/eval-heldout.md. It may be spent only once.\n'
+      : '\nHeld-out set not run. It is reported in docs/eval-heldout.md, from its single run.\n',
+  );
 }
 
 const invoked = process.argv[1];

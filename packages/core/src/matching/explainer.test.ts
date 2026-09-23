@@ -35,7 +35,6 @@ import {
   repeatReason,
   siblingReason,
   unmatchedReason,
-  tieBanner,
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
@@ -708,27 +707,7 @@ describe('note builders', () => {
   });
 });
 
-describe('banner and override strings', () => {
-  it('states the tie and what would settle it', () => {
-    expect(tieBanner(7, ['material', 'finish'])).toBe(
-      '7 compatible options, specify material or finish',
-    );
-  });
-
-  it('asks for a single attribute without a list', () => {
-    expect(tieBanner(3, ['finish'])).toBe('3 compatible options, specify finish');
-  });
-
-  it('separates three attributes with commas and a final or', () => {
-    expect(tieBanner(9, ['material', 'finish', 'standard'])).toBe(
-      '9 compatible options, specify material, finish or standard',
-    );
-  });
-
-  it('states the count alone when nothing varies', () => {
-    expect(tieBanner(2, [])).toBe('2 compatible options');
-  });
-
+describe('override strings', () => {
   it('says what history wanted and that the query won', () => {
     expect(overrideReason(['alloy', 'black oxide'])).toBe(
       'history prefers alloy black oxide; overridden by the query',
