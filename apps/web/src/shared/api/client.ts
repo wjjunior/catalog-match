@@ -16,7 +16,8 @@ export type NoteCode =
   | 'discontinued'
   | 'customerRequired'
   | 'historyReference'
-  | 'unverifiedResidue';
+  | 'unverifiedResidue'
+  | 'unboundLength';
 
 export type ConfidenceLabel = 'High' | 'Medium' | 'Low';
 

@@ -15,6 +15,7 @@ export const NOTE_CODES = [
   'customerRequired',
   'historyReference',
   'unverifiedResidue',
+  'unboundLength',
 ] as const;
 
 export type NoteCode = (typeof NOTE_CODES)[number];

@@ -1,5 +1,5 @@
 import type { Alternative, Match, MatchRequest, MatchResponse, Note } from '../domain/match';
-import type { AttributeName, ParsedSpec } from '../domain/spec';
+import type { AttributeName, Length, ParsedSpec } from '../domain/spec';
 import type { CatalogItem, CustomerProfile } from '../domain/catalog';
 import {
   alternatives,
@@ -22,6 +22,7 @@ import {
   formatMaterial,
   historyReferenceNote,
   orderedReason,
+  unboundLengthNote,
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
@@ -29,6 +30,7 @@ import {
   unverifiedResidueNote,
   withPersonalization,
 } from '../matching/explainer';
+import { bindLength } from '../matching/lengthBearing';
 import type { LexicalIndex } from '../matching/lexicalFallback';
 import { score } from '../matching/lexicalFallback';
 import { labelFor, posterior } from '../matching/posterior';
@@ -377,10 +379,17 @@ function changeOf(spec: ParsedSpec, attribute: AttributeName): AttributeChange |
   return value === undefined ? [] : { attr: attribute, value };
 }
 
+function unboundNotes(spec: ParsedSpec, unbound: Length | undefined): Note[] {
+  const type = spec.type?.[0]?.value;
+  if (unbound === undefined || type === undefined) return [];
+
+  return [unboundLengthNote(type, unbound)];
+}
+
 /** Everything the query states about attributes, once the intent has had its say. */
 function attributeAnswer(
   query: string,
-  spec: ParsedSpec,
+  parsed: ParsedSpec,
   deps: MatchQueryDeps,
   config: MatcherConfig,
   limit: number,
@@ -388,6 +397,9 @@ function attributeAnswer(
   carried: readonly Note[],
 ): Answer {
   const items = deps.catalog.active();
+  // A length no type the query names can carry is lifted before C is taken, so the filter,
+  // the ranker and the explanation are all given the constraints that can actually bind.
+  const { spec, unbound } = bindLength(parsed, items);
   const compatible = compatibleSet(spec, items);
   const status = deriveStatus(spec, compatible);
 
@@ -400,7 +412,7 @@ function attributeAnswer(
         ? unparsed(query, spec, compatible, deps, config, limit)
         : ranked(status, spec, compatible, config, limit, profile);
 
-  const added = [...carried, ...discontinuedNotes(profile, spec)];
+  const added = [...unboundNotes(spec, unbound), ...carried, ...discontinuedNotes(profile, spec)];
 
   return added.length === 0 ? answer : { ...answer, notes: [...answer.notes, ...added] };
 }

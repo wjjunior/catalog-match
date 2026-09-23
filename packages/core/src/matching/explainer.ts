@@ -377,6 +377,17 @@ export function unitMismatchNote(diameter: Diameter, length: Length): Note {
   );
 }
 
+/** Not `no M8 hex nut at 60 mm`, which says the catalog is out of one: a hex nut has no
+ * length for the query to have missed. */
+export function unboundLengthNote(type: ProductType, length: Length): Note {
+  const named = formatType(type);
+
+  return note(
+    'unboundLength',
+    `${article(named)} ${named} carries no length; ${formatLength(length)} ignored`,
+  );
+}
+
 export function discontinuedNote(sku: string): Note {
   return note('discontinued', `previously ordered ${sku} is discontinued; showing closest active`);
 }
