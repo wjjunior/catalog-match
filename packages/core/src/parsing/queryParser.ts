@@ -104,6 +104,14 @@ function free(draft: Draft, from: number, to: number): boolean {
   return true;
 }
 
+function settled(draft: Draft, from: number, to: number): boolean {
+  for (let index = from; index < to; index++) {
+    if (!draft.claimed.has(index)) return false;
+  }
+
+  return true;
+}
+
 /** A term reached through a correction is worth less than the same term spelled right,
  * so the discount multiplies the strength the lexicon gives. */
 function discount(draft: Draft, from: number, to: number): number {
@@ -346,10 +354,13 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
     claim(draft, head.from, head.to);
   }
 
+  const reach = sizes.diameter === undefined ? undefined : head?.to;
+
   // Every documented length sits after the diameter: past the separator, attached to a
-  // unit, or trailing the type phrase. A number before it belongs to something else, as
-  // the 8 of `grade 8 1/2-13 hex nut` does.
+  // unit, or trailing the type phrase. A number the diameter only reaches over ground
+  // nothing has claimed belongs to something else, as the 8 of `1/2-13 hex nut grade 8`.
   for (const slot of thread === undefined ? slots : slots.slice(headAt + 1)) {
+    if (reach !== undefined && !settled(draft, reach, slot.from)) continue;
     const candidate = asLength(slot.size);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;

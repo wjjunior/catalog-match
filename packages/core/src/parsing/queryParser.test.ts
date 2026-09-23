@@ -192,6 +192,31 @@ describe('a diameter outside the catalog', () => {
   });
 });
 
+describe('an unclaimed word between the diameter and a number', () => {
+  it.each(['grade 8 1/2-13 hex nut', '1/2-13 hex nut grade 8'])(
+    'leaves the 8 of %s out of the length',
+    (query) => {
+      const spec = parse(query);
+
+      expect(spec.length).toBeUndefined();
+      expect(spec.evidence.length).toBeUndefined();
+      expect(spec.residue).toEqual(['grade', '8']);
+      expect(spec.diameter?.nominal).toBe('1/2');
+    },
+  );
+
+  it('parses both word orders to the same spec', () => {
+    expect(values(parse('grade 8 1/2-13 hex nut'))).toEqual(
+      values(parse('1/2-13 hex nut grade 8')),
+    );
+  });
+
+  it('still reads a length the type phrase alone separates from the diameter', () => {
+    expect(parse('M16 threaded rod 60mm').length).toEqual({ value: 60, unit: 'mm', mm: 60 });
+    expect(parse('3/8 lag screw 1 inch').length).toEqual({ value: 1, unit: 'in', mm: 25.4 });
+  });
+});
+
 describe('a quantity phrase standing beside a length', () => {
   it.each(['M8 x 50 qty 100 BHCS', 'M8 x 50 BHCS qty 100'])(
     'reads the 50 of %s as the length and the 100 as the quantity',

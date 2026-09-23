@@ -131,3 +131,20 @@ describe('a quantity phrase standing beside a length', () => {
     },
   );
 });
+
+describe('an unclaimed word between the diameter and a number', () => {
+  it.each(['grade 8 1/2-13 hex nut', '1/2-13 hex nut grade 8'])(
+    'answers %s over the five 1/2-13 hex nuts',
+    (query) => {
+      expect(answer(query)).toEqual({
+        status: 'ambiguous',
+        count: 5,
+        failed: undefined,
+        alternativeCount: 0,
+      });
+      expect(core.matchQuery({ query }).notes.map((n) => n.message)).toEqual([
+        'not verifiable: grade, 8',
+      ]);
+    },
+  );
+});
