@@ -1,8 +1,8 @@
 import type { FormEvent } from 'react';
 
 import { Button } from '../../shared/ui/Button';
-
-import styles from './QueryForm.module.css';
+import { Input } from '../../shared/ui/input';
+import { Label } from '../../shared/ui/label';
 
 interface QueryFormProps {
   value: string;
@@ -21,17 +21,20 @@ export function QueryForm({ value, onChange, onSubmit, busy = false }: QueryForm
   }
 
   return (
-    <form className={styles.form} onSubmit={submit}>
-      <label className={styles.label} htmlFor="query">
+    <form className="flex flex-col gap-1.5" onSubmit={submit}>
+      <Label
+        htmlFor="query"
+        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+      >
         Query
-      </label>
-      <div className={styles.row}>
-        <input
+      </Label>
+      <div className="flex gap-2">
+        <Input
           id="query"
-          className={styles.input}
           type="text"
           autoComplete="off"
           placeholder="M8 flat washer"
+          className="flex-1"
           value={value}
           onChange={(event) => {
             onChange(event.target.value);
