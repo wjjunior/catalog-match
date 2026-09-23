@@ -278,13 +278,30 @@ export const PROTECTED_CODES: ReadonlySet<string> = new Set([
 
 const MAX_PHRASE_TOKENS = Math.max(...[...LEXICON.keys()].map((term) => term.split(' ').length));
 
-export function longestMatch(tokens: readonly string[]): LexiconMatch[] {
+function blocked(claimed: ReadonlySet<number> | undefined, from: number, to: number): boolean {
+  if (claimed === undefined) return false;
+
+  for (let index = from; index < to; index++) {
+    if (claimed.has(index)) return true;
+  }
+
+  return false;
+}
+
+/** `claimed` holds ground a wider reading already took, so a phrase that reaches into it
+ * is passed over and the shorter terms beside it are still offered. */
+export function longestMatch(
+  tokens: readonly string[],
+  claimed?: ReadonlySet<number>,
+): LexiconMatch[] {
   const matches: LexiconMatch[] = [];
 
   for (let i = 0; i < tokens.length;) {
     let width = 0;
 
     for (let n = Math.min(MAX_PHRASE_TOKENS, tokens.length - i); n >= 1; n--) {
+      if (blocked(claimed, i, i + n)) continue;
+
       const term = tokens.slice(i, i + n).join(' ');
       const entry = LEXICON.get(term);
       if (entry) {
