@@ -184,6 +184,11 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
 function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
   const isNumberToken = (token: NormalizedToken | undefined): boolean =>
     token !== undefined && /^\d+$/.test(token.text);
+  // A unit or an inch/foot mark is stronger evidence of a dimension than a bare integer,
+  // not weaker: `50mm` and `5/8"` must count as "another number" just as `100` does.
+  const isDimensionLike = (token: NormalizedToken | undefined): boolean =>
+    token !== undefined &&
+    (isNumberToken(token) || /^\d[\d./-]*(?:mm|in|ft|["'])$/.test(token.text));
   // `x` binds to `index` only if `x`'s far side is not itself a number: a number sandwiched
   // between `x` and another number (`5 x 50`) is `x`'s pair, not a dimension guarding index.
   const boundBySeparator = (index: number): boolean =>
@@ -194,13 +199,13 @@ function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
   const isLeadingPair = (from: number): boolean =>
     tokens.slice(0, from).every((token) => NOISE_WORDS.has(token.text));
 
-  const totalNumbers = tokens.filter(isNumberToken).length;
+  const totalDimensionTokens = tokens.filter(isDimensionLike).length;
 
-  // With another number elsewhere in the query, that other number can carry the
-  // dimension, so a single adjacent number is safe to claim on the strength of the word
-  // alone; only the query's one and only number needs the checks below.
+  // With another dimension-like token elsewhere in the query, that other token can carry
+  // the length, so a single adjacent number is safe to claim on the strength of the word
+  // alone; only the query's one and only dimension-like token needs the checks below.
   const isProtected = (wordIndex: number, numberIndex: number): boolean =>
-    totalNumbers === 1 &&
+    totalDimensionTokens === 1 &&
     (boundBySeparator(numberIndex) || !isLeadingPair(Math.min(wordIndex, numberIndex)));
 
   const claimed = new Set<number>();
