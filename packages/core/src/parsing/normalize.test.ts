@@ -1,7 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import { STANDARD_BODIES } from './lexicon';
 import { normalize } from './normalize';
+import { parseQuery } from './queryParser';
 
 describe('tokenizing', () => {
   it('lowercases and collapses irregular whitespace', () => {
@@ -269,71 +271,127 @@ describe('stripping quantities and noise', () => {
   });
 });
 
-// F4: a quantity word governs one adjacent number, not both neighbours. `BASE_QUERIES`
-// carry a length the quantity phrase must never touch; `QUANTITY_PHRASES` cover both
-// directions a real quantity word binds (`qty 100`, `100 pcs`, `qty 5`) plus a control
-// that looks like a phrase but is not one (`x 100`, since `x` is never a quantity word).
-interface BaseQuery {
-  tokens: readonly string[];
-  length: string;
+// Round 4 rebuilt `claimedQuantityNumbers` on a single rule: a quantity word takes the
+// number beside it — the governed side when both sides are numbers — and gives up a lone
+// neighbour only when the token in front of that number already binds it, which is the
+// separator `x` or the body of a standard, and `x` only holds against the adverbs. There is
+// no tally of the rest of the query and no position rule. The round-3 demand that
+// `M8 BHCS 50 each` keep its 50 is withdrawn: protecting a bare number by where it sat is
+// what read `qty 100` as a 100-inch length.
+
+interface Dimension {
+  token: string;
+  /** A bare run of digits is the only shape a quantity word can reach for at all. */
+  bare: boolean;
   label: string;
 }
 
-interface QuantityPhrase {
+const DIMENSIONS: readonly Dimension[] = [
+  { token: '50', bare: true, label: 'bare integer' },
+  { token: '50mm', bare: false, label: 'unit-attached' },
+  { token: '3/4', bare: false, label: 'bare fraction' },
+  { token: '1-1/2', bare: false, label: 'mixed number' },
+];
+
+// The same product and dimension said the two ways a query says them: bound by the
+// separator, or standing loose after the type. No dimension at all is the third way, and
+// the one H1 is about.
+const baseTokens = (dimension: string | undefined, xBound: boolean): string[] => {
+  if (dimension === undefined) return ['m8', 'bhcs'];
+
+  return xBound ? ['m8', 'x', dimension, 'bhcs'] : ['m8', 'bhcs', dimension];
+};
+
+interface Standard {
+  tokens: readonly string[];
+  label: string;
+}
+
+const STANDARDS: readonly Standard[] = [
+  { tokens: [], label: 'absent' },
+  { tokens: ['iso', '7380'], label: 'spaced' },
+  { tokens: ['iso7380'], label: 'compact' },
+];
+
+interface NumberedPhrase {
   tokens: readonly string[];
   number: string;
-  isQuantity: boolean;
+  word: string;
   label: string;
 }
 
-const BASE_QUERIES: readonly BaseQuery[] = [
-  { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'a bare length after the type' },
-  { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'a length bound by the separator' },
+const NUMBERED_PHRASES: readonly NumberedPhrase[] = [
+  { tokens: ['qty', '100'], number: '100', word: 'qty', label: 'qty 100' },
+  { tokens: ['qty', '5'], number: '5', word: 'qty', label: 'qty 5' },
+  { tokens: ['100', 'pcs'], number: '100', word: 'pcs', label: '100 pcs' },
+  { tokens: ['100', 'pieces'], number: '100', word: 'pieces', label: '100 pieces' },
+  { tokens: ['5', 'ea'], number: '5', word: 'ea', label: '5 ea' },
+  { tokens: ['5', 'each'], number: '5', word: 'each', label: '5 each' },
 ];
 
-const QUANTITY_PHRASES: readonly QuantityPhrase[] = [
-  { tokens: ['qty', '100'], number: '100', isQuantity: true, label: 'qty 100' },
-  { tokens: ['100', 'pcs'], number: '100', isQuantity: true, label: '100 pcs' },
-  { tokens: ['qty', '5'], number: '5', isQuantity: true, label: 'qty 5' },
-  { tokens: ['x', '100'], number: '100', isQuantity: false, label: 'x 100, not a quantity phrase' },
+const BARE_WORDS = ['qty', 'pcs', 'pieces', 'ea', 'each'] as const;
+
+// The whole of `QUANTITY_WORDS` is `pcs pc pieces piece ea each qty`: two adverbs that say
+// how a count is spread, and five nouns that name one. Restated from the word list itself,
+// so a word moving between the two halves has to be moved here as well.
+const DISTRIBUTIVE_WORDS = new Set(['ea', 'each']);
+
+const QUANTITY_RUNS: readonly (readonly string[])[] = [
+  ...NUMBERED_PHRASES.map((phrase) => phrase.tokens),
+  ...BARE_WORDS.map((word) => [word]),
 ];
 
-function insertAt(tokens: readonly string[], index: number, insert: readonly string[]): string {
-  return [...tokens.slice(0, index), ...insert, ...tokens.slice(index)].join(' ');
+// Where a person actually puts a quantity: in front of the request, at the end of it, or
+// right after the item is named. Every other index is contrived, and gets the weaker
+// assertion further down rather than a demand that a dimension survive it.
+const PLACEMENTS = ['leading', 'trailing', 'afterProduct'] as const;
+
+type Placement = (typeof PLACEMENTS)[number];
+
+function assemble(
+  base: readonly string[],
+  standard: readonly string[],
+  phrase: readonly string[],
+  placement: Placement,
+): string {
+  if (placement === 'leading') return [...phrase, ...base, ...standard].join(' ');
+  if (placement === 'trailing') return [...base, ...standard, ...phrase].join(' ');
+
+  const afterType = base.indexOf('bhcs') + 1;
+
+  return [...base.slice(0, afterType), ...phrase, ...base.slice(afterType), ...standard].join(' ');
 }
 
-// Every insertion point the phrase can occupy in a base query: before the diameter, before
-// the type, after the type, and at the end, generated from the base's own length rather than
-// hand-picked one at a time.
-const QUANTITY_INSERTION_CASES = BASE_QUERIES.flatMap((base) => {
-  const baseCanonical = normalize(base.tokens.join(' ')).canonical;
+const wordsOf = (query: string): string[] => normalize(query).tokens.map((token) => token.text);
 
-  return QUANTITY_PHRASES.flatMap((phrase) =>
-    Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
-      base,
-      phrase,
-      position,
-      baseCanonical,
-      query: insertAt(base.tokens, position, phrase.tokens),
-    })),
-  );
-});
+describe('an explicit quantity is removed wherever it sits (H1)', () => {
+  it.each([
+    ['brass hex nut 1/2-13 qty 100', 'brass hex nut 1/2-13'],
+    ['brass hex nut 1/2-13 100 pcs', 'brass hex nut 1/2-13'],
+    ['100 pcs brass hex nut 1/2-13', 'brass hex nut 1/2-13'],
+    ['M8 hex nut qty 100', 'm8 hex nut'],
+    ['M8 flat washer qty 200', 'm8 flat washer'],
+    ['M8 x 50 qty 100 BHCS', 'm8 x 50 bhcs'],
+    ['M8 x 50 BHCS qty 100', 'm8 x 50 bhcs'],
+    ['M8 BHCS 50 qty 100', 'm8 bhcs 50'],
+    ['1/4-20 x qty 100 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['3/4-10 tap bolt qty 100 5/8"', '3/4-10 tap bolt 5/8"'],
+    ['200 pcs of m8', 'm8'],
+    ['box of m8', 'box of m8'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
 
-describe('the quantity span (F4)', () => {
-  it.each(QUANTITY_INSERTION_CASES)(
-    'inserting $phrase.label into $base.label at position $position leaves the rest as if it were absent',
-    ({ query, phrase, baseCanonical }) => {
-      const { tokens } = normalize(query);
-      const words = tokens.map((token) => token.text);
-
-      if (phrase.isQuantity) {
-        expect(normalize(query).canonical).toBe(baseCanonical);
-        expect(words).not.toContain(phrase.number);
-      } else {
-        expect(words).toContain(phrase.number);
-      }
-    },
-  );
+  // Withdrawn in round 3's favour and reinstated here: the 50 carries neither a separator
+  // nor a unit, so it is the quantity `each` says it is.
+  it.each([
+    ['M8 BHCS 50 each', 'm8 bhcs'],
+    ['M8 BHCS each 50', 'm8 bhcs'],
+    ['M8 BHCS 50 ea', 'm8 bhcs'],
+    ['M8 BHCS 50 pcs', 'm8 bhcs'],
+  ])('lets the quantity word have the unbound number in %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
 
   it('agrees on the canonical output whether the quantity phrase sits before or after the type', () => {
     expect(normalize('M8 x 50 qty 100 BHCS').canonical).toBe(
@@ -341,226 +399,278 @@ describe('the quantity span (F4)', () => {
     );
   });
 
-  it('keeps the length and drops only the quantity number with an unrelated word between them', () => {
-    const fillerWords = ['black', 'oxide', 'zzq'] as const;
-    const realPhrases = QUANTITY_PHRASES.filter((phrase) => phrase.isQuantity);
+  it.each([
+    ['M8 BHCS 50 qty 100', 'm8 bhcs 50'],
+    ['M8 BHCS 100 pcs 50', 'm8 bhcs 50'],
+    ['M8 BHCS 50 100 pcs', 'm8 bhcs 50'],
+  ])('governs one adjacent number and not both in %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+});
 
+describe('a dimension the number itself vouches for survives', () => {
+  it.each([
+    ['M8 BHCS x 50 each', 'm8 bhcs x 50'],
+    ['M8 x 50 each BHCS ISO 7380', 'm8 x 50 bhcs iso 7380'],
+    ['M8 x 50 each BHCS ISO7380', 'm8 x 50 bhcs iso7380'],
+    ['M8 BHCS x 50mm each', 'm8 bhcs x 50mm'],
+    ['M8 BHCS 50mm each', 'm8 bhcs 50mm'],
+    ['M8 BHCS 3/4 each', 'm8 bhcs 3/4'],
+    ['M8 BHCS 1-1/2 each', 'm8 bhcs 1-1/2'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+});
+
+// The collision that is left once the count nouns are out of it: an adverb reaching for a
+// number `x` has bound. `M8 BHCS x 50 each` must keep its 50, and these queries are
+// identical to it in every token the rule reads, so they keep theirs too.
+describe('the separator wins the number only an adverb reaches for', () => {
+  it.each([
+    ['M8 x 5 ea 50mm BHCS', 'm8 x 5 50mm bhcs'],
+    ['1/4-20 x 5 ea 3/4 hex cap screw', '1/4-20 x 5 3/4 hex cap screw'],
+    ['1/4-20 x 100 each 3/4 hex cap screw', '1/4-20 x 100 3/4 hex cap screw'],
+    ['M8 BHCS x 100 each', 'm8 bhcs x 100'],
+  ])('keeps the separator-bound number in %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  // What the choice costs, stated rather than left to be found: the unit-marked length the
+  // same query carries is the one that falls to the residue.
+  it('lets the separator-bound number take the length slot from a unit-marked one', () => {
+    const { spec } = parseQuery('M8 x 5 ea 50mm BHCS');
+
+    expect(spec.length).toMatchObject({ value: 5, unit: 'mm' });
+    expect(spec.residue).toContain('50mm');
+  });
+});
+
+// H2: a designator is a number too, so a quantity word reaches for it exactly as it
+// reaches for a length, and the space is the only thing that tells `ISO 7380` from
+// `ISO7380`. The expected values are the ones the query states, not the parser's.
+describe('the spelling of an unrelated standard changes nothing (H2)', () => {
+  it.each([
+    'M8 x 50 each BHCS ISO 7380',
+    'M8 x 50 each BHCS ISO7380',
+    'M8 x 50 BHCS ISO 7380 each',
+    'M8 x 50 BHCS ISO7380 each',
+    'M8 x 50 BHCS ISO 7380 qty 100',
+    'M8 x 50 BHCS ISO7380 100 pcs',
+  ])('reads 50mm and ISO 7380 out of %s', (query) => {
+    const { spec } = parseQuery(query);
+
+    expect(spec.standard).toBe('ISO 7380');
+    expect(spec.length).toMatchObject({ value: 50, unit: 'mm' });
+  });
+
+  it.each([
+    ['M8 BHCS DIN 125 ea', 'DIN 125'],
+    ['M8 BHCS DIN125 ea', 'DIN 125'],
+    ['M8 hex nut IFI 111 each', 'IFI 111'],
+    ['M8 hex nut IFI111 each', 'IFI 111'],
+  ])('keeps the standard of %s whole', (query, standard) => {
+    expect(parseQuery(query).spec.standard).toBe(standard);
+  });
+
+  it('reads the same standard and length whichever spelling and wherever the quantity lands', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom(...BASE_QUERIES),
-        fc.constantFrom(...realPhrases),
-        fc.constantFrom(...fillerWords),
-        fc.nat(),
-        fc.nat(),
-        (base, phrase, filler, rawFillerPosition, rawPhrasePosition) => {
-          const withFiller = insertAt(base.tokens, rawFillerPosition % (base.tokens.length + 1), [
-            filler,
-          ]).split(' ');
-          const query = insertAt(
-            withFiller,
-            rawPhrasePosition % (withFiller.length + 1),
-            phrase.tokens,
-          );
+        fc.constantFrom(...QUANTITY_RUNS),
+        fc.constantFrom(...PLACEMENTS),
+        (phrase, placement) => {
+          const base = baseTokens('50', true);
+          const spaced = parseQuery(assemble(base, ['iso', '7380'], phrase, placement)).spec;
+          const compact = parseQuery(assemble(base, ['iso7380'], phrase, placement)).spec;
 
-          const words = normalize(query).tokens.map((token) => token.text);
-
-          expect(words).toContain(base.length);
-          expect(words).toContain(filler);
-          expect(words).not.toContain(phrase.number);
+          expect(spaced.standard).toBe('ISO 7380');
+          expect(compact.standard).toBe('ISO 7380');
+          expect(spaced.length?.mm).toBe(50);
+          expect(compact.length?.mm).toBe(50);
         },
       ),
     );
   });
 });
 
-// G3: a quantity word must not eat a stated dimension, whether that dimension is bound by
-// `x` or stands as the query's only number. Bare forms (`each`, `ea` with no number of
-// their own) and numbered forms (`qty 100`, `100 pcs`) fail independently, so they are
-// crossed and asserted separately, per the re-review's diagnosis of what round 2 missed.
-describe('the quantity span crossed with the separator (G3)', () => {
-  it.each([
-    ['M8 x 50 qty 100 BHCS', 'm8 x 50 bhcs'],
-    ['M8 x 50 BHCS qty 100', 'm8 x 50 bhcs'],
-    ['M8 BHCS 50 qty 100', 'm8 bhcs 50'],
-    ['M8 BHCS x 50mm each', 'm8 bhcs x 50mm'],
-    ['200 pcs of M8', 'm8'],
-    ['box of M8', 'box of m8'],
-  ])('pins %s, unmoved by this round', (input, expected) => {
-    expect(normalize(input).canonical).toBe(expected);
-  });
+// The cross is enumerated rather than sampled: at the positions a person writes, both
+// invariants are owed on every combination, and a generator that visits a fifth of them
+// is how a round passes and ships the case it never drew.
+function cross<T>(runs: readonly T[]): {
+  dimension: Dimension;
+  xBound: boolean;
+  standard: Standard;
+  run: T;
+  placement: Placement;
+}[] {
+  return DIMENSIONS.flatMap((dimension) =>
+    [false, true].flatMap((xBound) =>
+      STANDARDS.flatMap((standard) =>
+        runs.flatMap((run) =>
+          PLACEMENTS.map((placement) => ({ dimension, xBound, standard, run, placement })),
+        ),
+      ),
+    ),
+  );
+}
 
-  it.each([
-    ['M8 BHCS x 50 each', 'm8 bhcs x 50'],
-    ['M8 BHCS x each 50', 'm8 bhcs x 50'],
-    ['M8 BHCS 50 each', 'm8 bhcs 50'],
-    ['M8 BHCS each 50', 'm8 bhcs 50'],
-    ['M8 BHCS 50 ea', 'm8 bhcs 50'],
-    ['M8 BHCS ea 50', 'm8 bhcs 50'],
-    ['M8 BHCS 50 pcs', 'm8 bhcs 50'],
-    ['M8 BHCS pcs 50', 'm8 bhcs 50'],
-  ])('no longer loses the dimension in %s', (input, expected) => {
-    expect(normalize(input).canonical).toBe(expected);
-  });
+describe('both invariants at the positions a person writes', () => {
+  it.each(cross(NUMBERED_PHRASES))(
+    'drops $run.label and keeps $dimension.label and the $standard.label standard, $placement, x-bound $xBound',
+    ({ dimension, xBound, standard, run, placement }) => {
+      const base = baseTokens(dimension.token, xBound);
+      const words = wordsOf(assemble(base, standard.tokens, run.tokens, placement));
 
+      expect(words).toContain(dimension.token);
+      expect(words).not.toContain(run.number);
+      for (const token of standard.tokens) expect(words).toContain(token);
+    },
+  );
+
+  // A bare word has no number of its own, so the only thing it can take is a bare run of
+  // digits nothing stands in front of. Every other spelling comes through untouched; the
+  // bare integer it can take is the withdrawn case pinned above.
+  it.each(cross(BARE_WORDS))(
+    'bare $run keeps $dimension.label and the $standard.label standard, $placement, x-bound $xBound',
+    ({ dimension, xBound, standard, run, placement }) => {
+      const base = baseTokens(dimension.token, xBound);
+      const words = wordsOf(assemble(base, standard.tokens, [run], placement));
+
+      expect(words).not.toContain(run);
+      for (const token of standard.tokens) expect(words).toContain(token);
+      if (!dimension.bare || xBound) expect(words).toContain(dimension.token);
+    },
+  );
+});
+
+// `x` is ordering shorthand as often as it is a size separator: `hex nut x 100 pcs` is a
+// count said twice over, and a query a person writes, so it is asserted here rather than
+// among the contrived indexes. The adverbs are the half that must not follow.
+interface Shorthand {
+  tokens: readonly string[];
+  number: string;
+  counts: boolean;
+  label: string;
+}
+
+const SHORTHAND_RUNS: readonly Shorthand[] = [
+  { tokens: ['x', '100', 'pcs'], number: '100', counts: true, label: 'x 100 pcs' },
+  { tokens: ['x', '100', 'pc'], number: '100', counts: true, label: 'x 100 pc' },
+  { tokens: ['x', '2', 'pieces'], number: '2', counts: true, label: 'x 2 pieces' },
+  { tokens: ['x', '2', 'piece'], number: '2', counts: true, label: 'x 2 piece' },
+  { tokens: ['x', '100', 'qty'], number: '100', counts: true, label: 'x 100 qty' },
+  { tokens: ['x', 'qty', '100'], number: '100', counts: true, label: 'x qty 100' },
+  { tokens: ['x', '100', 'each'], number: '100', counts: false, label: 'x 100 each' },
+  { tokens: ['x', '5', 'ea'], number: '5', counts: false, label: 'x 5 ea' },
+];
+
+// Ordering shorthand trails the item or follows the type; nobody opens a request with it.
+const SHORTHAND_PLACEMENTS = ['trailing', 'afterProduct'] as const satisfies readonly Placement[];
+
+// Following the type puts the run in front of a loose bare integer, where the word has a
+// number on each side and the governed direction decides instead. That is the two-number
+// case, pinned on its own below, not order shorthand.
+const isShorthand = (dimension: Dimension, xBound: boolean, placement: Placement): boolean =>
+  placement !== 'afterProduct' || xBound || !dimension.bare;
+
+describe('the order shorthand `x <n> <word>` at the positions a person writes', () => {
   it.each([
-    ['1/4-20 x qty 100 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
+    ['M8 hex nut x 100 pcs', 'm8 hex nut x'],
+    ['M8 BHCS x 100 pcs', 'm8 bhcs x'],
+    ['M8 x 100 pcs 50mm BHCS', 'm8 x 50mm bhcs'],
+    ['M8 x 2 pieces 50mm BHCS', 'm8 x 50mm bhcs'],
     ['1/4-20 x 100 pcs 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
-    ['1/4-20 x qty 5 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
-    ['1/4-20 x 100 each 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
-    ['1/4-20 x 5 ea 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
     ['1/4-20 x 2 pieces 3/4 hex cap screw', '1/4-20 x 3/4 hex cap screw'],
-    ['lock washer 1-1/2 qty 100', 'lock washer 1-1/2'],
-    ['lock washer qty 100 1-1/2', 'lock washer 1-1/2'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(normalize(input).canonical).toBe(expected);
+  });
+
+  it.each(
+    DIMENSIONS.flatMap((dimension) =>
+      [false, true].flatMap((xBound) =>
+        STANDARDS.flatMap((standard) =>
+          SHORTHAND_RUNS.flatMap((run) =>
+            SHORTHAND_PLACEMENTS.filter((placement) =>
+              isShorthand(dimension, xBound, placement),
+            ).map((placement) => ({ dimension, xBound, standard, run, placement })),
+          ),
+        ),
+      ),
+    ),
+  )(
+    '$run.label on $dimension.label with the $standard.label standard, $placement, x-bound $xBound',
+    ({ dimension, xBound, standard, run, placement }) => {
+      const base = baseTokens(dimension.token, xBound);
+      const words = wordsOf(assemble(base, standard.tokens, run.tokens, placement));
+
+      expect(words).toContain(dimension.token);
+      for (const token of standard.tokens) expect(words).toContain(token);
+      if (run.counts) expect(words).not.toContain(run.number);
+      else expect(words).toContain(run.number);
+    },
+  );
+
+  it.each([
+    ['M8 BHCS x 100 qty 50', 'm8 bhcs x 100'],
+    ['M8 BHCS x 100 each 50', 'm8 bhcs x 50'],
+    ['M8 BHCS x 5 ea 50', 'm8 bhcs x 50'],
+    ['M8 BHCS x 100 pcs 50', 'm8 bhcs x 50'],
   ])(
-    'does not let the quantity win the length slot from a bare fraction in %s',
+    'lets the governed direction decide in %s, where both sides are numbers',
     (input, expected) => {
       expect(normalize(input).canonical).toBe(expected);
     },
   );
-
-  // A word with no number of its own must not reach for the query's one stated length, on
-  // either side of it, with or without the separator: qty/pcs/pieces/ea risk this exactly
-  // as each does, since none of them carry evidence that the length is theirs to claim.
-  describe('a bare quantity word next to the only number in the query', () => {
-    const WORDS = ['qty', 'each', 'pcs', 'pieces', 'ea'] as const;
-
-    const CASES = BASE_QUERIES.flatMap((base) =>
-      WORDS.flatMap((word) =>
-        Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
-          base,
-          word,
-          position,
-        })),
-      ),
-    );
-
-    it.each(CASES)(
-      'keeps the length when bare "$word" lands at position $position of $base.label',
-      ({ base, word, position }) => {
-        const words = normalize(insertAt(base.tokens, position, [word])).tokens.map(
-          (token) => token.text,
-        );
-
-        expect(words).toContain(base.length);
-        expect(words).not.toContain(word);
-      },
-    );
-  });
-
-  // A word carrying its own number is a different claim: it must still strip that number
-  // wherever it lands, including glued to the separator, and must still leave the base
-  // length untouched. `each`/`ea` take the number before them; `qty` takes the one after.
-  describe('a self-contained quantity phrase inserted at every position', () => {
-    const PHRASES = [
-      { tokens: ['qty', '100'], number: '100' },
-      { tokens: ['100', 'pcs'], number: '100' },
-      { tokens: ['100', 'pieces'], number: '100' },
-      { tokens: ['100', 'ea'], number: '100' },
-      { tokens: ['100', 'each'], number: '100' },
-    ] as const;
-
-    it('never loses the base length and never keeps the phrase number, at any position', () => {
-      fc.assert(
-        fc.property(
-          fc.constantFrom(...BASE_QUERIES),
-          fc.constantFrom(...PHRASES),
-          fc.nat(),
-          (base, phrase, rawPosition) => {
-            const position = rawPosition % (base.tokens.length + 1);
-            const query = insertAt(base.tokens, position, phrase.tokens);
-            const words = normalize(query).tokens.map((token) => token.text);
-
-            expect(words).toContain(base.length);
-            expect(words).not.toContain(phrase.number);
-          },
-        ),
-      );
-    });
-
-    it.each([
-      ['M8 BHCS 50mm each', 'm8 bhcs 50mm'],
-      ['M8 x 50mm BHCS each', 'm8 x 50mm bhcs'],
-      ['M8 BHCS 50mm ea', 'm8 bhcs 50mm'],
-    ])('leaves a unit-attached length alone in %s', (input, expected) => {
-      expect(normalize(input).canonical).toBe(expected);
-    });
-  });
 });
 
-// Round 4 added a unit or an inch mark as "another number", since it is stronger evidence
-// of a dimension than a bare integer, not weaker. Round 5: a bare fraction (`3/4`) is
-// neither an integer nor unit-marked, so the same tally missed it too; a mixed number
-// (`1-1/2`) is included as the same family's next spelling, and must not regress next.
-describe('both invariants crossed with the dimension in every spelling (G3 round 4-5)', () => {
-  const DIMENSION_BASES = [
-    { tokens: ['m8', 'bhcs', '50'], length: '50', label: 'bare length' },
-    { tokens: ['m8', 'bhcs', '50mm'], length: '50mm', label: 'length with a unit' },
-    { tokens: ['m8', 'x', '50', 'bhcs'], length: '50', label: 'bare length, x-bound' },
-    { tokens: ['m8', 'x', '50mm', 'bhcs'], length: '50mm', label: 'unit length, x-bound' },
-    { tokens: ['m8', 'bhcs', '3/4'], length: '3/4', label: 'bare fraction length' },
-    { tokens: ['m8', 'x', '3/4', 'bhcs'], length: '3/4', label: 'bare fraction length, x-bound' },
-    { tokens: ['m8', 'bhcs', '1-1/2'], length: '1-1/2', label: 'mixed number length' },
-    {
-      tokens: ['m8', 'x', '1-1/2', 'bhcs'],
-      length: '1-1/2',
-      label: 'mixed number length, x-bound',
-    },
-  ] as const;
+// At an index nobody would write, only the weaker invariant is owed: the quantity number
+// must not survive as a dimension. It is unavailable where the number lands behind a
+// standard body, or behind the separator with an adverb reaching for it, so those are
+// skipped; a count noun behind the separator is asserted like any other.
+describe('the weaker invariant at every index, contrived ones included', () => {
+  it('never lets a quantity number survive an insertion the separator does not bind', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...DIMENSIONS.map((dimension) => dimension.token), undefined),
+        fc.boolean(),
+        fc.constantFrom(...STANDARDS),
+        fc.constantFrom(...NUMBERED_PHRASES),
+        fc.nat(),
+        (dimension, xBound, standard, phrase, rawIndex) => {
+          const carrier = [...baseTokens(dimension, xBound), ...standard.tokens];
+          const index = rawIndex % (carrier.length + 1);
+          const assembled = [...carrier.slice(0, index), ...phrase.tokens, ...carrier.slice(index)];
+          const inFront = assembled[index + phrase.tokens.indexOf(phrase.number) - 1];
 
-  // Every insertion position places the phrase both before and after the dimension token
-  // across the sweep, so "before/after" is not a separate parameter here, it falls out of it.
-  describe('a bare quantity word (no number of its own) at every position', () => {
-    const WORDS = ['qty', 'each', 'pcs', 'pieces', 'ea'] as const;
+          fc.pre(
+            !STANDARD_BODIES.has(inFront ?? '') &&
+              !(inFront === 'x' && DISTRIBUTIVE_WORDS.has(phrase.word)),
+          );
 
-    const CASES = DIMENSION_BASES.flatMap((base) =>
-      WORDS.flatMap((word) =>
-        Array.from({ length: base.tokens.length + 1 }, (_unused, position) => ({
-          base,
-          word,
-          position,
-        })),
+          expect(wordsOf(assembled.join(' '))).not.toContain(phrase.number);
+        },
       ),
-    );
-
-    it.each(CASES)(
-      'keeps $base.length when bare "$word" lands at position $position of $base.label',
-      ({ base, word, position }) => {
-        const words = normalize(insertAt(base.tokens, position, [word])).tokens.map(
-          (token) => token.text,
-        );
-
-        expect(words).toContain(base.length);
-      },
     );
   });
 
-  describe('a self-contained numbered phrase at every position', () => {
-    const NUMBERED_PHRASES = [
-      { tokens: ['qty', '100'], number: '100' },
-      { tokens: ['100', 'pcs'], number: '100' },
-      { tokens: ['100', 'pieces'], number: '100' },
-      { tokens: ['100', 'ea'], number: '100' },
-      { tokens: ['100', 'each'], number: '100' },
-    ] as const;
+  // `qty` always precedes its number, so nothing can ever stand between them: this half of
+  // the sweep owes no exception at all.
+  it('never lets `qty N` survive any insertion at all', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...DIMENSIONS.map((dimension) => dimension.token), undefined),
+        fc.boolean(),
+        fc.constantFrom(...STANDARDS),
+        fc.constantFrom('100', '5', '200'),
+        fc.nat(),
+        (dimension, xBound, standard, number, rawIndex) => {
+          const carrier = [...baseTokens(dimension, xBound), ...standard.tokens];
+          const index = rawIndex % (carrier.length + 1);
+          const query = [...carrier.slice(0, index), 'qty', number, ...carrier.slice(index)];
 
-    it('keeps invariant (a) the dimension and (b) the quantity number, together, everywhere', () => {
-      fc.assert(
-        fc.property(
-          fc.constantFrom(...DIMENSION_BASES),
-          fc.constantFrom(...NUMBERED_PHRASES),
-          fc.nat(),
-          (base, phrase, rawPosition) => {
-            const position = rawPosition % (base.tokens.length + 1);
-            const words = normalize(insertAt(base.tokens, position, phrase.tokens)).tokens.map(
-              (token) => token.text,
-            );
-
-            expect(words).toContain(base.length);
-            expect(words).not.toContain(phrase.number);
-          },
-        ),
-      );
-    });
+          expect(wordsOf(query.join(' '))).not.toContain(number);
+        },
+      ),
+    );
   });
 });
 

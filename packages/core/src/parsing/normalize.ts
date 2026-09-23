@@ -1,4 +1,4 @@
-import { classifySizeToken } from './units';
+import { STANDARD_BODIES } from './lexicon';
 
 export interface NormalizedToken {
   text: string;
@@ -72,6 +72,9 @@ const SINGULARS: Readonly<Record<string, string>> = {
 const QUANTITY_WORDS = new Set(['pcs', 'pc', 'pieces', 'piece', 'ea', 'each', 'qty']);
 // qty precedes its number ("qty 100"); every other quantity word follows theirs ("100 pcs").
 const QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER = new Set(['qty']);
+// Adverbs, not count nouns: `each` says how a count is distributed, so it is too weak to
+// take a number the separator has already bound. Every other quantity word names a count.
+const DISTRIBUTIVE_WORDS = new Set(['ea', 'each']);
 const NOISE_WORDS = new Set(['please', 'quote', 'need', 'want']);
 const NOTE_ORDER: readonly NormalizationNote[] = ['quantityStripped', 'noiseStripped'];
 
@@ -178,44 +181,20 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
   return merged;
 }
 
-// A quantity word governs one adjacent number, never both: `50 qty 100` is a length and a
-// complete quantity, not two candidates for the same rule to strip. With a number on each
-// side, the governed direction already resolves which is which, no further check needed;
-// a word with only one adjacent number risks reaching for a stated dimension instead, so
-// that single candidate must clear the checks below or be left unclaimed.
+// A quantity word governs one adjacent number, never both: with a number on each side the
+// governed direction already says which of them is the quantity.
 function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
   const isNumberToken = (token: NormalizedToken | undefined): boolean =>
     token !== undefined && /^\d+$/.test(token.text);
-  // units.ts is the parser's own definition of a dimension-shaped token, so a spelling it
-  // recognizes (a decimal, a fraction, a mixed number, any of them unit-marked) can never
-  // be a spelling this tally misses. A clean diameter (`m8`, `#10`) or a pitched thread
-  // (`3/4-10`) is excluded; a bare fraction (`3/4`) is not yet distinguishable from either
-  // by shape alone, so it counts, exactly like the bare integer it stands in for here.
-  const isDimensionLike = (token: NormalizedToken | undefined): boolean => {
-    if (token === undefined) return false;
-    const classified = classifySizeToken(token.text);
-    if (classified === undefined) return false;
-    if (classified.kind === 'length') return true;
-    return classified.pitch === undefined && /^\d+\/\d+$/.test(classified.nominal);
+
+  // `x` is ordering shorthand as often as it is a size separator, so `hex nut x 100 pcs` is
+  // a count twice over; only the adverbs leave it standing as a dimension.
+  const boundByPrevious = (index: number, word: string): boolean => {
+    const previous = tokens[index - 1]?.text;
+    if (previous === undefined) return false;
+
+    return STANDARD_BODIES.has(previous) || (previous === 'x' && DISTRIBUTIVE_WORDS.has(word));
   };
-  // `x` binds to `index` only if `x`'s far side is not itself a number: a number sandwiched
-  // between `x` and another number (`5 x 50`) is `x`'s pair, not a dimension guarding index.
-  const boundBySeparator = (index: number): boolean =>
-    (tokens[index - 1]?.text === 'x' && !isNumberToken(tokens[index - 2])) ||
-    (tokens[index + 1]?.text === 'x' && !isNumberToken(tokens[index + 2]));
-  // Nothing but a noise word precedes the pair: a leading "200 pcs" is unambiguous even
-  // as the query's only number, unlike one reached for after the item is already named.
-  const isLeadingPair = (from: number): boolean =>
-    tokens.slice(0, from).every((token) => NOISE_WORDS.has(token.text));
-
-  const totalDimensionTokens = tokens.filter(isDimensionLike).length;
-
-  // With another dimension-like token elsewhere in the query, that other token can carry
-  // the length, so a single adjacent number is safe to claim on the strength of the word
-  // alone; only the query's one and only dimension-like token needs the checks below.
-  const isProtected = (wordIndex: number, numberIndex: number): boolean =>
-    totalDimensionTokens === 1 &&
-    (boundBySeparator(numberIndex) || !isLeadingPair(Math.min(wordIndex, numberIndex)));
 
   const claimed = new Set<number>();
 
@@ -227,11 +206,13 @@ function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
 
     if (hasBefore && hasAfter) {
       claimed.add(QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER.has(token.text) ? index + 1 : index - 1);
-    } else if (hasBefore && !isProtected(index, index - 1)) {
-      claimed.add(index - 1);
-    } else if (hasAfter && !isProtected(index, index + 1)) {
-      claimed.add(index + 1);
+      return;
     }
+
+    // What speaks for a lone number is local to it: the token in front, weighed against the
+    // kind of word reaching for it. A standard body binds its designator against them all.
+    const lone = hasBefore ? index - 1 : hasAfter ? index + 1 : undefined;
+    if (lone !== undefined && !boundByPrevious(lone, token.text)) claimed.add(lone);
   });
 
   return claimed;
