@@ -14,7 +14,8 @@ pnpm install
 pnpm dev            # http://localhost:3000
 ```
 
-Node 20 or newer. `docs/RUNBOOK.md` has the cold-start walkthrough and what to do when it
+Node 22.13+ (not 23.x or 25.x — see `engines` in `package.json`); `nvm use` picks up
+`.nvmrc` (24). `docs/RUNBOOK.md` has the cold-start walkthrough and what to do when it
 does not work; `docs/DEMO.md` is the scripted tour.
 
 ## What it does
@@ -191,7 +192,7 @@ above are reported because the process surfaced them, not because it was asked t
 
 | Command            | What it does                                                             |
 | ------------------ | ------------------------------------------------------------------------ |
-| `pnpm install`     | Install the workspace. Node 20 or newer.                                 |
+| `pnpm install`     | Install the workspace. Node ≥22.13 (see engines); .nvmrc pins 24.        |
 | `pnpm dev`         | Development server for the web app.                                      |
 | `pnpm build`       | Production build.                                                        |
 | `pnpm lint`        | ESLint, including the architecture boundary rules.                       |
