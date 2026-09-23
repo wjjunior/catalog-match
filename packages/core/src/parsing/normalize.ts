@@ -68,6 +68,8 @@ const SINGULARS: Readonly<Record<string, string>> = {
 };
 
 const QUANTITY_WORDS = new Set(['pcs', 'pc', 'pieces', 'piece', 'ea', 'each', 'qty']);
+// qty precedes its number ("qty 100"); every other quantity word follows theirs ("100 pcs").
+const QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER = new Set(['qty']);
 const NOISE_WORDS = new Set(['please', 'quote', 'need', 'want']);
 const NOTE_ORDER: readonly NormalizationNote[] = ['quantityStripped', 'noiseStripped'];
 
@@ -174,22 +176,39 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
   return merged;
 }
 
+// A quantity word governs one adjacent number, never both: `50 qty 100` is a length and a
+// complete quantity, not two candidates for the same rule to strip.
+function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
+  const isNumber = (token: NormalizedToken | undefined): boolean =>
+    token !== undefined && /^\d+$/.test(token.text);
+
+  const claimed = new Set<number>();
+
+  tokens.forEach((token, index) => {
+    if (!QUANTITY_WORDS.has(token.text)) return;
+
+    const hasBefore = isNumber(tokens[index - 1]);
+    const hasAfter = isNumber(tokens[index + 1]);
+
+    if (hasBefore && hasAfter) {
+      claimed.add(QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER.has(token.text) ? index + 1 : index - 1);
+    } else if (hasBefore) {
+      claimed.add(index - 1);
+    } else if (hasAfter) {
+      claimed.add(index + 1);
+    }
+  });
+
+  return claimed;
+}
+
 function stripQuantitiesAndNoise(tokens: NormalizedToken[]): NormalizedText {
-  const isQuantityWord = (token: NormalizedToken | undefined): boolean =>
-    token !== undefined && QUANTITY_WORDS.has(token.text);
+  const claimedNumbers = claimedQuantityNumbers(tokens);
 
   const dropped = tokens.map((token, index) => {
     if (QUANTITY_WORDS.has(token.text)) return 'quantityStripped' as const;
     if (NOISE_WORDS.has(token.text)) return 'noiseStripped' as const;
-    // A bare integer is a quantity only when a quantity word binds it, and only when the
-    // separator has not bound it first: the 50 of `m8 x 50 qty 100` must survive.
-    if (
-      /^\d+$/.test(token.text) &&
-      tokens[index - 1]?.text !== 'x' &&
-      (isQuantityWord(tokens[index - 1]) || isQuantityWord(tokens[index + 1]))
-    ) {
-      return 'quantityStripped' as const;
-    }
+    if (claimedNumbers.has(index)) return 'quantityStripped' as const;
     return undefined;
   });
 
