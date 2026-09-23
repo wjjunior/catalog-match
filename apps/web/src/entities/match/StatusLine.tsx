@@ -1,7 +1,5 @@
 import type { MatchResponse, NoteCode } from '../../shared/api/client';
 
-import styles from './StatusLine.module.css';
-
 // A note already says it in core's words; only the counted sentences are composed here,
 // because no note carries a count. Every other note renders in the list below the cards.
 const HEADLINE_NOTES: readonly NoteCode[] = ['failedConstraint', 'customerRequired'];
@@ -51,7 +49,7 @@ function statusText(response: MatchResponse): string {
 
 export function StatusLine({ response }: { response: MatchResponse }) {
   return (
-    <p className={styles.status} role="status">
+    <p className="text-lg font-semibold text-foreground" role="status">
       {statusText(response)}
     </p>
   );

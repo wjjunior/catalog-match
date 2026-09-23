@@ -4,8 +4,6 @@ import type { Explanation, MatchedAttribute } from '../../shared/api/client';
 import { Badge } from '../../shared/ui/Badge';
 import { Chip } from '../../shared/ui/Chip';
 
-import styles from './AttributeChips.module.css';
-
 function reading(attribute: MatchedAttribute): string {
   return attribute.query === attribute.item
     ? attribute.query
@@ -14,9 +12,11 @@ function reading(attribute: MatchedAttribute): string {
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={styles.group}>
-      <span className={styles.label}>{label}</span>
-      <ul className={styles.chips} aria-label={label}>
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5">
+      <span className="min-w-[8.5rem] text-xs uppercase tracking-[0.04em] text-muted-foreground">
+        {label}
+      </span>
+      <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={label}>
         {children}
       </ul>
     </div>
@@ -29,13 +29,15 @@ export function AttributeChips({ explanation }: { explanation: Explanation }) {
   if (matched.length === 0 && unspecified.length === 0 && unverified.length === 0) return null;
 
   return (
-    <div className={styles.groups}>
+    <div className="flex flex-col gap-2">
       {matched.length > 0 && (
         <Group label="matched attributes">
           {matched.map((attribute) => (
             <li key={attribute.attr}>
               <Chip tone="matched">
-                <span className={styles.attr}>{attribute.attr}</span>
+                <span className="text-xs uppercase tracking-[0.04em] text-muted-foreground">
+                  {attribute.attr}
+                </span>
                 <span>{reading(attribute)}</span>
                 <Badge>{attribute.provenance}</Badge>
                 {attribute.partial === true && <Badge>partial</Badge>}
