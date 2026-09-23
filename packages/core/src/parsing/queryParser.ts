@@ -200,13 +200,13 @@ interface StandardCode {
   to: number;
 }
 
-/** `DIN125` and `DIN 125` are one expression spelled two ways; whether the catalog stocks
- * the standard decides nothing here, so neither may depend on a space. */
+/** `DIN125` and `DIN 125` are one expression spelled two ways, so neither may depend on a
+ * space; the body is the user's own spelling, as a correction into these six invents one. */
 function readStandardCode(draft: Draft, index: number): StandardCode | undefined {
   const token = draft.tokens[index];
   if (token === undefined) return undefined;
 
-  const compact = COMPACT_STANDARD.exec(token.text);
+  const compact = COMPACT_STANDARD.exec(token.original);
   if (compact) {
     const [, body = '', designator = ''] = compact;
 
@@ -215,9 +215,9 @@ function readStandardCode(draft: Draft, index: number): StandardCode | undefined
 
   const next = draft.tokens[index + 1];
   if (next === undefined) return undefined;
-  if (!STANDARD_BODIES.has(token.text) || !DESIGNATOR.test(next.text)) return undefined;
+  if (!STANDARD_BODIES.has(token.original) || !DESIGNATOR.test(next.original)) return undefined;
 
-  return { body: token.text, designator: next.text, to: index + 2 };
+  return { body: token.original, designator: next.original, to: index + 2 };
 }
 
 /** Syntactic, not a lookup, and read before the lexicon so `DIN 316` cannot be halved into
@@ -449,8 +449,10 @@ export function parseQuery(query: string): QueryParse {
     provenance: {},
   };
 
-  const attributes = takeAttributes(draft);
+  // Intent first, so a phrase the user wrote is claimed before the corrected spelling of it
+  // can be read as anything else; the standard scan then still precedes the lexicon.
   const intentCandidates = takeIntent(draft);
+  const attributes = takeAttributes(draft);
   const sizes = takeSizes(draft, sizeSlots(draft));
 
   const residue = draft.tokens

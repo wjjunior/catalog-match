@@ -11,7 +11,7 @@ import {
   type SpecValues,
 } from '../../test/fixtures/example-queries';
 import { correct, VOCABULARY } from './fuzzy';
-import { STANDARD_BODIES } from './lexicon';
+import { LEXICON, STANDARD_BODIES } from './lexicon';
 import { normalize } from './normalize';
 import { unitMismatch } from './units';
 import { parseQuery, queryParser } from './queryParser';
@@ -703,5 +703,205 @@ describe('a standard whose designator is also an attribute term', () => {
   it('leaves the body word in the residue when nothing follows it', () => {
     expect(parse('M8 flat washer 316 din').standard).toBeUndefined();
     expect(parse('M8 flat washer 316 din').residue).toEqual(['din']);
+  });
+});
+
+function swapped(word: string, index: number): string {
+  return (
+    word.slice(0, index) +
+    word.slice(index + 1, index + 2) +
+    word.slice(index, index + 1) +
+    word.slice(index + 2)
+  );
+}
+
+/** Every word one edit from this one, which is the reach the corrector is configured for:
+ * the family comes from the closed set of bodies, not from asking the parser for it. */
+function oneEditFrom(word: string): string[] {
+  const edits = new Set<string>();
+
+  for (let index = 0; index < word.length; index++) {
+    edits.add(word.slice(0, index) + word.slice(index + 1));
+    edits.add(swapped(word, index));
+
+    for (const letter of LETTERS) {
+      edits.add(word.slice(0, index) + letter + word.slice(index + 1));
+      edits.add(word.slice(0, index) + letter + word.slice(index));
+    }
+  }
+
+  for (const letter of LETTERS) edits.add(word + letter);
+
+  return [...edits];
+}
+
+/** A word the corrector carries onto a standards body although the user wrote no body.
+ * Membership is a precondition on the family, never the expectation of a test. */
+const reachesBody = (word: string): boolean =>
+  !STANDARD_BODIES.has(word) && STANDARD_BODIES.has(correct(word)?.word ?? '');
+
+const BODY_LOOKALIKES = [...STANDARD_BODIES].flatMap(oneEditFrom).filter(reachesBody);
+
+const LEXICON_STANDARDS = [...LEXICON.values()]
+  .filter((entry) => entry.attribute === 'standard')
+  .flatMap((entry) => entry.values.map((value) => String(value.value)));
+
+/** Designators no lexicon term pairs with any body, so a standard read off one of them
+ * could only have been minted by the scan. */
+const UNPAIRED = DESIGNATORS.filter(
+  (designator) =>
+    !LEXICON_STANDARDS.some((standard) => standard.endsWith(` ${designator.toUpperCase()}`)),
+);
+
+describe('a token the corrector can carry onto a standards body', () => {
+  it('is a family the vocabulary really holds, including the words this fix is about', () => {
+    expect(BODY_LOOKALIKES).toContain('same');
+    expect(BODY_LOOKALIKES).toContain('acme');
+    expect(BODY_LOOKALIKES.length).toBeGreaterThan(50);
+    expect(UNPAIRED).not.toHaveLength(0);
+  });
+
+  // The syntactic scan mints standards the catalog has never heard of, so it must be sure
+  // the user named a body; the lexicon only ever returns one of its own, and discounts it.
+  it('mints no standard of its own, whatever designator follows it', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...BODY_LOOKALIKES),
+        fc.constantFrom(...DESIGNATORS),
+        (word, designator) => {
+          for (const query of [
+            `${word} ${designator} M8 flat washer`,
+            `M8 flat washer ${word} ${designator}`,
+          ]) {
+            const spec = parse(query);
+            if (spec.standard === undefined) continue;
+
+            expect(LEXICON_STANDARDS).toContain(spec.standard);
+          }
+        },
+      ),
+    );
+  });
+
+  it('reads no standard at all from a designator the lexicon pairs with no body', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...BODY_LOOKALIKES), fc.constantFrom(...UNPAIRED), (word, n) => {
+        expect(parse(`${word} ${n} M8 flat washer`).standard).toBeUndefined();
+        expect(parse(`M8 flat washer ${word} ${n}`).standard).toBeUndefined();
+      }),
+    );
+  });
+
+  it('leaves the designator to be read as the attribute term it also is', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...BODY_LOOKALIKES), (word) => {
+        expect(parse(`${word} 316 M8 flat washer`).material).toEqual({
+          value: 'ss_316',
+          strength: 1,
+        });
+        expect(parse(`${word} a2 M8 flat washer`).material).toEqual({
+          value: 'ss_a2',
+          strength: 1,
+        });
+      }),
+    );
+  });
+
+  it('still reads the standard when the user spelled the body itself', () => {
+    for (const body of BODIES) {
+      for (const designator of DESIGNATORS) {
+        expect(parse(`${body} ${designator} M8 flat washer`).standard).toBe(
+          `${body.toUpperCase()} ${designator.toUpperCase()}`,
+        );
+      }
+    }
+  });
+});
+
+/** The values docs/BRIEF.md 4 gives these terms, read off the specification and not off
+ * the parser, so the cross below can assert an attribute was understood. */
+const MATERIAL_AXIS = [
+  ['A2', 'ss_a2'],
+  ['316', 'ss_316'],
+  ['304', 'ss_18_8'],
+  ['brass', 'brass'],
+] as const;
+
+const FINISH_AXIS = [
+  ['zinc', 'zinc'],
+  ['yellow zinc', 'yellow_zinc'],
+  ['hdg', 'hdg'],
+  ['black oxide', 'black_oxide'],
+] as const;
+
+const SIZE_AXIS = [
+  ['M8 x 50mm', 'M8', { value: 50, unit: 'mm', mm: 50 }],
+  ['1/2-13 x 2"', '1/2', { value: 2, unit: 'in', mm: 50.8 }],
+] as const;
+
+const INTENT_TAILS = ['A2 M8 flat washers', '316 M8 flat washers', 'zinc M8 x 50mm BHCS'];
+
+describe('an intent phrase crossed with the attributes of the same query', () => {
+  it.each([...INTENT_PHRASES])('keeps %s an intent and still reads the rest', (phrase) => {
+    for (const [material, materialValue] of MATERIAL_AXIS) {
+      for (const [finish, finishValue] of FINISH_AXIS) {
+        for (const [size, nominal, length] of SIZE_AXIS) {
+          const { spec, intentCandidates } = parseQuery(
+            `${phrase} ${material} ${finish} ${size} hex cap screw`,
+          );
+
+          expect(intentCandidates).toContain(phrase);
+          expect(spec.material).toEqual({ value: materialValue, strength: 1 });
+          expect(spec.finish).toEqual({ value: finishValue, strength: 1 });
+          expect(spec.diameter?.nominal).toBe(nominal);
+          expect(spec.length).toEqual(length);
+          expect(spec.standard).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it.each([...INTENT_PHRASES])('invents no standard from the designator after %s', (phrase) => {
+    for (const [material, value] of MATERIAL_AXIS) {
+      const { spec, intentCandidates } = parseQuery(`${phrase} ${material} M8 flat washers`);
+
+      expect(intentCandidates).toContain(phrase);
+      expect(spec.material).toEqual({ value, strength: 1 });
+      expect(spec.standard).toBeUndefined();
+      expect(spec.residue).toEqual([]);
+    }
+  });
+
+  // The invariant the regression broke: which phrase carries the intent decides nothing
+  // about how the words beside it are read.
+  it.each(INTENT_TAILS)('reads %s the same way whichever phrase carries the intent', (tail) => {
+    const [first = {}, ...rest] = INTENT_PHRASES.map((phrase) =>
+      values(parse(`${phrase} ${tail}`)),
+    );
+
+    for (const spec of rest) expect(spec).toEqual(first);
+  });
+
+  it('reads a phrase the corrector could carry onto a standards body as the intent', () => {
+    const reachable = INTENT_PHRASES.filter(reachesBody);
+
+    expect(reachable).not.toHaveLength(0);
+
+    for (const phrase of reachable) {
+      const { spec, intentCandidates } = parseQuery(`${phrase} a2 M8 flat washer`);
+
+      expect(intentCandidates).toContain(phrase);
+      expect(spec.standard).toBeUndefined();
+      expect(spec.material).toEqual({ value: 'ss_a2', strength: 1 });
+    }
+  });
+
+  it('still reads a standard the user spelled out beside an intent phrase', () => {
+    for (const phrase of INTENT_PHRASES) {
+      const { spec, intentCandidates } = parseQuery(`${phrase} M8 flat washer DIN 125`);
+
+      expect(intentCandidates).toContain(phrase);
+      expect(spec.standard).toBe('DIN 125');
+    }
   });
 });
