@@ -12,6 +12,7 @@ import {
   failedConstraint,
 } from '../matching/compatibility';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
+import { INTENT_PHRASES } from '../personalization/intent';
 import { core } from '../../test/integration/setup';
 import { descriptionParser } from './descriptionParser';
 import { parseQuery } from './queryParser';
@@ -243,5 +244,94 @@ describe('a standard spelled with and without the space', () => {
         expect(answer(`M8 flat washer ${spelling}`)).toEqual(answer('M8 flat washer DIN 125'));
       }
     }
+  });
+});
+
+/** From the catalog: the only row that is a 3/4 tap bolt 5/8 of an inch long. */
+const FIVE_EIGHTHS_TAP_BOLTS = items
+  .filter(
+    (item) =>
+      item.spec.diameter?.nominal === '3/4' &&
+      item.spec.length?.mm === 15.875 &&
+      item.spec.type?.some((value) => value.value === 'tap_bolt'),
+  )
+  .map((item) => item.sku);
+
+const FRACTION_SPELLINGS = [
+  '3/4-10 tap bolt 5/8"',
+  '3/4-10 tap bolt 5/8 inch',
+  '3/4-10 tap bolt 5/8 in',
+  '3/4-10 tap bolt length 5/8"',
+  '3/4-10 tap bolt length 5/8 inch',
+  '3/4-10 tap bolt length 5/8 in',
+  '3/4-10 tap bolt approx 5/8 inch',
+];
+
+describe('a fraction the query separates from its unit', () => {
+  it('names exactly one row in the catalog', () => {
+    expect(FIVE_EIGHTHS_TAP_BOLTS).toHaveLength(1);
+  });
+
+  it.each(FRACTION_SPELLINGS)('answers %s with that row', (query) => {
+    expect(core.matchQuery({ query }).results.map((match) => match.sku)).toEqual(
+      FIVE_EIGHTHS_TAP_BOLTS,
+    );
+  });
+
+  it.each(FRACTION_SPELLINGS)(
+    'answers %s as it answers the spelling with nothing between',
+    (query) => {
+      expect(answer(query)).toEqual(answer('3/4-10 tap bolt 5/8"'));
+    },
+  );
+});
+
+const A2_M8_FLAT_WASHERS = items
+  .filter(
+    (item) =>
+      item.spec.diameter?.nominal === 'M8' &&
+      item.spec.material?.value === 'ss_a2' &&
+      item.spec.type?.some((value) => value.value === 'flat_washer'),
+  )
+  .map((item) => item.sku);
+
+/** The stage the parser hands `intentCandidates` to. A phrase the corrector can reach a
+ * standards body from must still arrive there, with the attributes beside it intact. */
+describe('an intent phrase reaching the history', () => {
+  it.each([...INTENT_PHRASES])('answers %s M8 flat washers from the history', (phrase) => {
+    const response = core.matchQuery({
+      query: `${phrase} M8 flat washers`,
+      customerId: 'CUST-001',
+    });
+
+    expect(response.status).toBe('history');
+    expect(response.parsed.standard).toBeUndefined();
+  });
+
+  it.each(['A2 M8 flat washers', '316 M8 flat washers'])(
+    'answers %s the same way whichever phrase carries the intent',
+    (tail) => {
+      const answers = INTENT_PHRASES.map((phrase) => {
+        const response = core.matchQuery({ query: `${phrase} ${tail}`, customerId: 'CUST-001' });
+
+        return {
+          status: response.status,
+          skus: response.results.map((match) => match.sku),
+          standard: response.parsed.standard,
+        };
+      });
+
+      for (const one of answers) expect(one).toEqual(answers[0]);
+    },
+  );
+
+  it('answers same A2 M8 flat washers with an A2 M8 flat washer of the catalog', () => {
+    const response = core.matchQuery({
+      query: 'same A2 M8 flat washers',
+      customerId: 'CUST-001',
+    });
+
+    expect(response.status).toBe('unique');
+    expect(A2_M8_FLAT_WASHERS).toContain(response.results[0]?.sku);
   });
 });
