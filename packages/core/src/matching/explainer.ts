@@ -6,6 +6,7 @@ import type {
   ProductType,
   ThreadSystem,
 } from '../domain/attributes';
+import { FINISHES, FINISH_FAMILY, MATERIALS, MATERIAL_FAMILY } from '../domain/attributes';
 import type { CatalogItem } from '../domain/catalog';
 import type {
   Explanation,
@@ -129,8 +130,21 @@ function has(spec: ParsedSpec, attr: AttributeName): boolean {
   }
 }
 
+const isMaterial = (value: Material | MaterialFamily): value is Material =>
+  (MATERIALS as readonly string[]).includes(value);
+
+const materialFamilyOf = (value: Material | MaterialFamily): MaterialFamily =>
+  isMaterial(value) ? MATERIAL_FAMILY[value] : value;
+
+const isFinish = (value: Finish | FinishFamily): value is Finish =>
+  (FINISHES as readonly string[]).includes(value);
+
+const finishFamilyOf = (value: Finish | FinishFamily): FinishFamily =>
+  isFinish(value) ? FINISH_FAMILY[value] : value;
+
 /** Describes agreement; it never decides it. Items outside C never reach the explainer,
- * so where this and `compatibility` could differ, C has already had the last word. */
+ * so where this and `compatibility` could differ, C has already had the last word.
+ * A contradiction (different family) returns `undefined`: not agreement, so not matched. */
 function agreement(
   attr: AttributeName,
   query: ParsedSpec,
@@ -170,24 +184,41 @@ function agreement(
       };
     }
 
-    case 'material':
+    case 'material': {
       if (query.material === undefined || item.material === undefined) return undefined;
-      return {
-        query: formatMaterial(query.material.value),
-        item: formatMaterial(item.material.value),
-        partial: query.material.value !== item.material.value || query.material.strength < 1,
-      };
+      const q = query.material.value;
+      const i = item.material.value;
+      if (q === i) {
+        return {
+          query: formatMaterial(q),
+          item: formatMaterial(i),
+          partial: query.material.strength < 1,
+        };
+      }
+      // Same family, different member (stainless -> 18-8 SS): a genuine partial agreement.
+      // Different family (A2 -> brass): a contradiction, which is not agreement at all.
+      if (materialFamilyOf(q) !== materialFamilyOf(i)) return undefined;
+      return { query: formatMaterial(q), item: formatMaterial(i), partial: true };
+    }
 
-    case 'finish':
+    case 'finish': {
       if (query.finish === undefined || item.finish === undefined) return undefined;
-      return {
-        query: formatFinish(query.finish.value),
-        item: formatFinish(item.finish.value),
-        partial: query.finish.value !== item.finish.value || query.finish.strength < 1,
-      };
+      const q = query.finish.value;
+      const i = item.finish.value;
+      if (q === i) {
+        return {
+          query: formatFinish(q),
+          item: formatFinish(i),
+          partial: query.finish.strength < 1,
+        };
+      }
+      if (finishFamilyOf(q) !== finishFamilyOf(i)) return undefined;
+      return { query: formatFinish(q), item: formatFinish(i), partial: true };
+    }
 
     case 'standard':
       if (query.standard === undefined || item.standard === undefined) return undefined;
+      if (query.standard !== item.standard) return undefined;
       return { query: query.standard, item: item.standard, partial: false };
   }
 }
