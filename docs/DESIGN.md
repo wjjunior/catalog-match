@@ -405,7 +405,7 @@ Single page: free-text input (Enter submits), searchable customer combobox (id, 
 | Status correctness | Confusion matrix over unique, ambiguous, none, history, unparsed | All queries |
 | Constraint preservation | Number of returned matches contradicting an explicit attribute; must be 0, also as a property test over generated queries | All queries, with and without a customer |
 | Personalization | Hit@1 with vs without a customer; margin between top-1 and top-2 | Hand-labeled (query, customer) pairs |
-| Calibration | Bins of top-1 confidence vs empirical top-1 precision, with the count per bin | Single-label queries only; never tie queries, where "acceptable" and "intended" are different events |
+| Calibration | Bins of top-1 confidence vs empirical top-1 precision, with the count per bin | Every case carrying an intended-SKU label whose answer the posterior scored; history and unparsed answers stay out, scoring on a different scale |
 
 ## 10.3 Reporting
 
