@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DIAMETERS } from '../domain/diameters';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
+import { parseQuery } from './queryParser';
 import {
   classifySizeToken,
   parseNumber,
@@ -12,6 +13,10 @@ import {
   unitMismatch,
   withinTolerance,
 } from './units';
+
+// R7: a 310-digit run overflows Number() to Infinity (Number.MAX_VALUE is ~309 digits),
+// and Infinity/Infinity is NaN.
+const HUGE_DIGITS = '9'.repeat(310);
 
 describe('parseNumber', () => {
   it('reads a whole number', () => {
@@ -40,6 +45,14 @@ describe('parseNumber', () => {
 
   it('rejects a fraction over zero', () => {
     expect(parseNumber('1/0')).toBeUndefined();
+  });
+
+  it('rejects a fraction whose overflowing digits would divide to NaN (R7)', () => {
+    expect(parseNumber(`${HUGE_DIGITS}/${HUGE_DIGITS}`)).toBeUndefined();
+  });
+
+  it('rejects a plain digit run that overflows to Infinity (R7)', () => {
+    expect(parseNumber(HUGE_DIGITS)).toBeUndefined();
   });
 });
 
@@ -198,6 +211,19 @@ describe('resolveDiameter', () => {
   it('rejects a nominal that is no diameter shape at all', () => {
     expect(resolveDiameter('washer')).toBeUndefined();
   });
+
+  it('rejects a metric nominal whose digits overflow to Infinity mm, rather than shipping Infinity (R7)', () => {
+    expect(resolveDiameter(`M${HUGE_DIGITS}`)).toBeUndefined();
+  });
+
+  it('still resolves an ordinary metric nominal once the overflow guard is in place', () => {
+    expect(resolveDiameter('M20')).toEqual({
+      system: 'metric',
+      nominal: 'M20',
+      mm: 20,
+      known: false,
+    });
+  });
 });
 
 function length(token: string, diameterNominal?: string) {
@@ -281,6 +307,36 @@ describe('resolveLength: inferred units', () => {
 
   it('refuses a thread token', () => {
     expect(resolveLength({ kind: 'thread', nominal: 'M8' }, undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveLength: non-finite input (R7)', () => {
+  it('rejects a stated-unit magnitude whose digits overflow, never reaching resolveLength as a token', () => {
+    expect(classifySizeToken(`${HUGE_DIGITS}mm`)).toBeUndefined();
+  });
+
+  it('rejects an explicit token value that is already non-finite', () => {
+    expect(
+      resolveLength({ kind: 'length', value: Infinity, unit: 'mm' }, undefined),
+    ).toBeUndefined();
+  });
+
+  it('rejects an inferred-unit token value that is already non-finite', () => {
+    expect(resolveLength({ kind: 'length', value: NaN }, resolveDiameter('M8'))).toBeUndefined();
+  });
+
+  it('still resolves an ordinary stated-unit length once the overflow guard is in place', () => {
+    expect(length('45mm')).toEqual({
+      length: { value: 45, unit: 'mm', mm: 45 },
+      provenance: 'explicit',
+    });
+  });
+
+  it('still resolves an ordinary inferred-unit length once the overflow guard is in place', () => {
+    expect(length('3', 'M8')).toEqual({
+      length: { value: 3, unit: 'mm', mm: 3 },
+      provenance: 'inferred',
+    });
   });
 });
 
@@ -482,5 +538,52 @@ describe('acceptance criteria', () => {
     expect(withinTolerance(20, resolved.length.mm, DEFAULT_MATCHER_CONFIG.lengthTolerance)).toBe(
       true,
     );
+  });
+});
+
+function containsNull(value: unknown): boolean {
+  if (value === null) return true;
+  if (Array.isArray(value)) return value.some(containsNull);
+  if (typeof value === 'object')
+    return Object.values(value as Record<string, unknown>).some(containsNull);
+  return false;
+}
+
+// The reviewer's exact queries (R7): a 310-digit fraction that used to overflow gcd()
+// into an infinite recursion, and huge magnitudes that used to leak Infinity, which
+// JSON.stringify silently turns into null on a field the wire schema declares a number.
+describe('non-finite numeric input end to end (R7)', () => {
+  it('parses the 310-digit fraction query without throwing, leaving length unresolved', () => {
+    const query = `M8 x ${HUGE_DIGITS}/${HUGE_DIGITS} SHCS`;
+
+    const parse = parseQuery(query);
+
+    expect(parse.spec.length).toBeUndefined();
+    expect(containsNull(JSON.parse(JSON.stringify(parse.spec)))).toBe(false);
+  });
+
+  it('parses a huge stated-unit length without leaking Infinity/null into spec.length', () => {
+    const query = `M8 x ${HUGE_DIGITS}mm SHCS`;
+
+    const parse = parseQuery(query);
+
+    expect(parse.spec.length).toBeUndefined();
+    expect(containsNull(JSON.parse(JSON.stringify(parse.spec)))).toBe(false);
+  });
+
+  it('parses a huge metric nominal without leaking Infinity/null into spec.diameter', () => {
+    const query = `M${HUGE_DIGITS} x 16mm SHCS`;
+
+    const parse = parseQuery(query);
+
+    expect(parse.spec.diameter).toBeUndefined();
+    expect(containsNull(JSON.parse(JSON.stringify(parse.spec)))).toBe(false);
+  });
+
+  it('still parses an ordinary query with a diameter and length once the guard is in place', () => {
+    const parse = parseQuery('M8 x 45mm SHCS');
+
+    expect(parse.spec.diameter).toEqual({ system: 'metric', nominal: 'M8', mm: 8, known: true });
+    expect(parse.spec.length).toEqual({ value: 45, unit: 'mm', mm: 45 });
   });
 });
