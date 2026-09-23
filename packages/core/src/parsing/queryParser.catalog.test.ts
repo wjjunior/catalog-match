@@ -247,6 +247,45 @@ describe('a standard spelled with and without the space', () => {
   });
 });
 
+/** From the catalog: the only row that is a 3/4 tap bolt 5/8 of an inch long. */
+const FIVE_EIGHTHS_TAP_BOLTS = items
+  .filter(
+    (item) =>
+      item.spec.diameter?.nominal === '3/4' &&
+      item.spec.length?.mm === 15.875 &&
+      item.spec.type?.some((value) => value.value === 'tap_bolt'),
+  )
+  .map((item) => item.sku);
+
+const FRACTION_SPELLINGS = [
+  '3/4-10 tap bolt 5/8"',
+  '3/4-10 tap bolt 5/8 inch',
+  '3/4-10 tap bolt 5/8 in',
+  '3/4-10 tap bolt length 5/8"',
+  '3/4-10 tap bolt length 5/8 inch',
+  '3/4-10 tap bolt length 5/8 in',
+  '3/4-10 tap bolt approx 5/8 inch',
+];
+
+describe('a fraction the query separates from its unit', () => {
+  it('names exactly one row in the catalog', () => {
+    expect(FIVE_EIGHTHS_TAP_BOLTS).toHaveLength(1);
+  });
+
+  it.each(FRACTION_SPELLINGS)('answers %s with that row', (query) => {
+    expect(core.matchQuery({ query }).results.map((match) => match.sku)).toEqual(
+      FIVE_EIGHTHS_TAP_BOLTS,
+    );
+  });
+
+  it.each(FRACTION_SPELLINGS)(
+    'answers %s as it answers the spelling with nothing between',
+    (query) => {
+      expect(answer(query)).toEqual(answer('3/4-10 tap bolt 5/8"'));
+    },
+  );
+});
+
 const A2_M8_FLAT_WASHERS = items
   .filter(
     (item) =>

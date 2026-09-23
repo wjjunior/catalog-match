@@ -905,3 +905,101 @@ describe('an intent phrase crossed with the attributes of the same query', () =>
     }
   });
 });
+
+interface DimensionFamily {
+  readonly head: string;
+  /** From the literal and 25.4 mm to the inch, never from the parser. */
+  readonly length: Length;
+  /** Spellings that carry their own unit, and spellings that leave it to the diameter. */
+  readonly stated: readonly string[];
+  readonly bare: readonly string[];
+}
+
+const DIMENSION_FAMILIES: readonly DimensionFamily[] = [
+  {
+    head: '3/4-10 tap bolt',
+    length: { value: 0.625, unit: 'in', mm: 15.875 },
+    stated: ['5/8"', '5/8 inch', '5/8 in', '0.625"', '0.625 inch'],
+    bare: ['5/8', '0.625'],
+  },
+  {
+    head: '1/2-13 hex cap screw',
+    length: { value: 2, unit: 'in', mm: 50.8 },
+    stated: ['2"', '2 inch', '2 in'],
+    bare: ['2'],
+  },
+  {
+    head: 'M8 SHCS',
+    length: { value: 30, unit: 'mm', mm: 30 },
+    stated: ['30mm', '30 mm', '30 millimeters'],
+    bare: ['30'],
+  },
+  {
+    head: 'M8 SHCS',
+    length: { value: 12.5, unit: 'mm', mm: 12.5 },
+    stated: ['12.5mm', '12.5 mm', '12-1/2 mm'],
+    bare: [],
+  },
+];
+
+describe('a dimension crossed with its spelling and the words around it', () => {
+  it.each(DIMENSION_FAMILIES)(
+    'reads every stated spelling of $length.value $length.unit after $head as the one dimension',
+    (family) => {
+      for (const literal of family.stated) {
+        expect(parse(`${family.head} ${literal}`).length).toEqual(family.length);
+
+        for (const word of GAP_WORDS) {
+          expect(parse(`${family.head} ${word} ${literal}`).length).toEqual(family.length);
+        }
+      }
+    },
+  );
+
+  it.each(DIMENSION_FAMILIES)(
+    'keeps the diameter of $head whichever spelling states the dimension',
+    (family) => {
+      const nominal = parse(family.head).diameter?.nominal;
+
+      for (const literal of [...family.stated, ...family.bare]) {
+        for (const query of [`${family.head} ${literal}`, `${family.head} red ${literal}`]) {
+          expect(parse(query).diameter?.nominal).toBe(nominal);
+        }
+      }
+    },
+  );
+
+  // The other half of the rule: a bare number is a dimension where the separator sets it
+  // apart, and is not one where an unrecognized word is all that stands beside it.
+  it.each(DIMENSION_FAMILIES)(
+    'reads a bare $length.value only where the query delimits it',
+    (family) => {
+      for (const literal of family.bare) {
+        expect(parse(`${family.head} ${literal}`).length).toEqual(family.length);
+
+        for (const word of GAP_WORDS) {
+          expect(parse(`${family.head} ${word} x ${literal}`).length).toEqual(family.length);
+          expect(parse(`${family.head} ${word} ${literal}`).length).toBeUndefined();
+        }
+      }
+    },
+  );
+
+  it('reads a stated spelling behind any unrecognized word at all', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...DIMENSION_FAMILIES), unrecognizedWord, (family, word) => {
+        for (const literal of family.stated) {
+          expect(parse(`${family.head} ${word} ${literal}`).length).toEqual(family.length);
+        }
+      }),
+    );
+  });
+
+  it('marks a stated unit explicit however the query spelled it', () => {
+    for (const family of DIMENSION_FAMILIES) {
+      for (const literal of family.stated) {
+        expect(parse(`${family.head} length ${literal}`).provenance.length).toBe('explicit');
+      }
+    }
+  });
+});
