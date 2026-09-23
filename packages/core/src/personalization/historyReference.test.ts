@@ -3,9 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { CsvOrderHistoryRepository } from '../adapters/csv/csvOrderHistoryRepository';
+import { createCore } from '../application/createCore';
 import type { HistoryLine } from '../domain/catalog';
+import type { Match, MatchResponse } from '../domain/match';
 import type { ParsedSpec } from '../domain/spec';
 import { DEFAULT_MATCHER_CONFIG as config } from '../matching/config';
+import { parseDescription } from '../parsing/descriptionParser';
 import { parseQuery } from '../parsing/queryParser';
 import { resolveReference, statesOverride, type ReferencedLine } from './historyReference';
 
@@ -13,6 +16,7 @@ const W8 = 'M8-1.25 FLAT WASHER ISO 7380 18-8 SS PLAIN';
 const W16 = 'M16-2.0 FLAT WASHER ISO 7380 18-8 SS PLAIN';
 const L8 = 'M8-1.25 LOCK WASHER ASTM A307 ALLOY BLACK OXIDE';
 const N8 = 'M8-1.25 HEX NUT IFI 111 18-8 SS PLAIN';
+const U516 = '5/16 FLAT WASHER STEEL PLAIN';
 
 function line(orderDate: string, sku: string, description: string, quantity = 10): HistoryLine {
   return { customerId: 'A', customerName: 'A Inc', orderDate, sku, description, quantity };
@@ -73,6 +77,50 @@ describe('selecting the lines a reference names', () => {
 
   it('resolves to nothing when the customer never bought the type', () => {
     expect(pure(mixed, 'the same rods as last time')).toEqual([]);
+  });
+});
+
+describe('a reference whose query states a thread pitch of its own', () => {
+  it('names no order when every line contradicts the pitch the query states', () => {
+    expect(skus(pure(mixed, 'the same M8-1.0 washers as last time'))).toEqual([]);
+  });
+
+  it('still names the orders whose pitch is the one the query states', () => {
+    expect(skus(pure(mixed, 'the same M8-1.25 washers as last time'))).toEqual(['W8', 'L8']);
+  });
+
+  it('leaves a pitch the parser only inferred from the nominal inert', () => {
+    expect(skus(pure(mixed, 'the usual M8 washers'))).toEqual(['W8', 'L8']);
+  });
+
+  it('still names a line that states no pitch at all, which contradicts nothing', () => {
+    const withUnthreaded = [line('2026-05-01', 'U516', U516), ...mixed];
+
+    expect(skus(pure(withUnthreaded, 'the same 5/16-18 flat washers as last time'))).toEqual([
+      'U516',
+    ]);
+  });
+
+  it('falls back to a pure reference rather than overriding a line it cannot name', () => {
+    const asked = specOf('same M8-1.0 washers as last time, but brass');
+
+    expect(resolveReference(mixed, asked, config)).toEqual({ form: 'pure', lines: [] });
+  });
+
+  it('overrides a base that states no pitch without losing the thread the query stated', () => {
+    const withUnthreaded = [line('2026-05-01', 'U516', U516), ...mixed];
+    const merged = override(withUnthreaded, 'same 5/16-24 flat washers as last time, but brass');
+
+    expect(merged.spec.pitch).toBe('24');
+    expect(merged.spec.diameter).toMatchObject({ nominal: '5/16', known: false });
+    expect(merged.spec.provenance.pitch).toBe('explicit');
+  });
+
+  it('leaves the values of a base that already agrees with the query thread alone', () => {
+    const merged = override(mixed, 'same M8-1.25 washers as last time, but brass');
+
+    expect(merged.spec.pitch).toBe('1.25');
+    expect(merged.spec.diameter).toMatchObject({ nominal: 'M8', known: true });
   });
 });
 
@@ -273,5 +321,49 @@ describe('a query that asks for a change', () => {
     expect(asks('the same washers as last time')).toBe(false);
     expect(asks('reorder')).toBe(false);
     expect(asks('the same M8 washers as last time')).toBe(false);
+  });
+});
+
+describe('the whole pipeline answering a reference that states a pitch', () => {
+  const core = createCore({ dataDir: fileURLToPath(new URL('../../../../data', import.meta.url)) });
+
+  const answer = (query: string): MatchResponse =>
+    core.matchQuery({ query, customerId: 'CUST-002' });
+
+  const contradicting = (response: MatchResponse): Match[] =>
+    response.results.filter((result) => {
+      const item = parseDescription(result.description);
+
+      return item.pitch !== undefined && item.pitch !== response.parsed.pitch;
+    });
+
+  const leaks = [
+    'same M4-0.5 x 16mm socket head cap screw',
+    'same M4-0.5 socket head cap screw',
+    'same M8-1.0 x 50mm lag screw',
+    'same M16-1.5 hex nut',
+    'same 1/2-20 lag screws',
+  ];
+
+  it.each(leaks)('returns no product whose thread contradicts %s', (query) => {
+    expect(contradicting(answer(query)).map((result) => result.sku)).toEqual([]);
+  });
+
+  it.each(leaks)('never reports the contradicted attribute as matched for %s', (query) => {
+    expect(
+      contradicting(answer(query)).flatMap((result) =>
+        result.explanation.matched.map((entry) => `${result.sku} ${entry.attr}`),
+      ),
+    ).toEqual([]);
+  });
+
+  it('stops quoting the history thread back at a query that asked for another', () => {
+    const notes = answer('same 1/2-20 lag screw brass').notes.map((note) => note.message);
+
+    expect(notes.join(' ')).not.toContain('1/2-13');
+  });
+
+  it('still answers a reference that states no pitch of its own', () => {
+    expect(answer('same washers as last time').results[0]?.sku).toBe('PXWASH88088PL0688');
   });
 });
