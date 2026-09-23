@@ -62,6 +62,12 @@ function selects(query: ParsedSpec, line: ParsedSpec): boolean {
     return false;
   }
 
+  // A line silent about its pitch contradicts nothing, and an inferred pitch is the parser
+  // reading a bare nominal rather than the customer naming a thread.
+  if (stated(query, 'pitch') && line.pitch !== undefined && line.pitch !== query.pitch) {
+    return false;
+  }
+
   return query.diameter === undefined || line.diameter?.nominal === query.diameter.nominal;
 }
 
@@ -115,9 +121,20 @@ function inherit(base: ParsedSpec, query: ParsedSpec): ParsedSpec {
     if (quoted !== undefined) evidence[attribute] = quoted;
   }
 
+  // `selects` has already dropped a base that contradicts a stated pitch, so carrying the
+  // query's thread either restates the base or supplies one that was silent about it.
+  const threaded = stated(query, 'pitch') && query.diameter !== undefined;
+
+  if (threaded) {
+    provenance.diameter = query.provenance.diameter;
+    provenance.pitch = query.provenance.pitch;
+    evidence.diameter = query.evidence.diameter;
+    evidence.pitch = query.evidence.pitch;
+  }
+
   return {
-    diameter: base.diameter,
-    pitch: base.pitch,
+    diameter: threaded ? query.diameter : base.diameter,
+    pitch: threaded ? query.pitch : base.pitch,
     length: base.length,
     type: base.type,
     material: base.material,
