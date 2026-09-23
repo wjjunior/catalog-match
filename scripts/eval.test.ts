@@ -51,7 +51,28 @@ describe('a run over the real data', () => {
     expect(section?.setRecovery.cases).toBe(30);
     expect(section?.status.cases).toBe(78);
     expect(section?.personalization.cases).toBe(21);
-    expect(section?.calibration.cases).toBe(29);
+    expect(section?.calibration.cases).toBe(43);
+  });
+
+  // All 21 personalized golden cases carry an intended SKU, so restricting the Hit@1
+  // denominator to the scorable ones leaves every published golden number where it was.
+  it('leaves the golden Hit@1 denominator whole, since every pair names one SKU', () => {
+    expect(summary.sections[0]?.personalization).toMatchObject({
+      cases: 21,
+      hit1Cases: 21,
+      hit1: 1,
+    });
+  });
+
+  // 43, not the 48 retrieval scores: the five history answers carry a recency decay rather
+  // than a posterior. It was 29 until the filter read the label instead of the answer.
+  it('bins every labelled case the posterior scored, so the low bins are the data', () => {
+    const bins = summary.sections[0]?.calibration.bins ?? [];
+
+    expect(bins.map((bin) => bin.count)).toEqual([0, 1, 1, 1, 2, 3, 4, 1, 1, 29]);
+    expect(bins.filter((bin) => bin.count > 0).map((bin) => bin.precision)).toEqual(
+      Array.from({ length: 9 }, () => 1),
+    );
   });
 
   it('adds the held-out section only when asked', () => {

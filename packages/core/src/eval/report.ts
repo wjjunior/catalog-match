@@ -174,11 +174,13 @@ function section({ name, report, baseline }: EvalSection): string {
     table(
       ['metric', 'value', 'cases'],
       [
-        ['Hit@1 with the customer', rate(personalization.hit1), String(personalization.cases)],
+        // Its own denominator too: a personalized case whose label names no single intended
+        // SKU cannot be scored by any answer, so it is out of both rates rather than a miss.
+        ['Hit@1 with the customer', rate(personalization.hit1), String(personalization.hit1Cases)],
         [
           'Hit@1 without the customer',
           rate(personalization.hit1WithoutCustomer),
-          String(personalization.cases),
+          String(personalization.hit1Cases),
         ],
         // Its own denominator: a case answered with one result has no second to measure
         // against, so this mean covers fewer cases than the heading.
@@ -227,6 +229,7 @@ export interface JsonSection {
   constraints: { cases: number; violations: number };
   personalization: {
     cases: number;
+    hit1Cases: number;
     hit1: number;
     hit1WithoutCustomer: number;
     margin: number;
@@ -267,6 +270,7 @@ export function toJson(sections: readonly EvalSection[]): JsonSummary {
       constraints: { cases: report.constraints.cases, violations: report.constraints.violations },
       personalization: {
         cases: report.personalization.cases,
+        hit1Cases: report.personalization.hit1Cases,
         hit1: round(report.personalization.hit1),
         hit1WithoutCustomer: round(report.personalization.hit1WithoutCustomer),
         margin: round(report.personalization.margin),

@@ -89,8 +89,16 @@ run cannot overwrite it, `docs/eval-heldout.md`. Regenerate the golden one with
 | Exact-set rate on tie queries         | 0.967 (30)  | 1.000 (3)     |
 | Status accuracy                       | 0.987       | 0.900         |
 | Matches contradicting the query       | **0**       | **0**         |
-| Personalization Hit@1 with a customer | 1.000 (21)  | 0.500 (2)     |
+| Personalization Hit@1 with a customer | 1.000 (21)  | 1.000 (1)     |
 | p95 latency through the use case      | 0.4 ms      | 0.3 ms        |
+
+The bracketed counts are the cases behind each number. The held-out personalization cell
+was published as `0.500 (2)` and corrected on 2026-09-23: the denominator counted a case
+whose label names three acceptable SKUs and no single intended one, which no answer could
+have scored, as a miss. Only one held-out pair was ever scorable, and the matcher ranked it
+first. This is a correction to the metric, not a change to the matcher — no parameter moved
+and no answer changed. The 48 single-label golden cases are also the calibration
+population, less the five history answers; see the first limitation below.
 
 Against the lexical baseline of `docs/DESIGN.md` 5.8 — the same BM25-lite the parser falls
 back to, run alone over the same golden cases — Hit@1 1.000 against 0.167 and status
@@ -103,11 +111,16 @@ These are limited evidence from a small hand-labeled set. They support the desig
 for this data; they establish neither calibration nor generalization to a catalog this one
 has not seen.
 
-- **Calibration is established in the top band only.** All 29 single-label golden cases land
-  in the 0.9–1.0 bin at precision 1.000, which is a degenerate table: it supports High and
-  says nothing about Medium or Low, where no single-label case falls. The held-out set adds
-  11 cases across three bins, all at precision 1.000. Read the number as ordered, not as a
-  frequency.
+- **Calibration is measured thinly outside the top band.** 43 golden cases carry a single
+  intended SKU and an answer the posterior scored — the 48 of the table above, less the five
+  history answers, whose confidence is a recency decay rather than a posterior. 29 of them
+  land in the 0.9–1.0 bin; the other 14 spread one to four per bin from 0.1 up, at precision
+  1.000 throughout. Until 2026-09-23 this bullet read "all 29 single-label golden cases …
+  where no single-label case falls", because the harness had keyed the population on the
+  expected status and dropped every tie case that names the SKU it expects first. The empty
+  bins were an artifact of that filter. What holds is the smaller claim: outside the top bin
+  the evidence is one to four cases deep, so read the number as ordered, not as a frequency.
+  The held-out set adds 11 cases across three bins, all at precision 1.000.
 - **The personalized labels are circular.** A person wrote them looking at the same order
   history the algorithm reads, and there is no independent ground truth for what a customer
   meant. The mitigations are procedural only: labels frozen before any parameter moved, each

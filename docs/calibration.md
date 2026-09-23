@@ -245,3 +245,52 @@ session described, and picking a side is the owner's call, not a defect fix.
 The held-out set was then spent, once. 20 cases, Hit@1 1.000 over the 11 single-label ones,
 0 constraint violations, status accuracy 0.900. The two misses and what they say are in
 `docs/eval/heldout-policy.md`. No parameter moved after the run.
+
+## Addendum, 2026-09-23
+
+A correction to a metric, not to the matcher. Every parameter in `matching/config.ts`
+still carries the value the 2026-09-18 session measured, every sweep table above stands as
+measured, and `labels.high` 0.8 and `labels.medium` 0.35 do not move: they were set from
+the 69-answer distribution in "Label thresholds", not from the calibration table.
+
+The calibration population was wrong. It was keyed on the expected status, so it admitted
+only the 29 cases labelled `unique` and dropped the fourteen tie cases — `pers-01` to
+`pers-13` and `pers-21` — that carry an explicit `expectedTop1`. Those fourteen are scored
+by the same posterior as the 29; their exclusion was the reason the table had eight empty
+bins. Keyed instead on the label and the scoring mode, the population is 43: every case
+naming one intended SKU whose answer is not a history reference or an unparsed query.
+
+| bin     | as published, 29 cases | corrected, 43 cases |
+| ------- | ---------------------- | ------------------- |
+| 0.0–0.1 | 0 / —                  | 0 / —               |
+| 0.1–0.2 | 0 / —                  | 1 / 1.000           |
+| 0.2–0.3 | 0 / —                  | 1 / 1.000           |
+| 0.3–0.4 | 0 / —                  | 1 / 1.000           |
+| 0.4–0.5 | 0 / —                  | 2 / 1.000           |
+| 0.5–0.6 | 0 / —                  | 3 / 1.000           |
+| 0.6–0.7 | 0 / —                  | 4 / 1.000           |
+| 0.7–0.8 | 0 / —                  | 1 / 1.000           |
+| 0.8–0.9 | 0 / —                  | 1 / 1.000           |
+| 0.9–1.0 | 29 / 1.000             | 29 / 1.000          |
+
+Two sentences of this document are therefore false as written and are left in place so the
+record stays legible. "The calibration table the harness prints is degenerate by
+construction: it scores only single-label cases, and all 29 of them land in the top bin at
+precision 1.000" describes a filter, not the data: nine of ten bins are populated. And in
+"What this does not establish", "no single-label case lands there, so there is no observed
+precision to compare them against" is wrong about Medium and Low. Both bands have observed
+precision, 1.000 throughout — `pers-05` at 0.1744, `pers-04` at 0.4482 and `pers-02` at
+0.6320 among them. The closing instruction to the README stands with a different number:
+quote the bin count, now 43 rather than 29.
+
+What does not change is the conclusion. Outside the top bin the evidence is one to four
+cases per bin, so the bands are still ordered by the model rather than validated against
+frequency, and "Confidence is calibrated" is still **Not established** in the claims ledger of
+`docs/DESIGN.md` 3.4. The five `history` answers stay out of the table, all five sitting on exactly 0.7000:
+their confidence is a recency decay, and binning it against a posterior would measure
+neither.
+
+The held-out set was not re-run. Its calibration table is unaffected by the widening — no
+held-out case carries an `expectedTop1` — and its personalization Hit@1 was corrected by
+arithmetic over the outcomes of the single 2026-09-21 run. `docs/eval-heldout.md` records
+both, with the numbers that run published.
