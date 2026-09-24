@@ -135,9 +135,14 @@ export function ResultsPanel() {
   }
 
   // The same request the answer on screen came from, widened; asking it again rather
-  // than the query in the box is what keeps the wider answer the same answer.
+  // than the query in the box is what keeps the wider answer the same answer. It asks for
+  // exactly the number the control names, so the panel never fills the difference with
+  // near misses the reader did not ask to see.
   function showTheRest() {
-    run(asked.current.query, asked.current.customerId, MAX_LIMIT);
+    const response = state.phase === 'ready' ? state.response : undefined;
+    if (response === undefined) return;
+
+    run(asked.current.query, asked.current.customerId, revealable(response));
   }
 
   // Re-asks the same query with whichever customer is selected now, same as any other

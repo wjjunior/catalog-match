@@ -491,11 +491,25 @@ describe('the rest of a compatible set the limit cut off', () => {
     await waitFor(() => {
       expect(cards()).toHaveLength(7);
     });
+    // The control names seven, so it asks for seven: a wider request would let the
+    // panel-fill rule top the answer up with near misses nobody asked to see.
     expect(matchBodies()).toEqual([
       { query: 'M8 flat washer' },
-      { query: 'M8 flat washer', limit: 10 },
+      { query: 'M8 flat washer', limit: 7 },
     ]);
     expect(screen.queryByRole('button', { name: 'Show all 7' })).toBeNull();
+  });
+
+  it('asks the cap, not the set size, when the set is larger than the cap', async () => {
+    serveTied(81);
+    render(<ResultsPanel />);
+
+    await submit('hex nut');
+    await userEvent.click(await screen.findByRole('button', { name: 'Show 10 of 81' }));
+
+    await waitFor(() => {
+      expect(matchBodies().at(-1)).toEqual({ query: 'hex nut', limit: 10 });
+    });
   });
 
   it('carries the customer the answer was asked for into the wider request', async () => {
@@ -511,7 +525,7 @@ describe('the rest of a compatible set the limit cut off', () => {
       expect(matchBodies().at(-1)).toEqual({
         query: 'M8 flat washer',
         customerId: 'CUST-003',
-        limit: 10,
+        limit: 7,
       });
     });
   });
