@@ -72,7 +72,7 @@ export function ResultsPanel() {
 
   return (
     <main className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr] sm:items-start">
+      <section className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
         <QueryForm
           value={query}
           onChange={setQuery}
@@ -80,16 +80,16 @@ export function ResultsPanel() {
             run(query, selected?.customerId);
           }}
           busy={state.phase === 'loading'}
+          customerField={<CustomerCombobox onSelect={setSelected} />}
         />
-        <CustomerCombobox onSelect={setSelected} />
-      </div>
 
-      <ExampleChips
-        onPick={(picked) => {
-          setQuery(picked);
-          run(picked, selected?.customerId);
-        }}
-      />
+        <ExampleChips
+          onPick={(picked) => {
+            setQuery(picked);
+            run(picked, selected?.customerId);
+          }}
+        />
+      </section>
 
       <div className="flex flex-col gap-4">
         {state.phase === 'idle' && (
