@@ -47,6 +47,10 @@ describe('what the confidence dialog explains', () => {
 
     expect(text).toMatch(/estimate that this SKU is the intended one/i);
     expect(text).toMatch(/not a measured frequency/i);
+    // The ceiling is 1 - epsilon, so a reader who sees 98% on an exact match needs the page
+    // to account for the rest rather than leave it unexplained.
+    expect(text).toMatch(/never reaches 100%/i);
+    expect(text).toMatch(/not in this catalog/i);
   });
 
   // The numbers behind the bands stay out of the page on purpose: every threshold lives in

@@ -71,6 +71,9 @@ p_i = (1 − ε) · q_i · s_i / [ (1 − ε) · Σ_j q_j · s_j + ε · κ^|res
 
 ε and κ are set by hand; the model is small and explicit so the estimate can be taken apart,
 and every response carries `components: { compatibility: s_i, prior: q_i }` so it can be.
+Because ε is never zero the number never reaches 1: a single compatible item in perfect
+agreement reads 0.98, and each unverifiable term multiplies the null mass by κ, so the same
+item reads 0.94, 0.85 and 0.64 as residue accumulates.
 The labels **High** (≥ 0.80) and **Medium** (≥ 0.35) were attached after the calibration
 measurement in `docs/calibration.md`, not before it. See `docs/DESIGN.md` 5.5 and ADR-002.
 
