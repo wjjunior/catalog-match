@@ -22,7 +22,7 @@ function Results({ response }: { response: MatchResponse }) {
       {response.results.length > 0 && (
         <section className="flex flex-col gap-2.5" aria-labelledby="matches">
           <h2
-            className="m-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"
+            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             id="matches"
           >
             Matches
@@ -38,7 +38,7 @@ function Results({ response }: { response: MatchResponse }) {
       {response.alternatives.length > 0 && (
         <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
           <h2
-            className="m-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"
+            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             id="alternatives"
           >
             Alternatives
@@ -71,7 +71,7 @@ function Results({ response }: { response: MatchResponse }) {
 function ConfidenceSemantics() {
   return (
     <aside
-      className="mt-8 border-t border-border pt-4 text-[0.8125rem] leading-normal text-muted-foreground"
+      className="mt-8 border-t border-border pt-4 text-sm leading-normal text-muted-foreground"
       role="note"
       aria-label="what confidence means"
     >
@@ -91,8 +91,8 @@ export function ResultsPanel() {
   const { state, run } = useMatchQuery();
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-5">
-      <h1 className="mb-2 text-3xl tracking-tight">Catalog Match</h1>
+    <main className="mx-auto flex max-w-[44rem] flex-col gap-5">
+      <h1 className="text-3xl tracking-tight">Catalog Match</h1>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr] sm:items-start">
         <QueryForm

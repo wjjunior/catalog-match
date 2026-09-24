@@ -13,7 +13,7 @@ function reading(attribute: MatchedAttribute): string {
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5">
-      <span className="min-w-[8.5rem] text-xs uppercase tracking-[0.04em] text-muted-foreground">
+      <span className="min-w-[8.5rem] text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={label}>
@@ -35,7 +35,7 @@ export function AttributeChips({ explanation }: { explanation: Explanation }) {
           {matched.map((attribute) => (
             <li key={attribute.attr}>
               <Chip tone="matched">
-                <span className="text-xs uppercase tracking-[0.04em] text-muted-foreground">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {attribute.attr}
                 </span>
                 <span>{reading(attribute)}</span>

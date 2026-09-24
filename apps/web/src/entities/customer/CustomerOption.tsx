@@ -5,9 +5,9 @@ export function CustomerOption({ customer }: { customer: CustomerSummary }) {
 
   return (
     <span className="flex w-full items-baseline gap-2">
-      <span className="font-mono text-[0.8125rem] text-muted-foreground">{customerId}</span>
+      <span className="font-mono text-sm text-muted-foreground">{customerId}</span>
       <span className="flex-1">{customerName}</span>
-      <span className="whitespace-nowrap text-[0.8125rem] text-muted-foreground">{`${String(orderCount)} ${orderCount === 1 ? 'order' : 'orders'}`}</span>
+      <span className="whitespace-nowrap text-sm text-muted-foreground">{`${String(orderCount)} ${orderCount === 1 ? 'order' : 'orders'}`}</span>
     </span>
   );
 }

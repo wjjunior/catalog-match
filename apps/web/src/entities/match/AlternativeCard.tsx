@@ -14,10 +14,12 @@ export function AlternativeCard({ alternative }: { alternative: Alternative }) {
         </Badge>
       </header>
 
-      <p className="-mt-2 font-mono text-[0.8125rem] text-muted-foreground">{alternative.sku}</p>
+      <p className="-mt-2 font-mono text-sm text-muted-foreground">{alternative.sku}</p>
 
       <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
-        <span className="text-xs uppercase tracking-[0.04em] text-muted-foreground">closeness</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          closeness
+        </span>
         <ProgressBar value={alternative.closeness} label="closeness" />
         <span className="text-sm tabular-nums">{Math.round(alternative.closeness * 100)}%</span>
       </div>

@@ -17,10 +17,10 @@ export function MatchCard({ match }: { match: Match }) {
         </Badge>
       </header>
 
-      <p className="-mt-2 font-mono text-[0.8125rem] text-muted-foreground">{match.sku}</p>
+      <p className="-mt-2 font-mono text-sm text-muted-foreground">{match.sku}</p>
 
       <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
-        <span className="text-xs uppercase tracking-[0.04em] text-muted-foreground">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           confidence
         </span>
         <ProgressBar value={match.confidence} label="confidence" />
