@@ -26,7 +26,7 @@ function serve(matchResponse: MatchResponse | (() => Promise<Response>)) {
 
 async function submit(query: string) {
   await userEvent.type(screen.getByRole('textbox', { name: /query/i }), query);
-  await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 }
 
 function matchBody(): Record<string, unknown> {
@@ -219,7 +219,9 @@ describe('ResultsPanel', () => {
     await submit('M12 hex nut');
 
     expect(screen.getByText('Matching…')).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Match' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Match catalog' }).hasAttribute('disabled')).toBe(
+      true,
+    );
 
     release?.();
     expect(await screen.findByText('1 match')).toBeDefined();

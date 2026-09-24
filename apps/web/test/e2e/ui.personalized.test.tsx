@@ -39,7 +39,7 @@ async function selectCustomer(customerId: string): Promise<void> {
 
 async function ask(query: string): Promise<void> {
   await userEvent.type(screen.getByRole('textbox', { name: /query/i }), query);
-  await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 }
 
 describe('the page with a customer selected', () => {
@@ -52,7 +52,7 @@ describe('the page with a customer selected', () => {
     const anonymous = ranked();
 
     await selectCustomer('CUST-002');
-    await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 
     await waitFor(() => {
       expect(ranked()).not.toEqual(anonymous);
@@ -88,7 +88,12 @@ describe('the page without a customer', () => {
   it('asks for one before resolving a history reference', async () => {
     render(<HomePage />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'the same washers as last time' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'the same washers as last time',
+      }),
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toBe(

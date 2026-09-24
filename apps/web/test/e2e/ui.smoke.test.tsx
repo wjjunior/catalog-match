@@ -28,7 +28,12 @@ describe('the page against the real core', () => {
   it('answers an example chip with a status line and cards', async () => {
     render(<HomePage />);
 
-    await userEvent.click(screen.getByRole('button', { name: '1/4-20 x 3/4 hex cap screw zinc' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: '1/4-20 x 3/4 hex cap screw zinc',
+      }),
+    );
 
     const matches = await screen.findByRole('region', { name: 'Matches' });
     const cards = within(matches).getAllByRole('article');
@@ -43,7 +48,7 @@ describe('the page against the real core', () => {
     render(<HomePage />);
 
     await userEvent.type(screen.getByRole('textbox', { name: /query/i }), 'M8 x 45mm SHCS');
-    await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 
     expect(await screen.findByText('no M8 socket head cap screw at 45 mm')).toBeDefined();
 
