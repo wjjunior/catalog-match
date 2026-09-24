@@ -669,6 +669,20 @@ describe('explainAlternative', () => {
     expect(explanation.matched.map((entry) => entry.attr)).not.toContain('length');
     expect(explanation.unspecified).not.toContain('length');
   });
+
+  // C is empty wherever an alternative exists, so it cannot have ruled out a contradiction
+  // for the explainer the way it does on the `explainMatch` path.
+  it('drops a contradicting length rather than reporting it as matched (45 mm -> 30 mm)', () => {
+    const explanation = explainAlternative(query, SOC_M8_30, [], 1);
+
+    expect(explanation.matched.map((entry) => entry.attr)).toEqual(['diameter', 'type']);
+  });
+
+  it('drops a contradicting diameter rather than reporting it as matched (M8 -> M12)', () => {
+    const explanation = explainAlternative(query, NUT_M12, [], 1);
+
+    expect(explanation.matched.map((entry) => entry.attr)).not.toContain('diameter');
+  });
 });
 
 describe('withPersonalization', () => {

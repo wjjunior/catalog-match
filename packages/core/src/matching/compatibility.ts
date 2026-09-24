@@ -252,6 +252,7 @@ function applyStep(
       return;
     case 'dropLength':
       options.length = 'drop';
+      if (spec.length !== undefined && !relaxed.includes('length')) relaxed.push('length');
       return;
   }
 }
