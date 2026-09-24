@@ -90,6 +90,54 @@ describe('ResultsPanel', () => {
     expect(screen.getAllByRole('article')).toHaveLength(3);
   });
 
+  it('follows the match of a unique answer with the near misses under their own heading', async () => {
+    serve(
+      response({
+        query: 'M8 flat washer DIN 912',
+        status: 'unique',
+        compatibleCount: 1,
+        results: [match()],
+        alternatives: [
+          alternative({ sku: 'PXWASH812A2YZ0016', relaxed: ['standard'] }),
+          alternative({ sku: 'PXWASH82536HG0974', relaxed: ['standard'] }),
+        ],
+      }),
+    );
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer DIN 912');
+
+    const matches = await screen.findByRole('region', { name: 'Matches' });
+    const alternatives = screen.getByRole('region', { name: 'Alternatives' });
+
+    expect(within(matches).getAllByRole('article')).toHaveLength(1);
+    expect(within(alternatives).getAllByRole('article')).toHaveLength(2);
+  });
+
+  it('never announces a near miss as a match', async () => {
+    serve(
+      response({
+        status: 'unique',
+        compatibleCount: 1,
+        results: [match({ sku: 'PXWASH88088PL0688', confidence: 0.98, label: 'High' })],
+        alternatives: [alternative({ sku: 'PXWASH812A2YZ0016', relaxed: ['standard'] })],
+      }),
+    );
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer DIN 912');
+
+    const alternatives = await screen.findByRole('region', { name: 'Alternatives' });
+    const near = within(alternatives).getByRole('article');
+
+    expect(within(alternatives).queryByText('PXWASH88088PL0688')).toBeNull();
+    expect(within(near).getByText('PXWASH812A2YZ0016')).toBeDefined();
+    expect(within(near).getByText('Closeness')).toBeDefined();
+    expect(within(near).getByText('relaxed: standard')).toBeDefined();
+    expect(within(near).queryByText(/confidence/i)).toBeNull();
+    expect(within(near).queryByText('High')).toBeNull();
+  });
+
   it('explains an empty compatible set and offers the alternatives under their own heading', async () => {
     serve(
       response({

@@ -230,35 +230,47 @@ export interface AlternativeCandidate {
   relaxed: string[];
 }
 
-function applyStep(
+/** Reports whether the step widened what the constraints admit. A step that widened
+ * nothing admits nothing new, so the walk may pass over it. */
+function relax(
   step: BackoffStep,
   spec: ParsedSpec,
   options: BuildOptions,
   relaxed: string[],
   config: MatcherConfig,
-): void {
+): boolean {
   switch (step) {
     case 'standard':
       options.dropStandard = true;
-      if (spec.standard !== undefined) relaxed.push('standard');
-      return;
-    case 'materialFinishFamily':
+      if (spec.standard === undefined) return false;
+      relaxed.push('standard');
+      return true;
+    case 'materialFinishFamily': {
       options.widenMaterialFinish = true;
       // A singleton family widens to nothing, so only a family with siblings counts as relaxed.
-      if (spec.material && isMaterial(spec.material.value) && widensMaterial(spec.material.value))
-        relaxed.push('material');
-      if (spec.finish && isFinish(spec.finish.value) && widensFinish(spec.finish.value))
-        relaxed.push('finish');
-      return;
+      const material =
+        spec.material !== undefined &&
+        isMaterial(spec.material.value) &&
+        widensMaterial(spec.material.value);
+      const finish =
+        spec.finish !== undefined && isFinish(spec.finish.value) && widensFinish(spec.finish.value);
+      if (material) relaxed.push('material');
+      if (finish) relaxed.push('finish');
+      return material || finish;
+    }
     case 'approximateLength':
       options.length = 'approximate';
       options.lengthTolerance = config.lengthTolerance;
-      if (spec.length !== undefined) relaxed.push('length');
-      return;
+      if (spec.length === undefined) return false;
+      relaxed.push('length');
+      return true;
     case 'dropLength':
       options.length = 'drop';
-      if (spec.length !== undefined && !relaxed.includes('length')) relaxed.push('length');
-      return;
+      if (spec.length === undefined) return false;
+      // The approximate step already named the length; dropping it relaxes further without
+      // giving up a second constraint.
+      if (!relaxed.includes('length')) relaxed.push('length');
+      return true;
   }
 }
 
@@ -275,24 +287,24 @@ function rankByLengthDistance(
   return [...found].sort((a, b) => distance(a) - distance(b) || bySku(a, b));
 }
 
-export function alternatives(
+function backoff(
   spec: ParsedSpec,
   items: readonly CatalogItem[],
   config: MatcherConfig,
+  admitted: (found: readonly CatalogItem[]) => readonly CatalogItem[],
 ): readonly AlternativeCandidate[] {
-  const failed = failedConstraint(spec, items);
-  if (failed === undefined || failed === 'diameter' || failed === 'type') return [];
-
   const specified = buildConstraints(spec).length;
+  if (specified === 0) return [];
 
   const active = items.filter((item) => item.active);
   const options: BuildOptions = {};
   const relaxed: string[] = [];
 
   for (const step of config.backoffOrder) {
-    applyStep(step, spec, options, relaxed, config);
+    if (!relax(step, spec, options, relaxed, config)) continue;
+
     const constraints = buildConstraints(spec, options);
-    const found = active.filter((item) => constraints.every((c) => c.satisfiedBy(item)));
+    const found = admitted(active.filter((item) => constraints.every((c) => c.satisfiedBy(item))));
     if (found.length > 0) {
       const closeness = (specified - relaxed.length) / specified;
       return rankByLengthDistance(found, spec).map((item) => ({
@@ -303,4 +315,27 @@ export function alternatives(
     }
   }
   return [];
+}
+
+export function alternatives(
+  spec: ParsedSpec,
+  items: readonly CatalogItem[],
+  config: MatcherConfig,
+): readonly AlternativeCandidate[] {
+  const failed = failedConstraint(spec, items);
+  if (failed === undefined || failed === 'diameter' || failed === 'type') return [];
+
+  return backoff(spec, items, config, (found) => found);
+}
+
+/** The near misses of a compatible set that is short of the asked-for number of results.
+ * Every member of C is excluded, not only the results shown, so a compatible item can
+ * never be presented as an alternative to itself. */
+export function nearMisses(
+  spec: ParsedSpec,
+  items: readonly CatalogItem[],
+  config: MatcherConfig,
+  exclude: ReadonlySet<string>,
+): readonly AlternativeCandidate[] {
+  return backoff(spec, items, config, (found) => found.filter((item) => !exclude.has(item.sku)));
 }

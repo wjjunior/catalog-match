@@ -250,13 +250,15 @@ Status is decided by C and by the parse, before any number is computed:
 
 | Status | Condition | Response |
 |---|---|---|
-| unique | C has exactly one item | One match with posterior confidence; two nearest alternatives may follow, labeled as such |
-| ambiguous | C has two or more items | Top 3 of C by posterior; size of C and the attributes that vary inside C; personalization reorders C |
+| unique | C has exactly one item | One match with posterior confidence, followed by up to two near misses, labeled as such |
+| ambiguous | C has two or more items | Top 3 of C by posterior, followed by near misses to a combined three; size of C and the attributes that vary inside C; personalization reorders C |
 | none | C is empty (unknown diameter or type, length or standard not in catalog, contradictory combination) | No confidence; the failed constraint named; up to 3 alternatives from backoff (section 5.6), each with the relaxed constraint stated |
 | history | Intent detector fires (section 7.4) | History-derived candidates, or a prompt to select a customer |
 | unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none, and a pool no token of the query can order is reported by its size rather than sampled |
 
 This is what makes "explicit attributes always win" a structural guarantee rather than a weighting: nothing outside C is ever ranked with C, and personalization only sees C.
+
+The panel holds three cards: the results, and after them the near misses that fill the remainder — items outside C found by the backoff of section 5.6, carrying a closeness and the relaxed constraint and never a confidence, with every member of C excluded so a compatible item can never appear as an alternative to itself. A query that states nothing the backoff can relax has no near miss to offer and the panel stays short, because diameter and type are never relaxed. `unparsed` is excluded from the rule: its confidences are capped token overlap rather than a posterior, so a near miss beside them would compare two numbers that do not mean the same thing, and a pool nothing can rank must keep returning nothing.
 
 ## 5.3a Attributes the catalog does not carry
 

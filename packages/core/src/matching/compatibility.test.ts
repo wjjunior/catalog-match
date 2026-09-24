@@ -11,6 +11,7 @@ import {
   deriveStatus,
   disambiguateBy,
   failedConstraint,
+  nearMisses,
 } from './compatibility';
 import { explainAlternative } from './explainer';
 
@@ -448,6 +449,118 @@ describe('alternatives', () => {
 
       expect(alternatives(spec, ITEMS, ladder)[0]?.relaxed).toEqual(['length']);
     });
+  });
+});
+
+describe('nearMisses', () => {
+  const skusOf = (spec: ParsedSpec): string[] => compatibleSet(spec, ITEMS).map((item) => item.sku);
+
+  const DIN_912_WASHER = query({
+    diameter: M8,
+    type: [{ value: 'flat_washer', strength: 1 }],
+    standard: 'DIN 912',
+  });
+
+  it('offers the rest of the M8 flat washers once the standard is relaxed', () => {
+    const compatible = skusOf(DIN_912_WASHER);
+    expect(compatible).toEqual(['PXWASH816A2BO0624']);
+
+    const found = nearMisses(DIN_912_WASHER, ITEMS, CONFIG, new Set(compatible));
+
+    expect(found).toHaveLength(6);
+    expect(found[0]?.relaxed).toEqual(['standard']);
+    expect(found[0]?.closeness).toBeCloseTo(2 / 3, 10);
+    expect(found.map((a) => a.item.sku)).toEqual([...found.map((a) => a.item.sku)].sort());
+  });
+
+  it('never returns an excluded SKU, even one the relaxed constraints admit', () => {
+    const compatible = skusOf(DIN_912_WASHER);
+    const found = nearMisses(DIN_912_WASHER, ITEMS, CONFIG, new Set(compatible));
+
+    expect(found.map((a) => a.item.sku)).not.toContain('PXWASH816A2BO0624');
+  });
+
+  it('returns nothing when every item the backoff admits is excluded', () => {
+    const everyWasher = query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] });
+    const all = new Set(ITEMS.map((item) => item.sku));
+
+    expect(nearMisses(DIN_912_WASHER, ITEMS, CONFIG, all)).toEqual([]);
+    expect(nearMisses(everyWasher, ITEMS, CONFIG, new Set(skusOf(everyWasher)))).toEqual([]);
+  });
+
+  it('returns nothing for a query with nothing left to relax', () => {
+    const spec = query({ diameter: M8, type: [{ value: 'flat_washer', strength: 1 }] });
+
+    expect(nearMisses(spec, ITEMS, CONFIG, new Set(skusOf(spec)))).toEqual([]);
+  });
+
+  it('returns nothing when the query states no constraints at all', () => {
+    expect(nearMisses(query({ residue: ['red'] }), ITEMS, CONFIG, new Set())).toEqual([]);
+  });
+
+  it('keeps the diameter and the type of the compatible set it fills out', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 30, unit: 'mm', mm: 30 },
+    });
+    const compatible = skusOf(spec);
+    const found = nearMisses(spec, ITEMS, CONFIG, new Set(compatible));
+
+    expect(compatible.length).toBeGreaterThan(0);
+    expect(found.length).toBeGreaterThan(0);
+    for (const { item } of found) {
+      expect(item.spec.diameter?.nominal).toBe('M8');
+      expect(item.spec.type?.[0]?.value).toBe('socket_head_cap_screw');
+    }
+  });
+
+  it('ranks by length distance and then by SKU, as alternatives does', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 30, unit: 'mm', mm: 30 },
+    });
+    const found = nearMisses(spec, ITEMS, CONFIG, new Set(skusOf(spec)));
+    const distance = (mm: number | undefined): number => Math.abs((mm ?? 0) - 30);
+
+    expect(found.map((a) => distance(a.item.spec.length?.mm))).toEqual(
+      [...found.map((a) => distance(a.item.spec.length?.mm))].sort((a, b) => a - b),
+    );
+  });
+
+  it('is independent of input order', () => {
+    const exclude = new Set(skusOf(DIN_912_WASHER));
+    const forward = nearMisses(DIN_912_WASHER, ITEMS, CONFIG, exclude).map((a) => a.item.catalogId);
+    const reversed = nearMisses(DIN_912_WASHER, [...ITEMS].reverse(), CONFIG, exclude).map(
+      (a) => a.item.catalogId,
+    );
+
+    expect(reversed).toEqual(forward);
+  });
+
+  it('records a length relaxed once when the ladder reaches dropLength after approximate', () => {
+    const ladder: MatcherConfig = { ...CONFIG, backoffOrder: ['approximateLength', 'dropLength'] };
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 8, unit: 'mm', mm: 8 },
+    });
+    const found = nearMisses(spec, ITEMS, ladder, new Set(skusOf(spec)));
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]?.relaxed).toEqual(['length']);
+  });
+
+  it('leaves the alternatives of an empty compatible set exactly as they were', () => {
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+    });
+
+    expect(compatibleSet(spec, ITEMS)).toEqual([]);
+    expect(nearMisses(spec, ITEMS, CONFIG, new Set())).toEqual(alternatives(spec, ITEMS, CONFIG));
   });
 });
 

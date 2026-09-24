@@ -1,12 +1,14 @@
 import type { Alternative, Match, MatchRequest, MatchResponse, Note } from '../domain/match';
 import type { AttributeName, Length, ParsedSpec } from '../domain/spec';
 import type { CatalogItem, CustomerProfile } from '../domain/catalog';
+import type { AlternativeCandidate } from '../matching/compatibility';
 import {
   alternatives,
   compatibleSet,
   deriveStatus,
   disambiguateBy,
   failedConstraint,
+  nearMisses,
 } from '../matching/compatibility';
 import type { MatcherConfig } from '../matching/config';
 import { DEFAULT_MATCHER_CONFIG } from '../matching/config';
@@ -171,9 +173,26 @@ function discontinuedNotes(profile: CustomerProfile | undefined, spec: ParsedSpe
   });
 }
 
+function offered(
+  spec: ParsedSpec,
+  candidates: readonly AlternativeCandidate[],
+  limit: number,
+): Alternative[] {
+  return candidates.slice(0, limit).map(({ item, closeness, relaxed }) => ({
+    sku: item.sku,
+    catalogId: item.catalogId,
+    description: item.description,
+    active: item.active,
+    closeness,
+    relaxed: [...relaxed],
+    explanation: explainAlternative(spec, item, relaxed, closeness),
+  }));
+}
+
 function ranked(
   status: Answer['status'],
   spec: ParsedSpec,
+  items: readonly CatalogItem[],
   compatible: readonly CatalogItem[],
   config: MatcherConfig,
   limit: number,
@@ -223,11 +242,15 @@ function ranked(
       );
     });
 
+  const room = limit - results.length;
+  const near =
+    room <= 0 ? [] : nearMisses(spec, items, config, new Set(compatible.map((item) => item.sku)));
+
   return {
     status,
     compatibleCount: compatible.length,
     results,
-    alternatives: [],
+    alternatives: offered(spec, near, room),
     notes: notesFor(spec, undefined),
   };
 }
@@ -240,23 +263,11 @@ function none(
 ): Answer {
   const failed = failedConstraint(spec, items);
 
-  const found: Alternative[] = alternatives(spec, items, config)
-    .slice(0, limit)
-    .map(({ item, closeness, relaxed }) => ({
-      sku: item.sku,
-      catalogId: item.catalogId,
-      description: item.description,
-      active: item.active,
-      closeness,
-      relaxed: [...relaxed],
-      explanation: explainAlternative(spec, item, relaxed, closeness),
-    }));
-
   return {
     status: 'none',
     compatibleCount: 0,
     results: [],
-    alternatives: found,
+    alternatives: offered(spec, alternatives(spec, items, config), limit),
     notes: notesFor(spec, failed === undefined ? undefined : diagnosis(spec, failed)),
   };
 }
@@ -396,7 +407,7 @@ function attributeAnswer(
   } else if (status === 'unparsed') {
     answer = unparsed(query, spec, compatible, deps, config, limit);
   } else {
-    answer = ranked(status, spec, compatible, config, limit, profile);
+    answer = ranked(status, spec, items, compatible, config, limit, profile);
   }
 
   const added = [

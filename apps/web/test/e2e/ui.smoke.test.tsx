@@ -44,6 +44,20 @@ describe('the page against the real core', () => {
     expect(within(matches).getByText('PXHEX1434STZC0003')).toBeDefined();
   });
 
+  it('fills a unique answer to three cards, the near misses under their own heading', async () => {
+    render(<HomePage />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: /query/i }), 'M8 flat washer DIN 912');
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
+
+    const matches = await screen.findByRole('region', { name: 'Matches' });
+    const alternatives = screen.getByRole('region', { name: 'Alternatives' });
+
+    expect(within(matches).getAllByRole('article')).toHaveLength(1);
+    expect(within(alternatives).getAllByRole('article')).toHaveLength(2);
+    expect(within(alternatives).getAllByText(/relaxed: standard/)).toHaveLength(2);
+  });
+
   it('answers a length the catalog does not stock with the note and the alternatives', async () => {
     render(<HomePage />);
 
