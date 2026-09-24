@@ -28,7 +28,7 @@ describe('MatchCard', () => {
     render(<MatchCard match={match({ confidence: 0.82, label: 'High' })} />);
 
     expect(
-      screen.getByRole('progressbar', { name: 'confidence' }).getAttribute('aria-valuenow'),
+      screen.getByRole('progressbar', { name: 'Match confidence' }).getAttribute('aria-valuenow'),
     ).toBe('82');
     expect(screen.getByText('82%')).toBeDefined();
     expect(screen.getByText('High')).toBeDefined();
@@ -38,10 +38,10 @@ describe('MatchCard', () => {
     render(<MatchCard match={match({ label: undefined })} />);
 
     expect(screen.queryByText('High')).toBeNull();
-    expect(screen.getByRole('progressbar', { name: 'confidence' })).toBeDefined();
+    expect(screen.getByRole('progressbar', { name: 'Match confidence' })).toBeDefined();
   });
 
-  it('renders the explanation chips', () => {
+  it('reads the matched attributes in business terms', () => {
     render(
       <MatchCard
         match={match({
@@ -87,11 +87,11 @@ describe('AlternativeCard', () => {
     render(<AlternativeCard alternative={alternative({ closeness: 0.67, relaxed: ['length'] })} />);
 
     expect(
-      screen.getByRole('progressbar', { name: 'closeness' }).getAttribute('aria-valuenow'),
+      screen.getByRole('progressbar', { name: 'Closeness' }).getAttribute('aria-valuenow'),
     ).toBe('67');
     expect(screen.getByText('67%')).toBeDefined();
     expect(screen.getByText('relaxed: length')).toBeDefined();
-    expect(screen.queryByRole('progressbar', { name: 'confidence' })).toBeNull();
+    expect(screen.queryByRole('progressbar', { name: 'Match confidence' })).toBeNull();
   });
 
   it('lists every relaxed constraint', () => {
