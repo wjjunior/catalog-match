@@ -388,6 +388,18 @@ export function unboundLengthNote(type: ProductType, length: Length): Note {
   );
 }
 
+/** The pool is real and the count is the only thing the query did achieve; the ask is
+ * what `unparsed` says is missing, so it is the same on every query that lands here. */
+export function unrankedPoolNote(count: number, stated: string): Note {
+  const pool = count === 1 ? '1 item' : `${String(count)} items`;
+  const what = stated === '' ? 'the query' : stated;
+
+  return note(
+    'unrankedPool',
+    `${what} leaves ${pool} compatible and nothing ranks them; name a diameter or a type`,
+  );
+}
+
 export function discontinuedNote(sku: string): Note {
   return note('discontinued', `previously ordered ${sku} is discontinued; showing closest active`);
 }

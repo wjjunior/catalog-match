@@ -217,9 +217,11 @@ describe('the structural guarantees: properties (docs/DESIGN.md 5.3, 5.5, 7.3, 1
         // No table entry carries an intent phrase, so nothing generated reaches 7.4.
         expect(status).not.toBe('history');
 
+        // `unparsed` is the one status the parse decides rather than |C|; all it promises
+        // of the set is that an empty one would have fallen through to `none`. 5.3, 5.8.
         const expected =
           status === 'unparsed'
-            ? compatibleCount === 0
+            ? compatibleCount > 0
             : status === 'unique'
               ? compatibleCount === 1
               : status === 'ambiguous'

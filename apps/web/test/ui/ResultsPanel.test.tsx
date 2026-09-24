@@ -199,6 +199,34 @@ describe('ResultsPanel', () => {
     expect(screen.getAllByText('no M8 socket head cap screw at 45 mm')).toHaveLength(1);
   });
 
+  it('does not call a pool it could not rank an empty one', async () => {
+    serve(
+      response({
+        query: 'stainless',
+        status: 'unparsed',
+        compatibleCount: 438,
+        results: [],
+        notes: [
+          note(
+            'unrankedPool',
+            'stainless leaves 438 items compatible and nothing ranks them; name a diameter or a type',
+          ),
+        ],
+      }),
+    );
+    render(<ResultsPanel />);
+
+    await submit('stainless');
+
+    expect(
+      await screen.findByText(
+        'stainless leaves 438 items compatible and nothing ranks them; name a diameter or a type',
+      ),
+    ).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Nothing to rank' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'No compatible items' })).toBeNull();
+  });
+
   it('says a query could not be parsed', async () => {
     serve(response({ query: 'zzz qqq', status: 'unparsed', compatibleCount: 0 }));
     render(<ResultsPanel />);

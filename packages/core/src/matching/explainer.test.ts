@@ -39,6 +39,7 @@ import {
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
+  unrankedPoolNote,
   unverifiedResidueNote,
   withPersonalization,
 } from './explainer';
@@ -818,6 +819,23 @@ describe('note builders', () => {
     );
   });
 
+  it('names the pool a query constrained but could not order', () => {
+    expect(unrankedPoolNote(438, 'stainless')).toEqual({
+      code: 'unrankedPool',
+      message:
+        'stainless leaves 438 items compatible and nothing ranks them; name a diameter or a type',
+    });
+  });
+
+  it('falls back to the query itself when nothing was recognized, and counts one', () => {
+    expect(unrankedPoolNote(916, '').message).toBe(
+      'the query leaves 916 items compatible and nothing ranks them; name a diameter or a type',
+    );
+    expect(unrankedPoolNote(1, 'brass').message).toBe(
+      'brass leaves 1 item compatible and nothing ranks them; name a diameter or a type',
+    );
+  });
+
   it('contains no template placeholder in any note', () => {
     const notes = [
       failedConstraintNote(
@@ -832,6 +850,7 @@ describe('note builders', () => {
       historyReferenceNote('2026-04-15', [{ attr: 'material', value: 'brass' }]),
       unresolvedReferenceNote('what we always get'),
       unverifiedResidueNote(['nylon']),
+      unrankedPoolNote(438, 'stainless'),
     ];
 
     for (const note of notes) {
