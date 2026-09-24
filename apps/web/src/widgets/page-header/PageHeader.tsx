@@ -37,9 +37,12 @@ export function PageHeader() {
             <strong>Confidence</strong> is the model&rsquo;s estimate that this SKU is the intended
             one, given the query, the selected customer and an explicit set of assumptions. It is
             not a measured frequency, and it is comparable within one answer rather than across
-            answers. High, Medium and Low are bands of that estimate, attached after the calibration
-            measurement rather than promised before it. An alternative carries{' '}
-            <strong>closeness</strong> instead, because it is not the thing that was asked for.
+            answers. It never reaches 100%: a share of the estimate always stays with the
+            possibility that the intended product is not in this catalog at all, and that share
+            grows with every term the parser cannot verify. High, Medium and Low are bands of that
+            estimate, attached after the calibration measurement rather than promised before it. An
+            alternative carries <strong>closeness</strong> instead, because it is not the thing that
+            was asked for.
           </DialogDescription>
         </DialogContent>
       </Dialog>
