@@ -54,10 +54,9 @@ function spanned(match: LexiconMatch): number[] {
   return Array.from({ length: match.end - match.start }, (_value, offset) => match.start + offset);
 }
 
-/** Strict reading of the one grammar every catalog row follows, docs/DESIGN.md 3.1:
+/** The one grammar every catalog row follows, docs/DESIGN.md 3.1:
  * `<diameter>[-<pitch>] [X <length><unit>] <type phrase> [<standard>] <material> <finish>`.
- * The size section is positional rather than searched for, so a number inside the type
- * phrase or a material code such as 316 can never be read as a length. */
+ * Its size section is positional, never searched, so a material code like 316 is never a length. */
 export function parseDescription(description: string): ParsedSpec {
   const { tokens } = normalize(description);
 
