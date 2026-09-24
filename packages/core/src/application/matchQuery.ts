@@ -407,7 +407,6 @@ function unboundNotes(spec: ParsedSpec, unbound: Length | undefined): Note[] {
   return [unboundLengthNote(type, unbound)];
 }
 
-/** Everything the query states about attributes, once the intent has had its say. */
 function attributeAnswer(
   query: string,
   parsed: ParsedSpec,

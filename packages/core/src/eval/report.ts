@@ -179,8 +179,6 @@ function section({ name, report, baseline }: EvalSection): string {
     table(
       ['metric', 'value', 'cases'],
       [
-        // Its own denominator too: a personalized case whose label names no single intended
-        // SKU cannot be scored by any answer, so it is out of both rates rather than a miss.
         ['Hit@1 with the customer', rate(personalization.hit1), String(personalization.hit1Cases)],
         [
           'Hit@1 without the customer',
