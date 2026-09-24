@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CatalogItem } from '../domain/catalog';
 import { DEFAULT_MATCHER_CONFIG } from './config';
-import { labelFor, posterior, uniformPrior } from './posterior';
+import { labelFor, posterior } from './posterior';
 
 const config = DEFAULT_MATCHER_CONFIG;
 
@@ -18,30 +18,12 @@ const items = (count: number): CatalogItem[] =>
 
 const ones = (count: number) => Array.from({ length: count }, () => 1);
 
-describe('uniformPrior', () => {
-  it('splits the mass evenly over the compatible set', () => {
-    expect(uniformPrior(items(4))).toEqual([0.25, 0.25, 0.25, 0.25]);
-  });
-
-  it('gives the single item of a unique match all of the mass', () => {
-    expect(uniformPrior(items(1))).toEqual([1]);
-  });
-
-  it('sums to 1 for a set that does not divide evenly', () => {
-    const q = uniformPrior(items(7));
-
-    expect(q.reduce((sum, value) => sum + value, 0)).toBeCloseTo(1, 12);
-  });
-
-  it('returns nothing for an empty compatible set', () => {
-    expect(uniformPrior([])).toEqual([]);
-  });
-});
+const uniform = (count: number) => Array.from({ length: count }, () => 1 / count);
 
 describe('posterior: the worked values of docs/DESIGN.md 5.5', () => {
   it('reaches 0.98 for a unique match with no residue', () => {
     const C = items(1);
-    const { p, pNull } = posterior(C, [1], uniformPrior(C), 0, config);
+    const { p, pNull } = posterior(C, [1], uniform(C.length), 0, config);
 
     expect(p.get('SKU-0000')).toBeCloseTo(0.98, 10);
     expect(pNull).toBeCloseTo(0.02, 10);
@@ -49,7 +31,7 @@ describe('posterior: the worked values of docs/DESIGN.md 5.5', () => {
 
   it('falls to 0.84 for a unique match with two residue tokens', () => {
     const C = items(1);
-    const { p } = posterior(C, [1], uniformPrior(C), 2, config);
+    const { p } = posterior(C, [1], uniform(C.length), 2, config);
 
     expect(p.get('SKU-0000')).toBeCloseTo(0.84, 2);
     expect(Math.abs((p.get('SKU-0000') ?? 0) - 0.84)).toBeLessThan(0.005);
@@ -57,7 +39,7 @@ describe('posterior: the worked values of docs/DESIGN.md 5.5', () => {
 
   it('gives about 0.14 to each of seven equally compatible items', () => {
     const C = items(7);
-    const { p } = posterior(C, ones(7), uniformPrior(C), 0, config);
+    const { p } = posterior(C, ones(7), uniform(C.length), 0, config);
 
     for (const item of C) {
       expect(p.get(item.sku)).toBeCloseTo(0.14, 10);
@@ -89,7 +71,7 @@ describe('posterior: edge cases', () => {
 
   it('carries one entry per SKU of the compatible set', () => {
     const C = items(3);
-    const { p } = posterior(C, ones(3), uniformPrior(C), 0, config);
+    const { p } = posterior(C, ones(3), uniform(C.length), 0, config);
 
     expect([...p.keys()]).toEqual(['SKU-0000', 'SKU-0001', 'SKU-0002']);
   });
@@ -97,7 +79,7 @@ describe('posterior: edge cases', () => {
   it('rejects an s vector that is not aligned with the compatible set', () => {
     const C = items(3);
 
-    expect(() => posterior(C, [1, 1], uniformPrior(C), 0, config)).toThrow(/aligned/i);
+    expect(() => posterior(C, [1, 1], uniform(C.length), 0, config)).toThrow(/aligned/i);
   });
 
   it('rejects a q vector that is not aligned with the compatible set', () => {
@@ -212,7 +194,7 @@ describe('posterior: properties (docs/DESIGN.md 5.5)', () => {
         (size, strength, residueCount) => {
           const C = items(size);
           const s = Array.from({ length: size }, () => strength);
-          const { p } = posterior(C, s, uniformPrior(C), residueCount, config);
+          const { p } = posterior(C, s, uniform(C.length), residueCount, config);
           const values = [...p.values()];
           const first = values[0] ?? Number.NaN;
 
