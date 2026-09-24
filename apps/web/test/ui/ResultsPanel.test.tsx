@@ -15,23 +15,31 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function serve(matchResponse: MatchResponse | (() => Promise<Response>)) {
-  fetchMock.mockImplementation((url: string) => {
+function serve(matchResponse: MatchResponse | ((init?: RequestInit) => Promise<Response>)) {
+  fetchMock.mockImplementation((url: string, init?: RequestInit) => {
     if (url.startsWith('/api/customers')) return Promise.resolve(json([customer()]));
     return typeof matchResponse === 'function'
-      ? matchResponse()
+      ? matchResponse(init)
       : Promise.resolve(json(matchResponse));
   });
 }
+
+const limitOf = (init?: RequestInit): number =>
+  (JSON.parse(String(init?.body)) as { limit?: number }).limit ?? 3;
 
 async function submit(query: string) {
   await userEvent.type(screen.getByRole('textbox', { name: /query/i }), query);
   await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 }
 
+function matchBodies(): Record<string, unknown>[] {
+  return fetchMock.mock.calls
+    .filter(([url]) => url === '/api/match')
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+}
+
 function matchBody(): Record<string, unknown> {
-  const call = fetchMock.mock.calls.find(([url]) => url === '/api/match');
-  return JSON.parse(String((call?.[1] as RequestInit).body)) as Record<string, unknown>;
+  return matchBodies()[0] ?? {};
 }
 
 beforeEach(() => {
@@ -396,5 +404,134 @@ describe('ResultsPanel', () => {
     expect((screen.getByRole('textbox', { name: /query/i }) as HTMLInputElement).value).toBe(
       'M8 flat washer',
     );
+  });
+});
+
+const TIE = 'all 7 compatible items score the same; the order shown is by SKU';
+
+const washers = (count: number): MatchResponse['results'] =>
+  Array.from({ length: count }, (_unused, index) =>
+    match({ sku: `PXWASH8${String(index).padStart(3, '0')}`, confidence: 0.14 }),
+  );
+
+const tied = (compatibleCount: number, shown: number): MatchResponse =>
+  response({
+    query: 'M8 flat washer',
+    status: 'ambiguous',
+    compatibleCount,
+    results: washers(Math.min(shown, compatibleCount)),
+    notes: [note('tiedSet', TIE)],
+  });
+
+const serveTied = (compatibleCount: number) => {
+  serve((init) => Promise.resolve(json(tied(compatibleCount, limitOf(init)))));
+};
+
+const cards = () => within(screen.getByRole('region', { name: 'Matches' })).getAllByRole('article');
+
+describe('the rest of a compatible set the limit cut off', () => {
+  it('reports a tie the answer carries', async () => {
+    serveTied(7);
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer');
+
+    expect(await screen.findByText(TIE)).toBeDefined();
+  });
+
+  it('names the whole set when the whole set fits', async () => {
+    serveTied(7);
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer');
+
+    expect(await screen.findByRole('button', { name: 'Show all 7' })).toBeDefined();
+    expect(cards()).toHaveLength(3);
+  });
+
+  it('never claims to show everything when the cap admits less', async () => {
+    serveTied(81);
+    render(<ResultsPanel />);
+
+    await submit('hex nut');
+
+    expect(await screen.findByRole('button', { name: 'Show 10 of 81' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /^Show all \d/ })).toBeNull();
+  });
+
+  it('offers nothing once every compatible item is already on screen', async () => {
+    serve(response({ status: 'ambiguous', compatibleCount: 3, results: washers(3) }));
+    render(<ResultsPanel />);
+
+    await submit('M4 hex nut');
+
+    await screen.findByRole('region', { name: 'Matches' });
+    expect(screen.queryByRole('button', { name: /^Show (all )?\d/ })).toBeNull();
+  });
+
+  it('offers nothing for a pool the results are not a truncation of', async () => {
+    serve(
+      response({ query: 'brass', status: 'unparsed', compatibleCount: 154, results: washers(3) }),
+    );
+    render(<ResultsPanel />);
+
+    await submit('brass');
+
+    await screen.findByRole('region', { name: 'Matches' });
+    expect(screen.queryByRole('button', { name: /^Show (all )?\d/ })).toBeNull();
+  });
+
+  it('asks the route for the rest and shows it, then offers nothing more', async () => {
+    serveTied(7);
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer');
+    await userEvent.click(await screen.findByRole('button', { name: 'Show all 7' }));
+
+    await waitFor(() => {
+      expect(cards()).toHaveLength(7);
+    });
+    expect(matchBodies()).toEqual([
+      { query: 'M8 flat washer' },
+      { query: 'M8 flat washer', limit: 10 },
+    ]);
+    expect(screen.queryByRole('button', { name: 'Show all 7' })).toBeNull();
+  });
+
+  it('carries the customer the answer was asked for into the wider request', async () => {
+    serveTied(7);
+    render(<ResultsPanel />);
+
+    await userEvent.click(screen.getByRole('combobox', { name: /customer/i }));
+    await userEvent.click(await screen.findByRole('option'));
+    await submit('M8 flat washer');
+    await userEvent.click(await screen.findByRole('button', { name: 'Show all 7' }));
+
+    await waitFor(() => {
+      expect(matchBodies().at(-1)).toEqual({
+        query: 'M8 flat washer',
+        customerId: 'CUST-003',
+        limit: 10,
+      });
+    });
+  });
+
+  it('collapses again when a new query is asked', async () => {
+    serveTied(7);
+    render(<ResultsPanel />);
+
+    await submit('M8 flat washer');
+    await userEvent.click(await screen.findByRole('button', { name: 'Show all 7' }));
+    await waitFor(() => {
+      expect(cards()).toHaveLength(7);
+    });
+
+    await userEvent.clear(screen.getByRole('textbox', { name: /query/i }));
+    await submit('M12 hex nut');
+
+    await waitFor(() => {
+      expect(cards()).toHaveLength(3);
+    });
+    expect(screen.getByRole('button', { name: 'Show all 7' })).toBeDefined();
   });
 });

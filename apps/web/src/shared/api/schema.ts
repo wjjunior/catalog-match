@@ -26,6 +26,8 @@ import type {
 } from '@catalog-match/core';
 import { z } from 'zod';
 
+import { MAX_LIMIT } from './client';
+
 // A Record over the union forces every member to be listed, so a value added to the
 // domain breaks compilation here instead of silently failing validation at runtime.
 function literalsOf<T extends string>(members: Readonly<Record<T, true>>) {
@@ -197,7 +199,7 @@ const customerSummary: z.ZodType<CustomerSummary, unknown> = z.object({
 export const matchRequestSchema = z.object({
   query: z.string().trim().min(1),
   customerId: z.string().trim().min(1).optional(),
-  limit: z.int().min(1).max(10).default(3),
+  limit: z.int().min(1).max(MAX_LIMIT).default(3),
 }) satisfies z.ZodType<MatchRequest, unknown>;
 
 export const matchResponseSchema: z.ZodType<MatchResponse, unknown> = z.object({

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,6 +56,30 @@ describe('the page against the real core', () => {
     expect(within(matches).getAllByRole('article')).toHaveLength(1);
     expect(within(alternatives).getAllByRole('article')).toHaveLength(2);
     expect(within(alternatives).getAllByText(/relaxed: standard/)).toHaveLength(2);
+  });
+
+  it('says a set is tied and reveals the whole of it on request', async () => {
+    render(<HomePage />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: /query/i }), 'M8 flat washer');
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
+
+    expect(await screen.findByText('7 compatible items')).toBeDefined();
+    expect(
+      screen.getByText('all 7 compatible items score the same; the order shown is by SKU'),
+    ).toBeDefined();
+
+    const matches = screen.getByRole('region', { name: 'Matches' });
+    expect(within(matches).getAllByRole('article')).toHaveLength(3);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show all 7' }));
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('region', { name: 'Matches' })).getAllByRole('article'),
+      ).toHaveLength(7);
+    });
+    expect(screen.queryByRole('button', { name: 'Show all 7' })).toBeNull();
   });
 
   it('answers a length the catalog does not stock with the note and the alternatives', async () => {

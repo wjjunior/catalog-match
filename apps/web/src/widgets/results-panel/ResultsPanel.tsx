@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 import { AlternativeCard } from '../../entities/match/AlternativeCard';
@@ -14,6 +14,7 @@ import { QueryForm } from '../../features/match-query/QueryForm';
 import { useMatchQuery } from '../../features/match-query/useMatchQuery';
 import { CustomerCombobox } from '../../features/select-customer/CustomerCombobox';
 import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
+import { MAX_LIMIT } from '../../shared/api/client';
 import { Alert, AlertDescription, AlertTitle } from '../../shared/ui/alert';
 import { Button } from '../../shared/ui/Button';
 
@@ -37,10 +38,40 @@ function Alternatives({ alternatives }: Readonly<{ alternatives: MatchResponse['
   );
 }
 
+// Only a ranked answer truncates the compatible set; an unparsed pool is ordered by
+// token overlap, so its count says nothing about how much more the route would return.
+function revealable(response: MatchResponse): number {
+  if (response.status !== 'ambiguous') return 0;
+
+  return Math.min(response.compatibleCount, MAX_LIMIT);
+}
+
+function ShowTheRest({
+  response,
+  onShowTheRest,
+}: Readonly<{ response: MatchResponse; onShowTheRest: () => void }>) {
+  const reveal = revealable(response);
+  if (reveal <= response.results.length) return null;
+
+  const label =
+    reveal === response.compatibleCount
+      ? `Show all ${String(reveal)}`
+      : `Show ${String(reveal)} of ${String(response.compatibleCount)}`;
+
+  return (
+    <div>
+      <Button variant="quiet" onClick={onShowTheRest}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
 function Results({
   response,
   customerName,
-}: Readonly<{ response: MatchResponse; customerName?: string }>) {
+  onShowTheRest,
+}: Readonly<{ response: MatchResponse; customerName?: string; onShowTheRest: () => void }>) {
   if (response.results.length === 0) {
     return (
       <>
@@ -71,6 +102,8 @@ function Results({
         </div>
       </section>
 
+      <ShowTheRest response={response} onShowTheRest={onShowTheRest} />
+
       <Alternatives alternatives={response.alternatives} />
 
       {notes.length > 0 && (
@@ -92,11 +125,19 @@ export function ResultsPanel() {
   const [selected, setSelected] = useState<CustomerSummary>();
   // The customer the answer was asked for, which a later selection must not rewrite.
   const [askedFor, setAskedFor] = useState<string>();
+  const asked = useRef<{ query: string; customerId?: string }>({ query: '' });
   const { state, run } = useMatchQuery();
 
   function ask(text: string) {
+    asked.current = { query: text, customerId: selected?.customerId };
     setAskedFor(selected?.customerName);
     run(text, selected?.customerId);
+  }
+
+  // The same request the answer on screen came from, widened; asking it again rather
+  // than the query in the box is what keeps the wider answer the same answer.
+  function showTheRest() {
+    run(asked.current.query, asked.current.customerId, MAX_LIMIT);
   }
 
   // Re-asks the same query with whichever customer is selected now, same as any other
@@ -145,7 +186,9 @@ export function ResultsPanel() {
             </AlertDescription>
           </Alert>
         )}
-        {state.phase === 'ready' && <Results response={state.response} customerName={askedFor} />}
+        {state.phase === 'ready' && (
+          <Results response={state.response} customerName={askedFor} onShowTheRest={showTheRest} />
+        )}
       </div>
     </main>
   );

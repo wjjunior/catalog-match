@@ -21,6 +21,9 @@ export type NoteCode =
   | 'unrankedPool'
   | 'tiedSet';
 
+/** The largest `limit` the match route accepts; `shared/api/schema.ts` enforces it. */
+export const MAX_LIMIT = 10;
+
 export type ConfidenceLabel = 'High' | 'Medium' | 'Low';
 
 export interface Note {
