@@ -17,6 +17,7 @@ import type { ParsedSpec } from '../domain/spec';
 import { DEFAULT_MATCHER_CONFIG as config } from '../matching/config';
 import { descriptionParser } from '../parsing/descriptionParser';
 import { queryParser } from '../parsing/queryParser';
+import { buildProfile } from './customerProfile';
 import { historyPrior } from './historyPrior';
 import { personalize } from './personalize';
 
@@ -427,6 +428,46 @@ describe('a profile with nothing to say', () => {
     });
 
     expect(explain(bought, M8_WASHER, WASHERS, 'SS').reason).toBe('bought 4x, last 2025-09-28');
+  });
+
+  // A known customer whose every line failed to parse: the shares are the alpha prior,
+  // flat over the whole table, and a tie-break over that names a value nobody expressed.
+  it('leaves a weightless history unexplained, though its shares are a full table', () => {
+    const weightless = profileOf({ nEff: 0, lambda: 0 });
+
+    expect(weightless.shares.material).toEqual(evenly(MATERIALS));
+    expect(
+      personalize(
+        weightless,
+        M8_WASHER,
+        WASHERS,
+        historyPrior(weightless, M8_WASHER, WASHERS, config),
+      ).size,
+    ).toBe(0);
+  });
+
+  it('builds exactly that profile from a history no line of which parses', () => {
+    const built = buildProfile(
+      'A',
+      [
+        {
+          customerId: 'A',
+          customerName: 'A Inc',
+          orderDate: '2026-04-25',
+          sku: 'X',
+          description: 'WIDGET',
+          quantity: 1,
+        },
+      ],
+      [],
+      config,
+    );
+
+    expect(built.nEff).toBe(0);
+    expect(built.shares.material).toEqual(evenly(MATERIALS));
+    expect(
+      personalize(built, M8_WASHER, WASHERS, historyPrior(built, M8_WASHER, WASHERS, config)).size,
+    ).toBe(0);
   });
 });
 
