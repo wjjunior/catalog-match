@@ -140,6 +140,16 @@ describe('attributeCredit: standard', () => {
 });
 
 describe('attributeCredit: type', () => {
+  // `compatibility.ts`, `explainer.ts` and `lengthBearing.ts` all read an empty reading
+  // list as an attribute the query never stated; a 0 here would make `compatibility` throw.
+  it('reads an empty reading list as unstated, as every other site does', () => {
+    const query = spec({ type: [] });
+    const candidate = item({ diameter: M8, type: [{ value: 'hex_nut', strength: 1 }] });
+
+    expect(attributeCredit('type', query, candidate, config)).toBe(1);
+    expect(() => compatibility(query, candidate, config)).not.toThrow();
+  });
+
   it('gives the strength the parser assigned to the reading that matches', () => {
     const query = spec({ type: [{ value: 'hex_cap_screw', strength: 1 }] });
 

@@ -48,7 +48,7 @@ function weightedCredit<V extends string, F extends string>(
 /** The strongest reading of an ambiguous term that names the item's type. The hex-head
  * family is already priced by the lexicon, so no family credit is applied here. */
 function typeCredit(query: ParsedSpec, item: ParsedSpec): number {
-  if (query.type === undefined) return 1;
+  if (query.type === undefined || query.type.length === 0) return 1;
   if (item.type === undefined) return 0;
 
   let best = 0;
