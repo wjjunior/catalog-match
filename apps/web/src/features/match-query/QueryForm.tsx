@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from 'react';
+import type { ReactNode, SubmitEvent } from 'react';
 import { X } from 'lucide-react';
 
 import { cn, focusRing } from '../../shared/lib/utils';
@@ -20,10 +20,10 @@ export function QueryForm({
   onSubmit,
   busy = false,
   customerField,
-}: QueryFormProps) {
+}: Readonly<QueryFormProps>) {
   const blank = value.trim() === '';
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (blank || busy) return;
     onSubmit();

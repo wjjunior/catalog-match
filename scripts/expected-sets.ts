@@ -28,8 +28,6 @@ const fraction = (text: string): number => {
   return Number(text);
 };
 
-/** A bare length is millimetres on a metric nominal and inches otherwise: the catalog
- * writes `M8-1.25 X 16` for 16 mm and `3/4-10 X 5/8"` for 5/8 inch. */
 export function lengthMm(
   value: string | null,
   unit: string | null,
@@ -43,23 +41,40 @@ export function lengthMm(
   return diameter.startsWith('M') ? n : n * 25.4;
 }
 
+type ParsedRow = NonNullable<ReturnType<typeof parseDescription>>;
+
+function matchesLength(parsed: ParsedRow, filter: Filter): boolean {
+  if (filter.lengthMm === undefined) return true;
+
+  const mm = lengthMm(parsed.length, parsed.lengthUnit, parsed.diameter);
+  return mm !== null && Math.abs(mm - filter.lengthMm) <= 0.001;
+}
+
+function matchesFilter(parsed: ParsedRow, sku: string, filter: Filter): boolean {
+  if (filter.diameter !== undefined && parsed.diameter !== filter.diameter) return false;
+  if (filter.types !== undefined && !filter.types.includes(skuTypeCode(sku) ?? '')) return false;
+  if (!matchesLength(parsed, filter)) return false;
+  if (filter.materials !== undefined && !filter.materials.includes(parsed.material)) return false;
+  if (filter.finishes !== undefined && !filter.finishes.includes(parsed.finish)) return false;
+  if (filter.standard !== undefined && parsed.standard !== filter.standard) return false;
+
+  return true;
+}
+
+function bySku(left: CatalogMatch, right: CatalogMatch): number {
+  return left.sku < right.sku ? -1 : left.sku > right.sku ? 1 : 0;
+}
+
 export function compatibleSet(filter: Filter): CatalogMatch[] {
   const rows = dedupeBySku(
     toCatalogRows(parseCsv(readFileSync(new URL('data/catalog.csv', ROOT), 'utf8'))),
   );
   const matched: CatalogMatch[] = [];
+
   for (const row of rows) {
     const parsed = parseDescription(row.description);
-    if (parsed === null) continue;
-    if (filter.diameter !== undefined && parsed.diameter !== filter.diameter) continue;
-    if (filter.types !== undefined && !filter.types.includes(skuTypeCode(row.sku) ?? '')) continue;
-    if (filter.lengthMm !== undefined) {
-      const mm = lengthMm(parsed.length, parsed.lengthUnit, parsed.diameter);
-      if (mm === null || Math.abs(mm - filter.lengthMm) > 0.001) continue;
-    }
-    if (filter.materials !== undefined && !filter.materials.includes(parsed.material)) continue;
-    if (filter.finishes !== undefined && !filter.finishes.includes(parsed.finish)) continue;
-    if (filter.standard !== undefined && parsed.standard !== filter.standard) continue;
+    if (parsed === null || !matchesFilter(parsed, row.sku, filter)) continue;
+
     matched.push({
       sku: row.sku,
       catalogId: row.catalogId,
@@ -67,7 +82,8 @@ export function compatibleSet(filter: Filter): CatalogMatch[] {
       active: row.active,
     });
   }
-  return matched.sort((left, right) => (left.sku < right.sku ? -1 : left.sku > right.sku ? 1 : 0));
+
+  return matched.sort(bySku);
 }
 
 export const activeSkus = (filter: Filter): string[] =>

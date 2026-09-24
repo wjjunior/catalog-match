@@ -15,8 +15,6 @@ const MIXED = /^(\d+)-(\d+)\/(\d+)$/;
 const FRACTION = /^(\d+)\/(\d+)$/;
 const PLAIN = /^\d+(?:\.\d+)?$/;
 
-/** A digit run long enough to overflow Number.MAX_VALUE parses "successfully" to
- * Infinity (or NaN once divided); undefined for that the same as undefined for `1/0`. */
 export function parseNumber(text: string): number | undefined {
   const mixed = MIXED.exec(text);
   if (mixed) {
@@ -46,7 +44,7 @@ export type SizeToken =
 const MIN_TPI = 4;
 const MAX_TPI = 80;
 
-const UNIT_SUFFIX = /^(.*?)\s*("|in|ft|mm)$/i;
+const UNIT_SUFFIXES = ['"', 'in', 'ft', 'mm'] as const;
 const METRIC_THREAD = /^m(\d+)(?:-(\d+(?:\.\d+)?))?$/i;
 const NUMBERED_THREAD = /^#(\d+)(?:-(\d+))?$/;
 const FRACTION_THREAD = /^(\d+\/\d+)(?:-(\d+))?$/;
@@ -57,6 +55,21 @@ const UNITS: Readonly<Record<string, LengthUnit>> = {
   ft: 'ft',
   mm: 'mm',
 };
+
+function splitUnitSuffix(token: string): { numberText: string; unitText: string } | undefined {
+  const lower = token.toLowerCase();
+
+  for (const unit of UNIT_SUFFIXES) {
+    if (!lower.endsWith(unit)) continue;
+
+    return {
+      numberText: token.slice(0, token.length - unit.length).trimEnd(),
+      unitText: token.slice(token.length - unit.length),
+    };
+  }
+
+  return undefined;
+}
 
 /** Guards the imperial and numbered forms only: a metric pitch is a millimetre figure
  * (1.25, 0.7) and would fail every threads-per-inch bound. */
@@ -70,17 +83,14 @@ function thread(nominal: string, pitch: string | undefined): SizeToken {
   return pitch === undefined ? { kind: 'thread', nominal } : { kind: 'thread', nominal, pitch };
 }
 
-/** Shape decides, not a lookup: FRACTION_THREAD cannot match `integer-fraction`, so a
- * mixed number falls through to a length and 1/2-20 stays a thread with a foreign pitch. */
 export function classifySizeToken(text: string): SizeToken | undefined {
   const token = text.trim();
   if (token === '') return undefined;
 
-  const withUnit = UNIT_SUFFIX.exec(token);
+  const withUnit = splitUnitSuffix(token);
   if (withUnit) {
-    const [, numberText = '', unitText = ''] = withUnit;
-    const value = parseNumber(numberText);
-    const unit = UNITS[unitText.toLowerCase()];
+    const value = parseNumber(withUnit.numberText);
+    const unit = UNITS[withUnit.unitText.toLowerCase()];
     return value === undefined || unit === undefined ? undefined : { kind: 'length', value, unit };
   }
 
@@ -123,8 +133,6 @@ function diameterMm(nominal: string, system: ThreadSystem): number | undefined {
   return inches === undefined ? undefined : toMm(inches, 'in');
 }
 
-/** An unknown nominal still carries millimetres: it must reach the null hypothesis as a
- * real size, not be dropped. docs/DESIGN.md 5.2. */
 export function resolveDiameter(nominal: string): Diameter | undefined {
   const token = classifySizeToken(nominal);
   if (token?.kind !== 'thread' || token.pitch !== undefined) return undefined;
@@ -204,8 +212,6 @@ export function unitMismatch(diameter: Diameter, length: Length): boolean {
   return diameter.system === 'metric' ? length.unit !== 'mm' : length.unit === 'mm';
 }
 
-/** Tolerance is a fraction of the requested value, not an absolute distance:
- * "within 25% of the requested value after unit conversion". docs/DESIGN.md 5.6. */
 export function withinTolerance(
   candidateMm: number,
   requestedMm: number,

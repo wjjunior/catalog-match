@@ -133,6 +133,15 @@ function standardConstraint(spec: ParsedSpec): Constraint | undefined {
   return { attr: 'standard', satisfiedBy: (item) => item.spec.standard === q };
 }
 
+function lengthFor(spec: ParsedSpec, options: BuildOptions): Constraint | undefined {
+  if (options.length === 'drop') return undefined;
+  if (options.length === 'approximate') {
+    return approximateLengthConstraint(spec, options.lengthTolerance ?? 0);
+  }
+
+  return lengthConstraint(spec);
+}
+
 /** The order of this array is the probe order of `failedConstraint`, which is what makes
  * the note read `no M8 socket head cap screw at 45 mm`. */
 function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): Constraint[] {
@@ -140,11 +149,7 @@ function buildConstraints(spec: ParsedSpec, options: BuildOptions = {}): Constra
   const candidates: (Constraint | undefined)[] = [
     diameterConstraint(spec),
     typeConstraint(spec),
-    options.length === 'drop'
-      ? undefined
-      : options.length === 'approximate'
-        ? approximateLengthConstraint(spec, options.lengthTolerance ?? 0)
-        : lengthConstraint(spec),
+    lengthFor(spec, options),
     options.dropStandard === true ? undefined : standardConstraint(spec),
     materialConstraint(spec, widen),
     finishConstraint(spec, widen),

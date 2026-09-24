@@ -1,23 +1,18 @@
 interface ProgressBarProps {
   /** A fraction in the unit interval; the bar reports whole percents. */
-  value: number;
-  label: string;
+  readonly value: number;
+  readonly label: string;
 }
 
 export function ProgressBar({ value, label }: ProgressBarProps) {
   const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
 
   return (
-    <div
-      className="h-2 overflow-hidden rounded-full bg-secondary"
-      role="progressbar"
+    <progress
+      className="h-2 w-full appearance-none overflow-hidden rounded-full border-none bg-secondary [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
+      value={percent}
+      max={100}
       aria-label={label}
-      aria-valuenow={percent}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      {/* The only inline style in apps/web: a runtime percentage cannot be a utility class. */}
-      <div className="h-full rounded-[inherit] bg-primary" style={{ width: `${percent}%` }} />
-    </div>
+    />
   );
 }

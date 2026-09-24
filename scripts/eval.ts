@@ -8,8 +8,6 @@ import type { EvalSection, JsonSummary } from '../packages/core/src/eval/report'
 import { toJson, toMarkdown } from '../packages/core/src/eval/report';
 import { run } from '../packages/core/src/eval/run';
 
-// The composition point: the only module here that names a file or wires a core, so the
-// harness under packages/core stays pure and receives a Matcher. docs/DESIGN.md 4.2.
 const ROOT = new URL('../', import.meta.url);
 
 const read = (path: string): string => readFileSync(new URL(path, ROOT), 'utf8');
@@ -17,15 +15,11 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), 'utf8')
 export interface EvalOptions {
   readonly heldout: boolean;
   readonly gate: boolean;
-  /** Where the floor is read from, relative to the repository root or absolute. CI passes
-   * the copy on main, so a regression cannot lower the bar in the commit that causes it. */
   readonly floor: string;
 }
 
 export const DEFAULT_FLOOR = 'data/eval/baseline.json';
 
-/** Throws rather than defaulting when the flag arrives without a path: an empty variable
- * in a workflow would otherwise quietly gate the branch against its own floor. */
 const floorIn = (argv: readonly string[]): string => {
   const at = argv.indexOf('--floor');
   if (at === -1) return DEFAULT_FLOOR;
@@ -36,15 +30,12 @@ const floorIn = (argv: readonly string[]): string => {
   return path;
 };
 
-/** The held-out set is reported separately and only on request, so an ordinary run
- * cannot quietly tune against it. docs/DESIGN.md 10.1. */
 export const parseArgs = (argv: readonly string[]): EvalOptions => ({
   heldout: argv.includes('--heldout'),
   gate: argv.includes('--gate'),
   floor: floorIn(argv),
 });
 
-/** The floor CI holds the golden set to, committed in `data/eval/baseline.json`. */
 export interface GateFloor {
   readonly recordedOn: string;
   readonly goldenSet: {
@@ -54,8 +45,6 @@ export interface GateFloor {
   };
 }
 
-/** docs/DESIGN.md 10.3. The case count is gated too: dropping the cases a change breaks
- * would raise both other numbers, and is the one way to pass this that must not work. */
 export function gateFailures(summary: JsonSummary, floor: GateFloor): string[] {
   const golden = summary.sections.find((section) => section.name === 'Golden set');
   if (golden === undefined) return ['the run produced no golden section to gate on'];
@@ -82,9 +71,6 @@ export function gateFailures(summary: JsonSummary, floor: GateFloor): string[] {
 
 export const HELD_OUT_TITLE = '# Held-out evaluation';
 
-/** `markdown` is the golden report every run rewrites; `heldout` is present only on the one
- * run that spends the frozen set, and is written beside it rather than into it.
- * docs/DESIGN.md 10.3 and docs/eval/heldout-policy.md. */
 export function evaluate({ heldout }: Pick<EvalOptions, 'heldout'>): {
   markdown: string;
   heldout?: string;
@@ -97,8 +83,6 @@ export function evaluate({ heldout }: Pick<EvalOptions, 'heldout'>): {
   });
 
   const goldenCases = parseEvalJsonl(read('data/eval/golden.jsonl'));
-  // The golden set only. The held-out cases are read once, at the end, to report the
-  // parser; a control scored against them would spend them for nothing.
   const golden: EvalSection = {
     ...evaluateSet('Golden set', goldenCases),
     baseline: runBaseline({ catalog: core.catalog, cases: goldenCases }),
@@ -129,9 +113,8 @@ function main(argv: readonly string[]): void {
     const floor = JSON.parse(read(options.floor)) as GateFloor;
     const failed = gateFailures(summary, floor);
     if (failed.length > 0) {
-      process.stderr.write(
-        `\nEval gate failed:\n${failed.map((line) => `  - ${line}`).join('\n')}\n`,
-      );
+      const lines = failed.map((line) => `  - ${line}`).join('\n');
+      process.stderr.write(`\nEval gate failed:\n${lines}\n`);
       process.exitCode = 1;
       return;
     }

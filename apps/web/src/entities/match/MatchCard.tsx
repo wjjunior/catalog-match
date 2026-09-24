@@ -7,7 +7,7 @@ import { MatchDetails } from './MatchDetails';
 import { MatchedAttributes } from './MatchedAttributes';
 import { MissingAttributes } from './MissingAttributes';
 
-export function MatchCard({ match }: { match: Match }) {
+export function MatchCard({ match }: Readonly<{ match: Match }>) {
   const { explanation } = match;
 
   return (

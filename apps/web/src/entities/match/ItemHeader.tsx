@@ -8,11 +8,11 @@ export function ItemHeader({
   description,
   sku,
   active,
-}: {
+}: Readonly<{
   description: string;
   sku: string;
   active: boolean;
-}) {
+}>) {
   return (
     <header className="flex items-start gap-3">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-secondary text-muted-foreground">
@@ -20,7 +20,9 @@ export function ItemHeader({
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h3 className="m-0 break-words text-base font-semibold leading-[1.35]">{description}</h3>
+        <h3 className="m-0 wrap-break-word text-base font-semibold leading-[1.35]">
+          {description}
+        </h3>
         <p className="m-0 break-all font-mono text-xs text-muted-foreground">{sku}</p>
       </div>
 

@@ -3,7 +3,6 @@ import type { ConfidenceLabel } from '../domain/match';
 import type { MatcherConfig } from './config';
 
 export interface PosteriorDistribution {
-  /** Keyed by SKU, so the caller never has to keep C and the values in step by index. */
   readonly p: ReadonlyMap<string, number>;
   readonly pNull: number;
 }
@@ -43,14 +42,16 @@ export function posterior(
 
 export interface ConfidenceLabelling {
   readonly label: ConfidenceLabel;
-  /** True while the thresholds are unmeasured, when no document or test may promise the
-   * label. docs/DESIGN.md 5.5. */
   readonly provisional: boolean;
 }
 
 export function labelFor(p: number, config: MatcherConfig): ConfidenceLabelling {
   const { high, medium, provisional } = config.labels;
-  const label: ConfidenceLabel = p >= high ? 'High' : p >= medium ? 'Medium' : 'Low';
+
+  let label: ConfidenceLabel;
+  if (p >= high) label = 'High';
+  else if (p >= medium) label = 'Medium';
+  else label = 'Low';
 
   return { label, provisional };
 }

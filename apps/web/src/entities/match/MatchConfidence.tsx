@@ -7,10 +7,10 @@ const NAME = 'Match confidence';
 export function MatchConfidence({
   confidence,
   label,
-}: {
+}: Readonly<{
   confidence: number;
   label?: ConfidenceLabel;
-}) {
+}>) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-3">

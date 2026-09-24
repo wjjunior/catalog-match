@@ -1,6 +1,6 @@
 import type { CustomerSummary } from '../../shared/api/client';
 
-export function CustomerOption({ customer }: { customer: CustomerSummary }) {
+export function CustomerOption({ customer }: Readonly<{ customer: CustomerSummary }>) {
   const { customerId, customerName, orderCount } = customer;
 
   return (

@@ -4,7 +4,7 @@ import type { MatchedAttribute } from '../../shared/api/client';
 
 import { attributeLabel } from './attributeLabel';
 
-export function MatchedAttributes({ matched }: { matched: readonly MatchedAttribute[] }) {
+export function MatchedAttributes({ matched }: Readonly<{ matched: readonly MatchedAttribute[] }>) {
   if (matched.length === 0) return null;
 
   return (

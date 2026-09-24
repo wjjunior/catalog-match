@@ -12,7 +12,7 @@ function explanationLines(response: MatchResponse): readonly string[] {
     : [statusText(response)];
 }
 
-export function EmptyState({ response }: { response: MatchResponse }) {
+export function EmptyState({ response }: Readonly<{ response: MatchResponse }>) {
   return (
     <section
       aria-labelledby="empty-state"
@@ -24,13 +24,13 @@ export function EmptyState({ response }: { response: MatchResponse }) {
             calling that "no compatible items" would contradict the note below. */}
         {response.compatibleCount > 0 ? 'Nothing to rank' : 'No compatible items'}
       </h2>
-      <div role="status" className="flex max-w-prose flex-col gap-1">
+      <output className="flex max-w-prose flex-col gap-1">
         {explanationLines(response).map((line, index) => (
           <p key={`${line}-${String(index)}`} className="m-0 text-sm text-muted-foreground">
             {line}
           </p>
         ))}
-      </div>
+      </output>
     </section>
   );
 }

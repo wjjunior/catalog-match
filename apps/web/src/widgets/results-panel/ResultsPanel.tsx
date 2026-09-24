@@ -17,9 +17,7 @@ import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
 import { Alert, AlertDescription, AlertTitle } from '../../shared/ui/alert';
 import { Button } from '../../shared/ui/Button';
 
-// An alternative only ever comes back alongside an empty `results`, so this is the one
-// place it can appear; a compatible set never carries one of its own.
-function Alternatives({ alternatives }: { alternatives: MatchResponse['alternatives'] }) {
+function Alternatives({ alternatives }: Readonly<{ alternatives: MatchResponse['alternatives'] }>) {
   if (alternatives.length === 0) return null;
 
   return (
@@ -39,7 +37,10 @@ function Alternatives({ alternatives }: { alternatives: MatchResponse['alternati
   );
 }
 
-function Results({ response, customerName }: { response: MatchResponse; customerName?: string }) {
+function Results({
+  response,
+  customerName,
+}: Readonly<{ response: MatchResponse; customerName?: string }>) {
   if (response.results.length === 0) {
     return (
       <>
@@ -72,7 +73,7 @@ function Results({ response, customerName }: { response: MatchResponse; customer
 
       {notes.length > 0 && (
         <ul
-          className="m-0 flex flex-col gap-1.5 pl-[1.125rem] text-sm text-muted-foreground"
+          className="m-0 flex flex-col gap-1.5 pl-4.5 text-sm text-muted-foreground"
           aria-label="notes"
         >
           {notes.map((entry, index) => (

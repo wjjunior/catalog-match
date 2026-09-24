@@ -1,5 +1,3 @@
-// apps/web/src may never pull core runtime code into the browser bundle, so the wire
-// types it states its zod schemas against stay type-only here.
 export type * from './domain';
 
 export { createCore, createCoreFromRepositories } from './application/createCore';

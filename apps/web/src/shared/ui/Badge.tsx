@@ -13,7 +13,7 @@ const TONES: Record<NonNullable<BadgeProps['tone']>, string> = {
   inactive: 'bg-warn-surface text-warn',
 };
 
-export function Badge({ children, tone = 'neutral' }: BadgeProps) {
+export function Badge({ children, tone = 'neutral' }: Readonly<BadgeProps>) {
   return (
     <span
       data-tone={tone}

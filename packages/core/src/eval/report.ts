@@ -7,7 +7,6 @@ import type { EvalReport } from './run';
 export interface EvalSection {
   readonly name: string;
   readonly report: EvalReport;
-  /** The same cases through the lexical fallback alone; absent on the held-out section. */
   readonly baseline?: BaselineComparison;
 }
 
@@ -47,7 +46,6 @@ const binRow = (bin: CalibrationBin): string[] => [
   bin.precision === undefined ? '—' : rate(bin.precision),
 ];
 
-/** Statuses a score gap has no way to produce, whatever the query reads like. */
 const UNREACHABLE: readonly MatchStatus[] = ['history', 'unparsed'];
 
 const casesExpecting = (matrix: StatusMatrix, statuses: readonly MatchStatus[]): number =>
@@ -57,8 +55,6 @@ const casesExpecting = (matrix: StatusMatrix, statuses: readonly MatchStatus[]):
     0,
   );
 
-/** The evidence for ADR-001, and the one table where a number is not the parser's own.
- * docs/DESIGN.md 10.4. */
 function comparison(report: EvalReport, baseline: BaselineComparison): string[] {
   const { retrieval, setRecovery, status } = report;
 
@@ -112,7 +108,7 @@ function comparison(report: EvalReport, baseline: BaselineComparison): string[] 
     '',
     'Where the baseline puts each status, against the same expectations:',
     '',
-    table(['expected \\ actual', ...MATCH_STATUSES], matrixRows(baseline.status.matrix)),
+    table([String.raw`expected \ actual`, ...MATCH_STATUSES], matrixRows(baseline.status.matrix)),
   ];
 }
 
@@ -155,7 +151,7 @@ function section({ name, report, baseline }: EvalSection): string {
     '',
     `Accuracy ${rate(status.accuracy)}.`,
     '',
-    table(['expected \\ actual', ...MATCH_STATUSES], matrixRows(status.matrix)),
+    table([String.raw`expected \ actual`, ...MATCH_STATUSES], matrixRows(status.matrix)),
     '',
     `### Constraint preservation (${plural(constraints.cases)})`,
     '',
@@ -185,8 +181,6 @@ function section({ name, report, baseline }: EvalSection): string {
           rate(personalization.hit1WithoutCustomer),
           String(personalization.hit1Cases),
         ],
-        // Its own denominator: a case answered with one result has no second to measure
-        // against, so this mean covers fewer cases than the heading.
         [
           'Mean top-1 to top-2 margin',
           rate(personalization.margin),
@@ -246,9 +240,6 @@ export interface JsonSummary {
   sections: JsonSection[];
 }
 
-/** The committed record the CI gate of PRG-36 compares against. Latency is deliberately
- * absent: it moves between runs on identical inputs, so a gate over it would fail on a
- * slower machine rather than on a regression. */
 export function toJson(sections: readonly EvalSection[]): JsonSummary {
   return {
     sections: sections.map(({ name, report }) => ({

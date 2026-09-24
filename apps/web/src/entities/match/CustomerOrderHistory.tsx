@@ -6,9 +6,9 @@ import type { PersonalizationExplanation } from '../../shared/api/client';
 // separate fields, so the browser renders it whole rather than taking it apart.
 export function CustomerOrderHistory({
   personalization,
-}: {
+}: Readonly<{
   personalization: PersonalizationExplanation;
-}) {
+}>) {
   const { reason, prior, overriddenBy } = personalization;
 
   return (

@@ -36,7 +36,6 @@ const MATERIAL_NAMES: Readonly<Record<Material | MaterialFamily, string>> = {
   stainless: 'stainless',
 };
 
-/** The catalog writes HDG; a chip a rep reads at a glance spells it out. */
 const FINISH_NAMES: Readonly<Record<Finish | FinishFamily, string>> = {
   zinc: 'zinc',
   yellow_zinc: 'yellow zinc',
@@ -59,8 +58,6 @@ export function formatType(type: ProductType): string {
   return type.replaceAll('_', ' ');
 }
 
-/** A metric nominal already states its size; an imperial or numbered one is named by
- * nominal and pitch together, as the catalog writes it. */
 export function formatDiameter(diameter: Diameter, pitch?: string): string {
   if (diameter.system === 'metric' || pitch === undefined) return diameter.nominal;
   return `${diameter.nominal}-${pitch}`;
@@ -72,8 +69,6 @@ function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
 }
 
-/** Inch sizes are written as fractions in this trade, and `Length` keeps only the
- * decimal, so the fraction is rebuilt over the finest step the catalog uses. */
 function inches(value: number): string {
   const sixteenths = Math.round(value * SIXTEENTHS);
   if (Math.abs(value * SIXTEENTHS - sixteenths) > 1e-9) return String(value);
@@ -131,6 +126,83 @@ function has(spec: ParsedSpec, attr: AttributeName): boolean {
   }
 }
 
+function diameterAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  const q = query.diameter;
+  const i = item.diameter;
+  if (q === undefined || i === undefined) return undefined;
+  if (q.system !== i.system || q.nominal !== i.nominal) return undefined;
+
+  return {
+    query: formatDiameter(q, query.pitch),
+    item: formatDiameter(i, item.pitch),
+    partial: false,
+  };
+}
+
+function lengthAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  const q = query.length;
+  const i = item.length;
+  if (q === undefined || i === undefined) return undefined;
+  if (!sameLength(q.mm, i.mm)) return undefined;
+
+  return { query: formatLength(q), item: formatLength(i), partial: false };
+}
+
+function typeAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  const itemType = item.type?.[0]?.value;
+  const reading = typeReading(query.type, itemType);
+  if (reading === undefined || itemType === undefined) return undefined;
+
+  return {
+    query: formatType(reading.value),
+    item: formatType(itemType),
+    partial: (query.type?.length ?? 0) > 1 || reading.strength < 1,
+  };
+}
+
+function materialAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  if (query.material === undefined || item.material === undefined) return undefined;
+
+  const q = query.material.value;
+  const i = item.material.value;
+  if (q === i) {
+    return {
+      query: formatMaterial(q),
+      item: formatMaterial(i),
+      partial: query.material.strength < 1,
+    };
+  }
+
+  if (materialFamilyOf(q) !== materialFamilyOf(i)) return undefined;
+
+  return { query: formatMaterial(q), item: formatMaterial(i), partial: true };
+}
+
+function finishAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  if (query.finish === undefined || item.finish === undefined) return undefined;
+
+  const q = query.finish.value;
+  const i = item.finish.value;
+  if (q === i) {
+    return {
+      query: formatFinish(q),
+      item: formatFinish(i),
+      partial: query.finish.strength < 1,
+    };
+  }
+
+  if (finishFamilyOf(q) !== finishFamilyOf(i)) return undefined;
+
+  return { query: formatFinish(q), item: formatFinish(i), partial: true };
+}
+
+function standardAgreement(query: ParsedSpec, item: ParsedSpec): Agreement | undefined {
+  if (query.standard === undefined || item.standard === undefined) return undefined;
+  if (query.standard !== item.standard) return undefined;
+
+  return { query: query.standard, item: item.standard, partial: false };
+}
+
 /** A contradiction returns `undefined`: not agreement, so not matched. C cannot be relied
  * on to have ruled one out, because `explainAlternative` runs precisely where C is empty. */
 function agreement(
@@ -142,76 +214,18 @@ function agreement(
     // The pitch is part of the diameter designation (1/2-13), not a chip of its own.
     case 'pitch':
       return undefined;
-
-    case 'diameter': {
-      const q = query.diameter;
-      const i = item.diameter;
-      if (q === undefined || i === undefined) return undefined;
-      if (q.system !== i.system || q.nominal !== i.nominal) return undefined;
-      return {
-        query: formatDiameter(q, query.pitch),
-        item: formatDiameter(i, item.pitch),
-        partial: false,
-      };
-    }
-
-    case 'length': {
-      const q = query.length;
-      const i = item.length;
-      if (q === undefined || i === undefined) return undefined;
-      if (!sameLength(q.mm, i.mm)) return undefined;
-      return { query: formatLength(q), item: formatLength(i), partial: false };
-    }
-
-    case 'type': {
-      const itemType = item.type?.[0]?.value;
-      const reading = typeReading(query.type, itemType);
-      if (reading === undefined || itemType === undefined) return undefined;
-      return {
-        query: formatType(reading.value),
-        item: formatType(itemType),
-        // Several readings mean the term named a family ("HHB" is hex cap screw and tap
-        // bolt); a strength below full means a weak or corrected term.
-        partial: (query.type?.length ?? 0) > 1 || reading.strength < 1,
-      };
-    }
-
-    case 'material': {
-      if (query.material === undefined || item.material === undefined) return undefined;
-      const q = query.material.value;
-      const i = item.material.value;
-      if (q === i) {
-        return {
-          query: formatMaterial(q),
-          item: formatMaterial(i),
-          partial: query.material.strength < 1,
-        };
-      }
-      // Same family, different member (stainless -> 18-8 SS): a genuine partial agreement.
-      // Different family (A2 -> brass): a contradiction, which is not agreement at all.
-      if (materialFamilyOf(q) !== materialFamilyOf(i)) return undefined;
-      return { query: formatMaterial(q), item: formatMaterial(i), partial: true };
-    }
-
-    case 'finish': {
-      if (query.finish === undefined || item.finish === undefined) return undefined;
-      const q = query.finish.value;
-      const i = item.finish.value;
-      if (q === i) {
-        return {
-          query: formatFinish(q),
-          item: formatFinish(i),
-          partial: query.finish.strength < 1,
-        };
-      }
-      if (finishFamilyOf(q) !== finishFamilyOf(i)) return undefined;
-      return { query: formatFinish(q), item: formatFinish(i), partial: true };
-    }
-
+    case 'diameter':
+      return diameterAgreement(query, item);
+    case 'length':
+      return lengthAgreement(query, item);
+    case 'type':
+      return typeAgreement(query, item);
+    case 'material':
+      return materialAgreement(query, item);
+    case 'finish':
+      return finishAgreement(query, item);
     case 'standard':
-      if (query.standard === undefined || item.standard === undefined) return undefined;
-      if (query.standard !== item.standard) return undefined;
-      return { query: query.standard, item: item.standard, partial: false };
+      return standardAgreement(query, item);
   }
 }
 
@@ -230,7 +244,6 @@ function matchedAttributes(
 
     const entry: MatchedAttribute = {
       attr,
-      // The query text the parser recorded, so a chip traces back to what was typed.
       query: query.evidence[attr] ?? found.query,
       item: found.item,
       provenance: query.provenance[attr] ?? 'explicit',
@@ -242,8 +255,6 @@ function matchedAttributes(
   return matched;
 }
 
-/** An attribute the item does not carry either is not a missing detail: a flat washer
- * has no length to specify. */
 function unspecifiedAttributes(
   query: ParsedSpec,
   item: ParsedSpec,
@@ -275,8 +286,6 @@ export function explainMatch(
   };
 }
 
-/** An alternative exists only where C is empty, so there is no compatible count to
- * report and nothing inside C to disambiguate. docs/DESIGN.md 5.6. */
 export function explainAlternative(
   spec: ParsedSpec,
   item: CatalogItem,
@@ -296,8 +305,6 @@ export function explainAlternative(
   };
 }
 
-/** Keeps the explanation a value: a match is explained before a customer is known, and
- * the personalization card adds its reason without reaching into this module. */
 export function withPersonalization(
   explanation: Explanation,
   personalization: PersonalizationExplanation,
@@ -336,7 +343,6 @@ function failedClause(spec: ParsedSpec, constraint: AttributeName): string {
       return spec.material === undefined ? '' : ` in ${formatMaterial(spec.material.value)}`;
     case 'finish':
       return spec.finish === undefined ? '' : ` in ${formatFinish(spec.finish.value)}`;
-    // A diameter or type that emptied C is unknown to the catalog and has its own note.
     case 'diameter':
     case 'pitch':
     case 'type':
@@ -381,8 +387,6 @@ export function unitMismatchNote(diameter: Diameter, length: Length): Note {
   );
 }
 
-/** Not `no M8 hex nut at 60 mm`, which says the catalog is out of one: a hex nut has no
- * length for the query to have missed. */
 export function unboundLengthNote(type: ProductType, length: Length): Note {
   const named = formatType(type);
 
@@ -392,8 +396,6 @@ export function unboundLengthNote(type: ProductType, length: Length): Note {
   );
 }
 
-/** The pool is real and the count is the only thing the query did achieve; the ask is
- * what `unparsed` says is missing, so it is the same on every query that lands here. */
 export function unrankedPoolNote(count: number, stated: string): Note {
   const pool = count === 1 ? '1 item' : `${String(count)} items`;
   const what = stated === '' ? 'the query' : stated;
@@ -441,13 +443,10 @@ export function repeatReason(count: number, lastOrderDate: string): string {
   return `bought ${String(count)}x, last ${lastOrderDate}`;
 }
 
-/** What earns an active item part of a discontinued purchase's weight. docs/DESIGN.md 7.2. */
 export function siblingReason(sku: string): string {
   return `shares diameter, type and material family with ${sku}`;
 }
 
-/** The set, not the item, is what failed: no compatible item carries the value this
- * customer buys, so the attribute contributes nothing to the ranking. */
 export function unmatchedReason(attribute: AttributeName, preferred: string): string {
   return `no ${preferred} in the compatible set; ${attribute} could not be matched`;
 }

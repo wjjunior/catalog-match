@@ -10,13 +10,8 @@ import { intendedSku } from './loader';
 
 export interface CaseOutcome {
   readonly entry: EvalCase;
-  /** The limit raised to cover the compatible set, so a rank below the served window is
-   * still a rank and MRR is not silently truncated. */
   readonly full: MatchResponse;
-  /** The same query at the limit the API actually serves; the only response latency is
-   * measured on, because building 192 explanations is the harness, not the product. */
   readonly served: MatchResponse;
-  /** The same query with the customer dropped, on personalized cases only. */
   readonly withoutCustomer?: MatchResponse;
   readonly latencyMs: number;
 }
@@ -35,8 +30,6 @@ export interface RetrievalMetrics {
   mrr: number;
 }
 
-/** Scored only where a label names one intended SKU: on a tie query every member is
- * acceptable and none is intended, so a hit rate there would answer a different claim. */
 export function retrieval(outcomes: readonly CaseOutcome[]): RetrievalMetrics {
   const ranks = outcomes.flatMap((outcome) => {
     const intended = intendedSku(outcome.entry);
@@ -60,8 +53,6 @@ export interface SetRecoveryMetrics {
   exactSetRate: number;
 }
 
-/** Averaged per case rather than pooled over every SKU: the claim is about recovering a
- * query's set, so a query with 30 members must not outweigh one with 2. */
 export function setRecovery(outcomes: readonly CaseOutcome[]): SetRecoveryMetrics {
   const scored = outcomes.filter(
     (outcome) => outcome.entry.expectedStatus === 'ambiguous' && outcome.entry.expected.length > 0,
@@ -73,8 +64,6 @@ export function setRecovery(outcomes: readonly CaseOutcome[]): SetRecoveryMetric
     const hits = [...returned].filter((sku) => expected.has(sku)).length;
 
     return {
-      // An empty result recovered nothing; reading it as precision over an empty
-      // selection would award 1 for answering nothing at all.
       precision: rate(hits, returned.size),
       recall: rate(hits, expected.size),
       exact: returned.size === expected.size && hits === expected.size ? 1 : 0,
@@ -94,9 +83,6 @@ export interface AlternativeRecoveryMetrics {
   recall: number;
 }
 
-/** Its own denominator: most cases name no alternatives, and scoring them would report the
- * silence of the label as a failure of the backoff. Read off the raised limit, like the
- * other set metrics, so the served window cannot truncate a recall. */
 export function alternativeRecovery(outcomes: readonly CaseOutcome[]): AlternativeRecoveryMetrics {
   const recalls = outcomes.flatMap((outcome) => {
     const expected = outcome.entry.expectedAlternatives;
@@ -145,8 +131,6 @@ export interface Offender {
 
 export interface ConstraintPreservation {
   cases: number;
-  /** Returned matches, not attributes: one match contradicting two attributes is one
-   * broken promise to the customer. */
   violations: number;
   offenders: Offender[];
 }
@@ -155,14 +139,8 @@ const isMaterial = (value: string): value is Material => value in MATERIAL_FAMIL
 
 const isFinish = (value: string): value is Finish => value in FINISH_FAMILY;
 
-/** What the customer asked for: an exact spelling, and a typo the parser repaired into one.
- * An inferred value is the parser's own reading and an approximate one is a deliberate
- * relaxation, so neither is a promise the answer can break. docs/DESIGN.md 10.2. */
 const STATED = new Set<Provenance | undefined>(['explicit', 'corrected']);
 
-/** True only when the item carries a value that differs from the one the query stated. An
- * item silent about an attribute is not contradicting it: a washer has no pitch, and the
- * golden set lists exactly such a row as a correct answer to a query that states one. */
 function contradicts(attribute: AttributeName, query: ParsedSpec, item: ParsedSpec): boolean {
   switch (attribute) {
     case 'diameter':
@@ -174,8 +152,6 @@ function contradicts(attribute: AttributeName, query: ParsedSpec, item: ParsedSp
     case 'pitch':
       return item.pitch !== undefined && item.pitch !== query.pitch;
     case 'length':
-      // Millimetres scaled to integers, the resolution the catalog resolves lengths to.
-      // A looser window here would wave through a length the matcher itself rejects.
       return (
         item.length !== undefined &&
         query.length !== undefined &&
@@ -203,9 +179,6 @@ function contradicts(attribute: AttributeName, query: ParsedSpec, item: ParsedSp
   }
 }
 
-/** Written against the catalog row and the query's own provenance rather than through
- * `compatibility.ts`: a matcher asked whether it agrees with itself always says yes, and
- * the number would stop being evidence exactly where it matters. docs/DESIGN.md 10.5. */
 export function constraintPreservation(
   outcomes: readonly CaseOutcome[],
   catalog: CatalogRepository,
@@ -242,16 +215,10 @@ function brokenBy(id: string, response: MatchResponse, catalog: CatalogRepositor
 
 export interface PersonalizationMetrics {
   cases: number;
-  /** Its own denominator: a case whose label names only acceptable SKUs has no answer that
-   * could rank the intended one first, so scoring it would report a ceiling as a result. */
   hit1Cases: number;
   hit1: number;
   hit1WithoutCustomer: number;
-  /** Mean gap between top-1 and top-2 confidence: how far personalization moved the
-   * intended item clear of the rest, not merely whether it reached the front. */
   margin: number;
-  /** Its own denominator: a case answered with one result has no second to measure
-   * against, so the margin is averaged over fewer cases than `cases`. */
   marginCases: number;
 }
 
@@ -264,8 +231,6 @@ export function personalization(outcomes: readonly CaseOutcome[]): Personalizati
       ? 1
       : 0;
 
-  // Every personalized case, not only the eligible ones: separation between top-1 and
-  // top-2 is well defined whether or not a label names which of them was intended.
   const margins = scored.flatMap((outcome) => {
     const [first, second] = outcome.full.results;
 
@@ -288,8 +253,6 @@ export interface CalibrationBin {
   lower: number;
   upper: number;
   count: number;
-  /** Absent rather than zero for an empty bin: no case fell here, which is not the same
-   * as every case here being wrong. */
   precision: number | undefined;
 }
 
@@ -300,9 +263,6 @@ export interface CalibrationMetrics {
 
 const BIN_COUNT = 10;
 
-/** Every case whose label names one intended SKU and whose answer came from the posterior.
- * Keyed on the answer, not on the expected status: a history reference reports a recency
- * decay rather than a posterior, and binning two scales together would measure neither. */
 export function calibration(outcomes: readonly CaseOutcome[]): CalibrationMetrics {
   const scored = outcomes.filter(
     (outcome) =>
@@ -342,8 +302,6 @@ export interface LatencyMetrics {
   p95: number;
 }
 
-/** Nearest rank rather than interpolation: with 78 samples an interpolated percentile
- * reports a duration no request took. */
 function percentile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
 

@@ -18,7 +18,7 @@ import type {
 } from '../domain/spec';
 import { INTENT_PHRASES } from '../personalization/intent';
 import { correct } from './fuzzy';
-import { STANDARD_BODIES, longestMatch, type LexiconValue } from './lexicon';
+import { STANDARD_BODIES, longestMatch, type LexiconMatch, type LexiconValue } from './lexicon';
 import { normalize } from './normalize';
 import {
   classifySizeToken,
@@ -31,9 +31,6 @@ import {
 
 export interface QueryParse {
   spec: ParsedSpec;
-  /** The intent detector (docs/DESIGN.md 7.4, PRG-25) owns these words. They are
-   * recognised here only so they never reach the residue, and reported so the same scan
-   * that dropped them is the one that names them. */
   intentCandidates: string[];
 }
 
@@ -41,7 +38,6 @@ type ThreadToken = Extract<SizeToken, { kind: 'thread' }>;
 
 interface Token {
   text: string;
-  /** The normalized word before any correction: residue and evidence quote the user. */
   original: string;
   start: number;
   end: number;
@@ -52,8 +48,6 @@ interface SizeSlot {
   size: SizeToken;
   from: number;
   to: number;
-  /** The unit the slot consumed as a token of its own. A fraction keeps its thread shape,
-   * so without this the unit beside it would be swallowed with the token and lost. */
   unit?: LengthUnit;
 }
 
@@ -67,14 +61,11 @@ interface Draft {
 
 const SEPARATOR = 'x';
 
-/** Everything normalization leaves a unit as, plus the inch mark it may leave standing
- * alone when the user put a space before it. */
 const UNIT_TOKENS: ReadonlySet<string> = new Set(['in', 'ft', 'mm', '"']);
 
 const MAX_INTENT_TOKENS = Math.max(...INTENT_PHRASES.map((phrase) => phrase.split(' ').length));
 
-/** `125`, `a307`, `b18.2.1`: the designator half of a standard, never a whole standard. */
-const DESIGNATOR_SHAPE = '[a-z]?\\d+(?:\\.\\d+)*[a-z]?';
+const DESIGNATOR_SHAPE = String.raw`[a-z]?\d+(?:\.\d+)*[a-z]?`;
 
 const DESIGNATOR = new RegExp(`^${DESIGNATOR_SHAPE}$`);
 
@@ -123,8 +114,6 @@ function settled(draft: Draft, from: number, to: number): boolean {
   return true;
 }
 
-/** A term reached through a correction is worth less than the same term spelled right,
- * so the discount multiplies the strength the lexicon gives. */
 function discount(draft: Draft, from: number, to: number): number {
   let factor = 1;
 
@@ -149,8 +138,49 @@ interface LexiconAttributes {
   standard?: string;
 }
 
-/** First match per attribute wins; a second reading of an attribute already stated is
- * left unclaimed and becomes residue. */
+function claimUnknownType(draft: Draft, match: LexiconMatch): boolean {
+  if (match.attribute !== 'unknownType') return false;
+  if (draft.provenance.type !== undefined) return true;
+
+  draft.evidence.type = quote(draft, match.start, match.end);
+  draft.provenance.type = 'unrecognized';
+  claim(draft, match.start, match.end);
+
+  return true;
+}
+
+function storeAttribute(
+  draft: Draft,
+  found: LexiconAttributes,
+  match: LexiconMatch,
+  factor: number,
+  first: Weighted<LexiconValue>,
+  values: Weighted<LexiconValue>[],
+): boolean {
+  const attribute = match.attribute;
+  if (attribute === 'unknownType') return false;
+
+  if (attribute === 'type') {
+    if (found.type !== undefined || draft.provenance.type === 'unrecognized') return false;
+    found.type = values as Weighted<ProductType>[];
+  } else if (attribute === 'material') {
+    if (found.material !== undefined) return false;
+    found.material = first as Weighted<Material | MaterialFamily>;
+  } else if (attribute === 'finish') {
+    if (found.finish !== undefined) return false;
+    found.finish = first as Weighted<Finish | FinishFamily>;
+  } else {
+    if (found.standard !== undefined) return false;
+    found.standard = String(first.value);
+  }
+
+  draft.evidence[attribute] = quote(draft, match.start, match.end);
+  draft.provenance[attribute] = factor < 1 ? 'corrected' : 'explicit';
+  claim(draft, match.start, match.end);
+
+  return true;
+}
+
 function takeAttributes(draft: Draft): LexiconAttributes {
   const found: LexiconAttributes = { standard: takeStandardCode(draft) };
 
@@ -158,41 +188,14 @@ function takeAttributes(draft: Draft): LexiconAttributes {
     draft.tokens.map((token) => token.text),
     draft.claimed,
   )) {
-    // A phrase naming a product the catalog does not carry. It is claimed rather than
-    // left to the residue, which docs/DESIGN.md 5.3 forbids from emptying C.
-    if (match.attribute === 'unknownType') {
-      if (draft.provenance.type !== undefined) continue;
-
-      draft.evidence.type = quote(draft, match.start, match.end);
-      draft.provenance.type = 'unrecognized';
-      claim(draft, match.start, match.end);
-      continue;
-    }
+    if (claimUnknownType(draft, match)) continue;
 
     const factor = discount(draft, match.start, match.end);
     const values = weigh(match.values, factor);
     const [first] = values;
     if (first === undefined) continue;
 
-    // The lexicon keys its values by attribute; the type system carries the union, so
-    // the branch that reads the attribute is where the value regains its type.
-    if (match.attribute === 'type') {
-      if (found.type !== undefined || draft.provenance.type === 'unrecognized') continue;
-      found.type = values as Weighted<ProductType>[];
-    } else if (match.attribute === 'material') {
-      if (found.material !== undefined) continue;
-      found.material = first as Weighted<Material | MaterialFamily>;
-    } else if (match.attribute === 'finish') {
-      if (found.finish !== undefined) continue;
-      found.finish = first as Weighted<Finish | FinishFamily>;
-    } else {
-      if (found.standard !== undefined) continue;
-      found.standard = String(first.value);
-    }
-
-    draft.evidence[match.attribute] = quote(draft, match.start, match.end);
-    draft.provenance[match.attribute] = factor < 1 ? 'corrected' : 'explicit';
-    claim(draft, match.start, match.end);
+    storeAttribute(draft, found, match, factor, first, values);
   }
 
   return found;
@@ -204,8 +207,6 @@ interface StandardCode {
   to: number;
 }
 
-/** `DIN125` and `DIN 125` are one expression spelled two ways, so neither may depend on a
- * space; the body is the user's own spelling, as a correction into these six invents one. */
 function readStandardCode(draft: Draft, index: number): StandardCode | undefined {
   const token = draft.tokens[index];
   if (token === undefined) return undefined;
@@ -246,9 +247,15 @@ function takeStandardCode(draft: Draft): string | undefined {
 
 function takeIntent(draft: Draft): string[] {
   const candidates: string[] = [];
+  let index = 0;
 
-  for (let index = 0; index < draft.tokens.length; index++) {
-    if (draft.claimed.has(index)) continue;
+  while (index < draft.tokens.length) {
+    if (draft.claimed.has(index)) {
+      index += 1;
+      continue;
+    }
+
+    let matched = false;
 
     for (
       let width = Math.min(MAX_INTENT_TOKENS, draft.tokens.length - index);
@@ -268,56 +275,70 @@ function takeIntent(draft: Draft): string[] {
 
       candidates.push(phrase);
       claim(draft, index, index + width);
-      index += width - 1;
+      index += width;
+      matched = true;
       break;
     }
+
+    if (!matched) index += 1;
   }
 
   return candidates;
 }
 
-/** The unit the user stated, whether it was glued to the number or stood beside it as a
- * token of its own. */
 function statedUnit(size: SizeToken, united: SizeToken | undefined): LengthUnit | undefined {
   if (size.kind === 'length') return size.unit;
 
   return united?.kind === 'length' ? united.unit : undefined;
 }
 
-/** A unit standing on its own annotates the size token before it; a token that already
- * has the shape of a thread keeps it, which is what makes `1/2 inch` a diameter and
- * `12 mm` a length. */
+function sizeSlotAt(draft: Draft, index: number): SizeSlot | undefined {
+  const token = draft.tokens[index];
+  if (token === undefined) return undefined;
+
+  const next = draft.tokens[index + 1];
+  const unit = next !== undefined && !draft.claimed.has(index + 1) && UNIT_TOKENS.has(next.text);
+
+  const bare = classifySizeToken(token.text);
+  const united = unit && next ? classifySizeToken(`${token.text} ${next.text}`) : undefined;
+  const size = bare?.kind === 'thread' ? bare : (united ?? bare);
+  if (size === undefined) return undefined;
+
+  const to = unit && (united !== undefined || bare?.kind === 'thread') ? index + 2 : index + 1;
+
+  return { size, from: index, to, unit: statedUnit(size, united) };
+}
+
 function sizeSlots(draft: Draft): SizeSlot[] {
   const slots: SizeSlot[] = [];
+  let index = 0;
 
-  for (let index = 0; index < draft.tokens.length; index++) {
+  while (index < draft.tokens.length) {
     const token = draft.tokens[index];
-    if (token === undefined || draft.claimed.has(index)) continue;
-
-    if (token.text === SEPARATOR) {
-      claim(draft, index, index + 1);
+    if (token === undefined || draft.claimed.has(index)) {
+      index += 1;
       continue;
     }
 
-    const next = draft.tokens[index + 1];
-    const unit = next !== undefined && !draft.claimed.has(index + 1) && UNIT_TOKENS.has(next.text);
+    if (token.text === SEPARATOR) {
+      claim(draft, index, index + 1);
+      index += 1;
+      continue;
+    }
 
-    const bare = classifySizeToken(token.text);
-    const united = unit && next ? classifySizeToken(`${token.text} ${next.text}`) : undefined;
-    const size = bare?.kind === 'thread' ? bare : (united ?? bare);
-    if (size === undefined) continue;
+    const slot = sizeSlotAt(draft, index);
+    if (slot === undefined) {
+      index += 1;
+      continue;
+    }
 
-    const to = unit && (united !== undefined || bare?.kind === 'thread') ? index + 2 : index + 1;
-    slots.push({ size, from: index, to, unit: statedUnit(size, united) });
-    index = to - 1;
+    slots.push(slot);
+    index = slot.to;
   }
 
   return slots;
 }
 
-/** A nominal keeps the pitch the catalog gives it when the query does not say one; a
- * stated pitch the catalog does not use leaves the diameter unknown, so the query reaches
- * the null hypothesis instead of matching the coarse thread. */
 function readThread(draft: Draft, size: ThreadToken): Thread | undefined {
   const diameter = resolveDiameter(size.nominal);
   if (diameter === undefined) return undefined;
@@ -333,8 +354,6 @@ function readThread(draft: Draft, size: ThreadToken): Thread | undefined {
   draft.evidence.pitch = size.pitch;
   draft.provenance.pitch = 'explicit';
 
-  // M6-1 and M6-1.0 name one pitch; the stored value is the catalog's spelling so that
-  // everything downstream can compare pitches as equals rather than as text.
   const stated = catalog !== undefined && Number(size.pitch) === Number(catalog);
 
   return {
@@ -343,8 +362,6 @@ function readThread(draft: Draft, size: ThreadToken): Thread | undefined {
   };
 }
 
-/** No thread anywhere in the query: a whole number of millimetres is the nominal itself,
- * which is what reads `12 millimeter hex nut` as M12. docs/BRIEF.md 6. */
 function readMillimetres(draft: Draft, size: SizeToken): Thread | undefined {
   if (size.kind !== 'length' || size.unit !== 'mm' || !Number.isInteger(size.value)) {
     return undefined;
@@ -359,8 +376,6 @@ function readMillimetres(draft: Draft, size: SizeToken): Thread | undefined {
   return { diameter, pitch };
 }
 
-/** The mirror of `readMillimetres` on the imperial side: with no thread anywhere, a
- * fraction the user closed with the inch mark is the nominal, not a length. */
 function readInches(draft: Draft, size: SizeToken): Thread | undefined {
   if (size.kind !== 'length' || size.unit !== 'in') return undefined;
 
@@ -378,8 +393,6 @@ function readInches(draft: Draft, size: SizeToken): Thread | undefined {
   return { diameter, pitch: entry.pitch };
 }
 
-/** After the diameter, every remaining size token is read as a length: `3/4-10 tap bolt
- * 5/8` and `#10-24 x 1/2` both put a thread-shaped token where the length belongs. */
 function asLength(slot: SizeSlot): SizeToken | undefined {
   const { size } = slot;
   if (size.kind === 'length') return size;
@@ -401,44 +414,44 @@ interface Sizes {
   length?: Length;
 }
 
-/** A dimension the query sets apart itself: it carries its own unit, or it stands where
- * the separator put it. Either says dimension without help from the words in between. */
 function delimited(draft: Draft, slot: SizeSlot): boolean {
   if (slot.unit !== undefined) return true;
 
   return draft.tokens[slot.from - 1]?.text === SEPARATOR;
 }
 
-function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
-  const sizes: Sizes = {};
-  const threadAt = slots.findIndex((slot) => slot.size.kind === 'thread');
-  const headAt = threadAt >= 0 ? threadAt : 0;
-  const head = slots[headAt];
-  const size = head?.size;
+function headThread(draft: Draft, size: SizeToken | undefined): Thread | undefined {
+  if (size === undefined) return undefined;
+  if (size.kind === 'thread') return readThread(draft, size);
 
-  const thread =
-    size === undefined
-      ? undefined
-      : size.kind === 'thread'
-        ? readThread(draft, size)
-        : (readMillimetres(draft, size) ?? readInches(draft, size));
+  return readMillimetres(draft, size) ?? readInches(draft, size);
+}
 
-  if (head !== undefined && thread !== undefined) {
-    sizes.diameter = thread.diameter;
-    sizes.pitch = thread.pitch;
-    draft.evidence.diameter = quote(draft, head.from, head.to);
-    draft.provenance.diameter = size?.kind === 'thread' ? 'explicit' : 'inferred';
-    claim(draft, head.from, head.to);
-  }
+function claimDiameter(
+  draft: Draft,
+  sizes: Sizes,
+  head: SizeSlot,
+  thread: Thread,
+  size: SizeToken | undefined,
+): void {
+  sizes.diameter = thread.diameter;
+  sizes.pitch = thread.pitch;
+  draft.evidence.diameter = quote(draft, head.from, head.to);
+  draft.provenance.diameter = size?.kind === 'thread' ? 'explicit' : 'inferred';
+  claim(draft, head.from, head.to);
+}
 
-  const reach = sizes.diameter === undefined ? undefined : head?.to;
-
-  // A number the diameter reaches only over unclaimed ground belongs to something else,
-  // as the 8 of `1/2-13 hex nut grade 8`; one the query delimits is a dimension regardless.
-  for (const slot of thread === undefined ? slots : slots.slice(headAt + 1)) {
+function claimFirstLength(
+  draft: Draft,
+  sizes: Sizes,
+  slots: readonly SizeSlot[],
+  reach: number | undefined,
+): void {
+  for (const slot of slots) {
     if (reach !== undefined && !delimited(draft, slot) && !settled(draft, reach, slot.from)) {
       continue;
     }
+
     const candidate = asLength(slot);
     const resolved = candidate && resolveLength(candidate, sizes.diameter);
     if (!resolved) continue;
@@ -449,6 +462,23 @@ function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
     claim(draft, slot.from, slot.to);
     break;
   }
+}
+
+function takeSizes(draft: Draft, slots: readonly SizeSlot[]): Sizes {
+  const sizes: Sizes = {};
+  const threadAt = slots.findIndex((slot) => slot.size.kind === 'thread');
+  const headAt = Math.max(threadAt, 0);
+  const head = slots[headAt];
+  const size = head?.size;
+  const thread = headThread(draft, size);
+
+  if (head !== undefined && thread !== undefined) {
+    claimDiameter(draft, sizes, head, thread, size);
+  }
+
+  const reach = sizes.diameter === undefined ? undefined : head?.to;
+  const remaining = thread === undefined ? slots : slots.slice(headAt + 1);
+  claimFirstLength(draft, sizes, remaining, reach);
 
   return sizes;
 }

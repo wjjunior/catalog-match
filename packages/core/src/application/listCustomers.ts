@@ -19,8 +19,6 @@ export function listCustomers(deps: ListCustomersDeps): (q?: string) => readonly
     const matches = (customer: CustomerSummary, how: (field: string) => boolean): boolean =>
       searchable(customer).some(how);
 
-    // A prefix is the stronger reading of what a rep is typing, so those come first; the
-    // repository's order decides inside each group.
     const prefix = customers.filter((customer) =>
       matches(customer, (field) => field.startsWith(needle)),
     );

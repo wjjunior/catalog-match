@@ -6,7 +6,7 @@ import { MatchedAttributes } from './MatchedAttributes';
 
 // An alternative is not a match: it carries closeness and the constraints that were given
 // up, and never a confidence.
-export function AlternativeCard({ alternative }: { alternative: Alternative }) {
+export function AlternativeCard({ alternative }: Readonly<{ alternative: Alternative }>) {
   return (
     <article className="flex flex-col gap-3.5 rounded-xl border border-border/70 bg-card p-4 shadow-sm transition-colors hover:border-border sm:p-5">
       <ItemHeader

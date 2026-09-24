@@ -4,20 +4,16 @@ import type { Core } from '../packages/core/src/application/createCore';
 import { createCore } from '../packages/core/src/application/createCore';
 import type { MatchResponse } from '../packages/core/src/domain/match';
 
-// A fourth driving adapter over the Matcher port, beside the route handlers, the eval
-// harness and the property tests. docs/DESIGN.md 4.2 and 14.
 const ROOT = new URL('../', import.meta.url);
 
 export interface DemoStep {
   readonly title: string;
   readonly query: string;
   readonly customerId?: string;
-  /** What the room should be looking at while this is on screen. */
   readonly expectation: string;
   readonly limit?: number;
 }
 
-/** The beats of docs/DESIGN.md 14, in the order they are performed. */
 export const DEMO_STEPS: readonly DemoStep[] = [
   {
     title: 'Fully specified',
@@ -149,8 +145,6 @@ function alternativeLines(response: MatchResponse): string[] {
   );
 }
 
-/** One beat, as the lines it puts on screen. Kept separate from printing so the rehearsal
- * is a test rather than a thing someone watches scroll past. */
 export function render(core: Core, step: DemoStep): string[] {
   const response = core.matchQuery({
     query: step.query,
@@ -158,13 +152,14 @@ export function render(core: Core, step: DemoStep): string[] {
     limit: step.limit ?? 3,
   });
 
-  const who = step.customerId === undefined ? 'no customer' : step.customerId;
+  const who = step.customerId ?? 'no customer';
   const settle = response.results[0]?.explanation.disambiguateBy ?? [];
+  const settleHint = settle.length === 0 ? '' : `, specify ${settle.join(' or ')}`;
 
   return [
     `> ${step.query}   (${who})`,
     '',
-    `  status ${response.status} — ${headline(response)}${settle.length === 0 ? '' : `, specify ${settle.join(' or ')}`}`,
+    `  status ${response.status} — ${headline(response)}${settleHint}`,
     ...(response.results.length === 0 ? [] : ['', ...matchLines(response)]),
     ...(response.alternatives.length === 0 ? [] : ['', ...alternativeLines(response)]),
     ...(response.notes.length === 0 ? [] : ['', ...response.notes.map((n) => `  · ${n.message}`)]),

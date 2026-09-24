@@ -5,10 +5,10 @@ import { attributeLabel } from './attributeLabel';
 export function MissingAttributes({
   attributes,
   label,
-}: {
+}: Readonly<{
   attributes: readonly AttributeName[];
   label: string;
-}) {
+}>) {
   if (attributes.length === 0) return null;
 
   return (

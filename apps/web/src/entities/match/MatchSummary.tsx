@@ -21,10 +21,10 @@ function customerLine(customerName: string, personalized: boolean): string {
 export function MatchSummary({
   response,
   customerName,
-}: {
+}: Readonly<{
   response: MatchResponse;
   customerName?: string;
-}) {
+}>) {
   const headline = countedHeadline(response);
   const unspecified = response.results[0]?.explanation.unspecified ?? [];
   const personalized = response.results.some(
