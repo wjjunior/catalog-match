@@ -1,7 +1,5 @@
 import type { AttributeName, ParsedSpec, Provenance } from './spec';
 
-/** Decided by the compatible set before any number; a threshold never stands in for
- * `none`. docs/DESIGN.md 5.3. */
 export const MATCH_STATUSES = ['unique', 'ambiguous', 'none', 'history', 'unparsed'] as const;
 
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
@@ -33,7 +31,6 @@ export interface MatchedAttribute {
   query: string;
   item: string;
   provenance: Provenance;
-  /** True when the agreement is at family level rather than exact. */
   partial?: boolean;
 }
 
@@ -49,7 +46,6 @@ export interface Explanation {
   unverified: string[];
   compatibleCount: number;
   disambiguateBy: AttributeName[];
-  /** `relaxed` and `closeness` are set on alternatives only. */
   relaxed?: string[];
   closeness?: number;
   personalization?: PersonalizationExplanation;
@@ -63,15 +59,12 @@ export interface Match {
   confidence: number;
   label?: ConfidenceLabel;
   explanation: Explanation;
-  /** The s_i and q_i of docs/DESIGN.md 5.4 and 7.2, so a posterior can be taken apart. */
   components: {
     compatibility: number;
     prior: number;
   };
 }
 
-/** Reached by relaxing a stated constraint, so it carries closeness and never a
- * confidence. docs/DESIGN.md 5.6. */
 export interface Alternative {
   sku: string;
   catalogId: string;
@@ -85,7 +78,6 @@ export interface Alternative {
 export interface MatchRequest {
   query: string;
   customerId?: string;
-  /** Defaults to 3. */
   limit?: number;
 }
 

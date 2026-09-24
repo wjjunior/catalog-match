@@ -14,7 +14,7 @@ import {
 
 const VISIBLE_COUNT = 5;
 
-export function ExampleChips({ onPick }: { onPick: (query: string) => void }) {
+export function ExampleChips({ onPick }: Readonly<{ onPick: (query: string) => void }>) {
   const [open, setOpen] = useState(false);
   const visible = EXAMPLE_QUERIES.slice(0, VISIBLE_COUNT);
   const remaining = EXAMPLE_QUERIES.length - VISIBLE_COUNT;

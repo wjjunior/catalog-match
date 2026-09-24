@@ -2,7 +2,6 @@ import { STANDARD_BODIES } from './lexicon';
 
 export interface NormalizedToken {
   text: string;
-  /** Offsets into the original input, so evidence can quote what the user wrote. */
   start: number;
   end: number;
 }
@@ -26,16 +25,13 @@ const UNICODE_FRACTIONS: Readonly<Record<string, string>> = {
 const FRACTION_CHARS = Object.keys(UNICODE_FRACTIONS).join('');
 const SIZE_CHAR = `0-9"'/″”’${FRACTION_CHARS}`;
 
-// Anchored between size characters: a bare replacement would cut `hex` into `he x`.
-const INNER_SEPARATOR = new RegExp(`(?<=[${SIZE_CHAR}])[x×](?=[0-9])`, 'g');
+const INNER_SEPARATOR = new RegExp(String.raw`(?<=[${SIZE_CHAR}])[x×](?=\d)`, 'g');
 const TRAILING_SEPARATOR = new RegExp(`[${SIZE_CHAR}][x×]$`);
-const LEADING_SEPARATOR = /^[x×][0-9]/;
+const LEADING_SEPARATOR = /^[x×]\d/;
 const ENDS_WITH_SIZE_CHAR = new RegExp(`[${SIZE_CHAR}]$`);
-const FRACTION = new RegExp(`(\\d?)([${FRACTION_CHARS}])`, 'g');
+const FRACTION = new RegExp(String.raw`(\d?)([${FRACTION_CHARS}])`, 'g');
 
-// Trailing only: a standard carries its periods inside (`b18.2.1`) and a size needs the
-// marks SIZE_CHAR claims, so neither may be read as the end of a sentence.
-const TRAILING_PUNCTUATION = /[,.;:!?]+$/;
+const TRAILING_PUNCTUATION = new Set([',', '.', ';', ':', '!', '?']);
 
 const UNIT_ALIASES: Readonly<Record<string, string>> = {
   inch: 'in',
@@ -52,11 +48,10 @@ const UNIT_ALIASES: Readonly<Record<string, string>> = {
   mm: 'mm',
 };
 
-// Whole tokens only, plus a unit glued to a number: `zinc` ends in a unit alias and
-// must survive untouched.
-const GLUED_UNIT = new RegExp(
-  `^(\\d[\\d./-]*?)(${Object.keys(UNIT_ALIASES).join('|').replace(/\./g, '\\.')})$`,
-);
+const UNIT_ALTERNATION = Object.keys(UNIT_ALIASES)
+  .join('|')
+  .replaceAll('.', String.raw`\.`);
+const GLUED_UNIT = new RegExp(String.raw`^(\d[\d./-]*?)(${UNIT_ALTERNATION})$`);
 
 const NUMBER_WORDS = new Set(['#', 'no.', 'no', 'number']);
 
@@ -70,10 +65,7 @@ const SINGULARS: Readonly<Record<string, string>> = {
 };
 
 const QUANTITY_WORDS = new Set(['pcs', 'pc', 'pieces', 'piece', 'ea', 'each', 'qty']);
-// qty precedes its number ("qty 100"); every other quantity word follows theirs ("100 pcs").
 const QUANTITY_WORDS_TAKING_FOLLOWING_NUMBER = new Set(['qty']);
-// Adverbs, not count nouns: `each` says how a count is distributed, so it is too weak to
-// take a number the separator has already bound. Every other quantity word names a count.
 const DISTRIBUTIVE_WORDS = new Set(['ea', 'each']);
 const NOISE_WORDS = new Set(['please', 'quote', 'need', 'want']);
 const NOTE_ORDER: readonly NormalizationNote[] = ['quantityStripped', 'noiseStripped'];
@@ -82,10 +74,16 @@ function slice(token: NormalizedToken, from: number, to: number): NormalizedToke
   return { text: token.text.slice(from, to), start: token.start + from, end: token.start + to };
 }
 
+function stripTrailingPunctuation(text: string): string {
+  let end = text.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(text[end - 1] ?? '')) end -= 1;
+  return text.slice(0, end);
+}
+
 function tokenize(input: string): NormalizedToken[] {
   return [...input.matchAll(/\S+/g)]
     .map((match) => {
-      const text = match[0].toLowerCase().replace(TRAILING_PUNCTUATION, '');
+      const text = stripTrailingPunctuation(match[0].toLowerCase());
 
       return { text, start: match.index, end: match.index + text.length };
     })
@@ -99,9 +97,7 @@ function separatorOffsets(
 ): number[] {
   const offsets = new Set([...token.text.matchAll(INNER_SEPARATOR)].map((match) => match.index));
 
-  // The catalog writes `1/2-13X 3"` and `1/2-13 x3"`: the separator is glued to one side
-  // only, so the digit that anchors it sits in the neighbouring token.
-  if (next && /^[0-9]/.test(next.text) && TRAILING_SEPARATOR.test(token.text)) {
+  if (next && /^\d/.test(next.text) && TRAILING_SEPARATOR.test(token.text)) {
     offsets.add(token.text.length - 1);
   }
   if (previous && ENDS_WITH_SIZE_CHAR.test(previous.text) && LEADING_SEPARATOR.test(token.text)) {
@@ -115,7 +111,7 @@ function separatorOffsets(
 function splitSeparators(tokens: NormalizedToken[]): NormalizedToken[] {
   return tokens.flatMap((token, index) => {
     const offsets = separatorOffsets(token, tokens[index - 1], tokens[index + 1]);
-    if (offsets.length === 0) return [{ ...token, text: token.text.replace(/×/g, 'x') }];
+    if (offsets.length === 0) return [{ ...token, text: token.text.replaceAll('×', 'x') }];
 
     const parts: NormalizedToken[] = [];
     let cursor = 0;
@@ -133,10 +129,10 @@ function splitSeparators(tokens: NormalizedToken[]): NormalizedToken[] {
 
 function rewriteCharacters(text: string): string {
   return text
-    .replace(/[’‘]/g, "'")
-    .replace(/''/g, '"')
-    .replace(/[″”“]/g, '"')
-    .replace(FRACTION, (match: string, digit: string, fraction: string) => {
+    .replaceAll(/[’‘]/g, "'")
+    .replaceAll("''", '"')
+    .replaceAll(/[″”“]/g, '"')
+    .replaceAll(FRACTION, (match: string, digit: string, fraction: string) => {
       const ascii = UNICODE_FRACTIONS[fraction];
       if (ascii === undefined) return match;
 
@@ -169,7 +165,7 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
 
     const next = tokens[index + 1];
 
-    if (NUMBER_WORDS.has(token.text) && next && /^[0-9]/.test(next.text)) {
+    if (NUMBER_WORDS.has(token.text) && next && /^\d/.test(next.text)) {
       merged.push({ text: `#${next.text}`, start: token.start, end: next.end });
       skipMerged = true;
       continue;
@@ -181,21 +177,30 @@ function mergeNumberWords(tokens: NormalizedToken[]): NormalizedToken[] {
   return merged;
 }
 
-// A quantity word governs one adjacent number, never both: with a number on each side the
-// governed direction already says which of them is the quantity.
+function isNumberToken(token: NormalizedToken | undefined): boolean {
+  return token !== undefined && /^\d+$/.test(token.text);
+}
+
+// `x` is ordering shorthand as often as it is a size separator, so `hex nut x 100 pcs` is
+// a count twice over; only the adverbs leave it standing as a dimension.
+function boundByPrevious(tokens: NormalizedToken[], index: number, word: string): boolean {
+  const previous = tokens[index - 1]?.text;
+  if (previous === undefined) return false;
+
+  return STANDARD_BODIES.has(previous) || (previous === 'x' && DISTRIBUTIVE_WORDS.has(word));
+}
+
+function loneQuantityIndex(
+  index: number,
+  hasBefore: boolean,
+  hasAfter: boolean,
+): number | undefined {
+  if (hasBefore) return index - 1;
+  if (hasAfter) return index + 1;
+  return undefined;
+}
+
 function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
-  const isNumberToken = (token: NormalizedToken | undefined): boolean =>
-    token !== undefined && /^\d+$/.test(token.text);
-
-  // `x` is ordering shorthand as often as it is a size separator, so `hex nut x 100 pcs` is
-  // a count twice over; only the adverbs leave it standing as a dimension.
-  const boundByPrevious = (index: number, word: string): boolean => {
-    const previous = tokens[index - 1]?.text;
-    if (previous === undefined) return false;
-
-    return STANDARD_BODIES.has(previous) || (previous === 'x' && DISTRIBUTIVE_WORDS.has(word));
-  };
-
   const claimed = new Set<number>();
 
   tokens.forEach((token, index) => {
@@ -209,10 +214,8 @@ function claimedQuantityNumbers(tokens: NormalizedToken[]): Set<number> {
       return;
     }
 
-    // What speaks for a lone number is local to it: the token in front, weighed against the
-    // kind of word reaching for it. A standard body binds its designator against them all.
-    const lone = hasBefore ? index - 1 : hasAfter ? index + 1 : undefined;
-    if (lone !== undefined && !boundByPrevious(lone, token.text)) claimed.add(lone);
+    const lone = loneQuantityIndex(index, hasBefore, hasAfter);
+    if (lone !== undefined && !boundByPrevious(tokens, lone, token.text)) claimed.add(lone);
   });
 
   return claimed;
@@ -228,8 +231,6 @@ function stripQuantitiesAndNoise(tokens: NormalizedToken[]): NormalizedText {
     return undefined;
   });
 
-  // `of` carries nothing on its own; it goes only with the quantity phrase it belongs to,
-  // which is what `200 pcs of m8` needs and what leaves `box of m8` alone.
   tokens.forEach((token, index) => {
     if (token.text === 'of') dropped[index] ??= dropped[index - 1] ?? dropped[index + 1];
   });

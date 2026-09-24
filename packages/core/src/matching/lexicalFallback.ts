@@ -64,6 +64,12 @@ function inverseDocumentFrequency(index: LexicalIndex, term: string): number {
   return Math.log(1 + (index.size - held + 0.5) / (held + 0.5));
 }
 
+function byCodeUnit(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 /** Scores relative to the best hit, so a caller can cap them without knowing how long the
  * descriptions happen to be. Documents no query term reaches are absent, not zero. */
 export function score(index: LexicalIndex, queryTokens: readonly string[]): ScoredSku[] {
@@ -88,11 +94,9 @@ export function score(index: LexicalIndex, queryTokens: readonly string[]): Scor
 
   // Code units, not `localeCompare`: the latter follows the runner's locale, and
   // Lithuanian collates `Y` between `I` and `J`, which would reorder tied skus.
-  return ranked.sort((a, b) => b.score - a.score || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
+  return ranked.sort((a, b) => b.score - a.score || byCodeUnit(a.sku, b.sku));
 }
 
-/** The baseline of docs/DESIGN.md 10.4: the same scoring the parser falls back to, run
- * alone so the parse-and-score hypothesis has something to be measured against. */
 export class LexicalOnlyMatcher {
   private readonly bySku: ReadonlyMap<string, CatalogItem>;
 

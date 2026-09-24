@@ -6,49 +6,71 @@ export function parseCsv(text: string): Record<string, string>[] {
   return rows.map((cells) => Object.fromEntries(header.map((name, i) => [name, cells[i] ?? ''])));
 }
 
+interface ParseState {
+  rows: string[][];
+  cells: string[];
+  cell: string;
+  quoted: boolean;
+  index: number;
+}
+
+function pushCell(state: ParseState): void {
+  state.cells.push(state.cell);
+  state.cell = '';
+}
+
+function endRow(state: ParseState): void {
+  pushCell(state);
+  state.rows.push(state.cells);
+  state.cells = [];
+}
+
+function readQuoted(text: string, state: ParseState, char: string): void {
+  if (char !== '"') {
+    state.cell += char;
+    return;
+  }
+
+  if (text[state.index + 1] === '"') {
+    state.cell += '"';
+    state.index += 1;
+    return;
+  }
+
+  state.quoted = false;
+}
+
+function readUnquoted(text: string, state: ParseState, char: string): void {
+  if (char === '"') {
+    state.quoted = true;
+    return;
+  }
+
+  if (char === ',') {
+    pushCell(state);
+    return;
+  }
+
+  if (char === '\n' || char === '\r') {
+    if (char === '\r' && text[state.index + 1] === '\n') state.index += 1;
+    endRow(state);
+    return;
+  }
+
+  state.cell += char;
+}
+
 function readRows(text: string): string[][] {
-  const rows: string[][] = [];
-  let cells: string[] = [];
-  let cell = '';
-  let quoted = false;
+  const state: ParseState = { rows: [], cells: [], cell: '', quoted: false, index: 0 };
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
+  for (; state.index < text.length; state.index += 1) {
+    const char = text[state.index] ?? '';
 
-    if (quoted) {
-      if (char === '"') {
-        if (text[i + 1] === '"') {
-          cell += '"';
-          i++;
-        } else {
-          quoted = false;
-        }
-      } else {
-        cell += char;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      quoted = true;
-    } else if (char === ',') {
-      cells.push(cell);
-      cell = '';
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && text[i + 1] === '\n') i++;
-      cells.push(cell);
-      rows.push(cells);
-      cells = [];
-      cell = '';
-    } else {
-      cell += char;
-    }
+    if (state.quoted) readQuoted(text, state, char);
+    else readUnquoted(text, state, char);
   }
 
-  if (cell !== '' || cells.length > 0) {
-    cells.push(cell);
-    rows.push(cells);
-  }
+  if (state.cell !== '' || state.cells.length > 0) endRow(state);
 
-  return rows;
+  return state.rows;
 }

@@ -7,12 +7,9 @@ import type { MatcherConfig } from '../matching/config';
 type ShareName = 'material' | 'finish' | 'threadSystem';
 
 export interface PriorReason {
-  /** repeat_i of docs/DESIGN.md 7.2, after the discontinued-sibling credit. */
   repeat: number;
   purchase?: Omit<Purchase, 'spec'>;
-  /** The SKU this item inherited the sibling credit from. */
   discontinuedSibling?: string;
-  /** The P(a_i | c) that entered h_i. An attribute the query stated is absent. */
   shares: Partial<Record<ShareName, number>>;
 }
 
@@ -21,8 +18,6 @@ export interface HistoryPriorResult {
   reasons: ReadonlyMap<string, PriorReason>;
 }
 
-/** A stated attribute contributes no factor. The diameter names the thread system, and
- * every item of C then shares it, so dropping that factor changes no q. */
 function shareNames(spec: ParsedSpec): ShareName[] {
   const names: ShareName[] = [];
   if (spec.material === undefined) names.push('material');
@@ -45,12 +40,12 @@ function valueOf(spec: ParsedSpec, name: ShareName): string | undefined {
 const isMaterial = (value: string): value is Material =>
   (MATERIALS as readonly string[]).includes(value);
 
-/** A generic term parses to the family itself, so the value may already be one. */
-const familyOf = (value: Material | MaterialFamily | undefined): MaterialFamily | undefined =>
-  value === undefined ? undefined : isMaterial(value) ? MATERIAL_FAMILY[value] : value;
+function familyOf(value: Material | MaterialFamily | undefined): MaterialFamily | undefined {
+  if (value === undefined) return undefined;
+  if (isMaterial(value)) return MATERIAL_FAMILY[value];
+  return value;
+}
 
-/** Diameter, type and material family: what docs/BRIEF.md 8 calls sharing enough with a
- * discontinued purchase to inherit part of its weight. */
 function siblingKey(spec: ParsedSpec | undefined): string | undefined {
   if (spec === undefined) return undefined;
 
@@ -120,8 +115,6 @@ function reasonFor(
 const bySku = (a: CatalogItem, b: CatalogItem): number =>
   a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0;
 
-/** q_i of docs/DESIGN.md 7.2 over C. An absent profile leaves lambda_c at 0, and the
- * mixture is then the uniform distribution, so no-customer needs no branch of its own. */
 export function historyPrior(
   profile: CustomerProfile | undefined,
   spec: ParsedSpec,
@@ -131,8 +124,6 @@ export function historyPrior(
   const names = shareNames(spec);
   const siblingOf = discontinuedSiblings(profile);
 
-  // Summed in SKU order rather than the caller's: floating-point addition is not
-  // associative, and q is promised to be the same distribution whatever order C arrives in.
   const entries = [...candidates].sort(bySku).map((item) => {
     const { factor, shares } = weigh(item, profile, names);
     const reason = reasonFor(item, profile, shares, siblingOf, config);
@@ -142,7 +133,6 @@ export function historyPrior(
   const mass = entries.reduce((sum, entry) => sum + entry.weight, 0);
   const lambda = profile?.lambda ?? 0;
   const share = candidates.length === 0 ? 0 : 1 / candidates.length;
-  // Every factor at zero leaves nothing to normalize, and the history has nothing to say.
   const h = (weight: number): number => (mass === 0 ? share : weight / mass);
 
   return {

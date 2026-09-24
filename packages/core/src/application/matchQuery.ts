@@ -56,8 +56,6 @@ export interface MatchQueryDeps {
   readonly catalog: CatalogRepository;
   readonly index: LexicalIndex;
   readonly config?: MatcherConfig;
-  /** Both are absent for a matcher wired without a customer to speak of, which is what
-   * the eval harness and the base tests use. */
   readonly history?: OrderHistoryRepository;
   readonly profile?: (customerId: string) => CustomerProfile | undefined;
 }
@@ -68,16 +66,12 @@ const DEFAULT_LIMIT = 3;
 
 const bySku = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** A response carrying a label promises one, so an unmeasured threshold must not reach
- * the caller. docs/DESIGN.md 5.5. */
 function labelled(match: Match, config: MatcherConfig): Match {
   if (config.labels.provisional) return match;
 
   return { ...match, label: labelFor(match.confidence, config).label };
 }
 
-/** What qualifies a product rather than identifies it, in the probe order of
- * `buildConstraints`, which is the order a failure note reads in. */
 const QUALIFIERS = ['length', 'standard', 'material', 'finish'] as const;
 
 type Qualifier = (typeof QUALIFIERS)[number];
@@ -105,8 +99,6 @@ function statedValue(spec: ParsedSpec, attribute: Qualifier): string | undefined
   }
 }
 
-/** `failedConstraintNote` names the product by its diameter and type, and a query that
- * reached the lexical fallback has neither; the qualifiers that held stand in for it. */
 function qualifierOnlyNote(spec: ParsedSpec, failed: Qualifier): Note | undefined {
   const value = statedValue(spec, failed);
   if (value === undefined) return undefined;
@@ -121,8 +113,6 @@ function qualifierOnlyNote(spec: ParsedSpec, failed: Qualifier): Note | undefine
   };
 }
 
-/** Everything the query did constrain, in probe order; on the fallback path the qualifiers
- * are all of it, since neither a diameter nor a type was recognized. */
 const statedQualifiers = (spec: ParsedSpec): string =>
   QUALIFIERS.map((attribute) => statedValue(spec, attribute))
     .filter((value) => value !== undefined)
@@ -159,14 +149,12 @@ function notesFor(spec: ParsedSpec, failure: Note | undefined): Note[] {
   return notes;
 }
 
-/** A purchase the catalog has dropped is worth naming where the rep expected to see it:
- * the diameter and type they just asked for. docs/DESIGN.md 7.3. */
 function discontinuedNotes(profile: CustomerProfile | undefined, spec: ParsedSpec): Note[] {
   if (profile === undefined) return [];
 
   const types = spec.type?.map((entry) => entry.value);
 
-  return [...profile.discontinued].sort().flatMap((sku) => {
+  return [...profile.discontinued].sort(bySku).flatMap((sku) => {
     const purchase = profile.purchases[sku];
     if (purchase === undefined) return [];
     if (spec.diameter !== undefined && purchase.spec.diameter?.nominal !== spec.diameter.nominal) {
@@ -192,8 +180,6 @@ function ranked(
   profile: CustomerProfile | undefined,
 ): Answer {
   const s = compatible.map((item) => compatibility(spec, item, config));
-  // An absent profile leaves lambda at 0, which is the uniform prior exactly, so the
-  // no-customer response needs no branch of its own. docs/DESIGN.md 7.2.
   const distribution = historyPrior(profile, spec, compatible, config);
   const prior = compatible.map((item) => distribution.q.get(item.sku) ?? 0);
   const { p } = posterior(compatible, s, prior, spec.residue.length, config);
@@ -275,9 +261,6 @@ function none(
   };
 }
 
-/** docs/DESIGN.md 5.8. The constraints the parser did find are too weak to name a product,
- * which is what `unparsed` says, but they still rule out what contradicts them: the pool
- * they leave is a compatible set and is reported as one; token overlap only orders it. */
 function unparsed(
   query: string,
   spec: ParsedSpec,
@@ -286,16 +269,12 @@ function unparsed(
   config: MatcherConfig,
   limit: number,
 ): Answer {
-  // The same tokens the baseline scores (matching/lexicalFallback.ts), so the comparison
-  // of docs/DESIGN.md 10.4 stays one of parsing against scoring, not of two tokenizers.
   const tokens = normalize(query).tokens.map((token) => correct(token.text)?.word ?? token.text);
   const meta: ExplanationMeta = { compatibleCount: pool.length, disambiguateBy: [] };
   const admitted = new Set(pool.map((item) => item.sku));
 
   const candidates = score(deps.index, tokens).filter((entry) => admitted.has(entry.sku));
 
-  // A synonym the catalog never writes (stainless for 18-8 SS) overlaps no description, so
-  // there is no order to serve; the pool it did constrain is the answer, not three of it.
   if (candidates.length === 0) {
     return {
       status: 'unparsed',
@@ -306,8 +285,6 @@ function unparsed(
     };
   }
 
-  // `score` divides by the best hit in the whole index, and an item the attributes ruled
-  // out must not be what the best surviving overlap is measured against.
   const best = candidates[0]?.score ?? 1;
 
   const results = candidates.slice(0, limit).flatMap((entry) => {
@@ -325,7 +302,6 @@ function unparsed(
           active: item.active,
           confidence: config.lexicalCap * overlap,
           explanation: explainMatch(spec, item, meta),
-          // Token overlap is all the evidence there is, and no customer is known yet.
           components: { compatibility: overlap, prior: 1 },
         },
         config,
@@ -342,9 +318,6 @@ function unparsed(
   };
 }
 
-/** The lines a reference names, most recent first. There is no compatible set behind
- * them: recency decides the order, and the quantity and date are the explanation.
- * docs/DESIGN.md 7.4. */
 function referencedOrders(
   spec: ParsedSpec,
   lines: readonly ReferencedLine[],
@@ -356,8 +329,6 @@ function referencedOrders(
 
   const results = lines
     .flatMap((line, rank) => {
-      // A SKU the catalog dropped is still what the customer ordered, so it is shown as
-      // inactive rather than hidden; one the catalog never had cannot be shown at all.
       const item = deps.catalog.bySku(line.sku);
       if (item === undefined) return [];
 
@@ -373,8 +344,6 @@ function referencedOrders(
               reason: orderedReason(line.quantity, line.orderDate),
               prior: 1,
             }),
-            // Rank is the whole of the evidence, and nothing weighted these against each
-            // other the way a prior over C would.
             components: { compatibility: config.historyDecayPerRank ** rank, prior: 1 },
           },
           config,
@@ -414,25 +383,21 @@ function attributeAnswer(
   config: MatcherConfig,
   limit: number,
   profile: CustomerProfile | undefined,
-  // A lifted length is only known after bindLength, and the history note must not announce
-  // a change to an attribute that then took no part in the match.
   carriedFor: (unbound: Length | undefined) => readonly Note[],
 ): Answer {
   const items = deps.catalog.active();
-  // A length no type the query names can carry is lifted before C is taken, so the filter,
-  // the ranker and the explanation are all given the constraints that can actually bind.
   const { spec, unbound } = bindLength(parsed, items);
   const compatible = compatibleSet(spec, items);
   const status = deriveStatus(spec, compatible);
 
-  // A recognized attribute that admits nothing is a failed constraint, not a licence to
-  // rank the catalog it just excluded: the fallback takes the backoff of 5.6 instead.
-  const answer =
-    compatible.length === 0
-      ? none(spec, items, config, limit)
-      : status === 'unparsed'
-        ? unparsed(query, spec, compatible, deps, config, limit)
-        : ranked(status, spec, compatible, config, limit, profile);
+  let answer: Answer;
+  if (compatible.length === 0) {
+    answer = none(spec, items, config, limit);
+  } else if (status === 'unparsed') {
+    answer = unparsed(query, spec, compatible, deps, config, limit);
+  } else {
+    answer = ranked(status, spec, compatible, config, limit, profile);
+  }
 
   const added = [
     ...unboundNotes(spec, unbound),
@@ -461,8 +426,6 @@ function answerFor(
   const lines =
     request.customerId === undefined ? undefined : deps.history?.byCustomer(request.customerId);
 
-  // A customer with no line at all is no more able to resolve a reference than no
-  // customer is, so both reach the prompt. docs/DESIGN.md 7.5.
   const reference = resolveReference(
     lines === undefined || lines.length === 0 ? undefined : lines,
     spec,
@@ -488,8 +451,6 @@ function answerFor(
     );
   }
 
-  // A reference that named no order is not an answer, and the history cannot be held
-  // against the catalog: status comes from C as it does for any other query. 5.3, 7.4.
   if (reference.form === 'unresolved') {
     return attributeAnswer(request.query, spec, deps, config, limit, profile, () => [
       unresolvedReferenceNote(phrase),
@@ -500,8 +461,6 @@ function answerFor(
     return referencedOrders(spec, reference.lines, deps, config, limit);
   }
 
-  // No customer: the reference cannot be resolved, but a query that also asks for a
-  // change still has attributes the pipeline can answer. docs/DESIGN.md 7.4.
   const prompt = customerRequiredNote(phrase);
   if (statesOverride(spec)) {
     return attributeAnswer(request.query, spec, deps, config, limit, profile, () => [prompt]);

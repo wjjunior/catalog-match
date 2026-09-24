@@ -27,7 +27,6 @@ export interface LexiconMatch extends LexiconEntry {
   end: number;
 }
 
-/** Spellings the catalog uses interchangeably inside a type phrase. */
 const WORD_VARIANTS: Readonly<Record<string, readonly string[]>> = {
   hex: ['hex', 'hx'],
   screw: ['screw', 'scr'],
@@ -56,7 +55,6 @@ const full = (...values: ProductType[]): Weighted<LexiconValue>[] =>
 const at = (strength: number, ...values: ProductType[]): Weighted<LexiconValue>[] =>
   values.map((value) => ({ value, strength }));
 
-/** Templates whose expansion covers every type phrase in the catalog. */
 const TYPE_TEMPLATES: ReadonlyArray<readonly [string, ProductType]> = [
   ['hex cap screw', 'hex_cap_screw'],
   ['hex nut', 'hex_nut'],
@@ -120,8 +118,6 @@ const TYPE_TERMS: ReadonlyArray<readonly [string, Weighted<LexiconValue>[]]> = [
   ['spring washer', full('lock_washer')],
   ['split lock washer', full('lock_washer')],
 
-  // A tap bolt is a fully threaded hex bolt, so a hex-head term names both at full
-  // strength and the explanation says which one was matched.
   ['hhb', full('hex_cap_screw', 'tap_bolt')],
   ['hex bolt', full('hex_cap_screw', 'tap_bolt')],
   ['hex head bolt', full('hex_cap_screw', 'tap_bolt')],
@@ -149,8 +145,6 @@ const TYPE_TERMS: ReadonlyArray<readonly [string, Weighted<LexiconValue>[]]> = [
   ],
 ];
 
-/** Fastener types the catalog does not stock, each built on a head word the lexicon reads
- * alone: without an entry only the modifier reaches the residue, which cannot empty C. */
 const UNKNOWN_TYPE_TERMS: readonly string[] = [
   'carriage bolt',
   'eye bolt',
@@ -192,7 +186,6 @@ const FINISH_TERMS: ReadonlyArray<readonly [string, Finish | FinishFamily, numbe
   ['yellow zinc', 'yellow_zinc', 1],
   ['yel zinc', 'yellow_zinc', 1],
   ['yellow zn', 'yellow_zinc', 1],
-  // The catalog writes it this way on eight rows; the brief lists only the first three.
   ['yel zn', 'yellow_zinc', 1],
   ['yz', 'yellow_zinc', 1],
   ['yellow', 'yellow_zinc', termStrengths.shortForm],
@@ -229,8 +222,6 @@ const STANDARD_TERMS: ReadonlyArray<readonly [string, Standard]> = [
   ['class 8', 'CLASS 8'],
 ];
 
-/** The bodies queryParser reads a designator after, so that a standard this catalog does
- * not stock is still parsed as one. docs/DESIGN.md 5.3. */
 export const STANDARD_BODIES: ReadonlySet<string> = new Set([
   'din',
   'iso',
@@ -256,7 +247,6 @@ export const LEXICON: ReadonlyMap<string, LexiconEntry> = new Map<string, Lexico
   ),
 ]);
 
-/** Short codes the fuzzy matcher must never "correct" into a longer lexicon word. */
 export const PROTECTED_CODES: ReadonlySet<string> = new Set([
   'ss',
   'zn',
@@ -288,8 +278,6 @@ function blocked(claimed: ReadonlySet<number> | undefined, from: number, to: num
   return false;
 }
 
-/** `claimed` holds ground a wider reading already took, so a phrase that reaches into it
- * is passed over and the shorter terms beside it are still offered. */
 export function longestMatch(
   tokens: readonly string[],
   claimed?: ReadonlySet<number>,

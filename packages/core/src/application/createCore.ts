@@ -33,8 +33,6 @@ export interface CoreRepositories {
   readonly config?: MatcherConfig;
 }
 
-/** Everything of the composition root that does not name a file, so tests, the eval
- * harness and property tests wire the same core over their own repositories. */
 export function createCoreFromRepositories({
   catalog,
   history,
@@ -42,12 +40,7 @@ export function createCoreFromRepositories({
 }: CoreRepositories): Core {
   const index = buildIndex(catalog.active());
 
-  // One profile per customer per catalog load: the history and the catalog it is
-  // cross-checked against both change only when this core is built again.
   const profiles = new Map<string, CustomerProfile>();
-  // An id the history has never seen is not a customer. It gets no profile, so it is
-  // answered exactly as no customer is, and the cache stays the size of the customer
-  // list however many ids arrive.
   const known = new Set(history.customers().map((customer) => customer.customerId));
 
   const profile = (customerId: string): CustomerProfile | undefined => {
@@ -71,7 +64,6 @@ export function createCoreFromRepositories({
   };
 }
 
-/** The single composition root: the only module in core that may reach the adapters. */
 export function createCore({ dataDir, config }: CoreOptions): Core {
   return createCoreFromRepositories({
     catalog: CsvCatalogRepository.load(join(dataDir, 'catalog.csv'), descriptionParser),

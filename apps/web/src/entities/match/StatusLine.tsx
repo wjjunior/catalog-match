@@ -2,10 +2,10 @@ import type { MatchResponse, NoteCode } from '../../shared/api/client';
 
 // A note already says it in core's words; only the counted sentences are composed here,
 // because no note carries a count. Every other note renders in the list below the cards.
-const HEADLINE_NOTES: readonly NoteCode[] = ['failedConstraint', 'customerRequired'];
+const HEADLINE_NOTES: ReadonlySet<NoteCode> = new Set(['failedConstraint', 'customerRequired']);
 
 export function isHeadlineNote(code: NoteCode): boolean {
-  return HEADLINE_NOTES.includes(code);
+  return HEADLINE_NOTES.has(code);
 }
 
 function list(items: readonly string[]): string {
@@ -52,13 +52,20 @@ export function statusText(response: MatchResponse): string {
 
 // `lead` is false when the summary states the count above this line, which then reads as
 // the sentence under a headline rather than as the headline itself.
-export function StatusLine({ response, lead = true }: { response: MatchResponse; lead?: boolean }) {
+export function StatusLine({
+  response,
+  lead = true,
+}: {
+  readonly response: MatchResponse;
+  readonly lead?: boolean;
+}) {
   return (
-    <p
-      className={lead ? 'text-lg font-semibold text-foreground' : 'text-sm text-muted-foreground'}
-      role="status"
+    <output
+      className={
+        lead ? 'block text-lg font-semibold text-foreground' : 'block text-sm text-muted-foreground'
+      }
     >
       {statusText(response)}
-    </p>
+    </output>
   );
 }

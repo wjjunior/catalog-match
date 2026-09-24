@@ -27,71 +27,134 @@ export const normalizeQuery = (query: string): string =>
 
 export class EvalSchemaError extends Error {}
 
+type Reject = (reason: string) => never;
+
+const KNOWN_FIELDS = new Set([
+  'id',
+  'query',
+  'customerId',
+  'expectedStatus',
+  'expected',
+  'expectedTop1',
+  'expectedAlternatives',
+  'tags',
+  'rationale',
+]);
+
 const isStatus = (value: unknown): value is MatchStatus =>
   MATCH_STATUSES.includes(value as MatchStatus);
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-export function parseEvalCase(value: unknown, where: string): EvalCase {
-  const reject = (reason: string): never => {
-    throw new EvalSchemaError(`${where}: ${reason}`);
-  };
+const include = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> =>
+  value === undefined ? {} : ({ [key]: value } as Partial<Record<K, V>>);
 
+function asObject(value: unknown, reject: Reject): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return reject('expected a JSON object');
   }
-  const row = value as Record<string, unknown>;
 
-  const { id, query, customerId, expectedStatus, expected, tags, rationale } = row;
-  const { expectedTop1, expectedAlternatives } = row;
+  return value as Record<string, unknown>;
+}
 
-  if (typeof id !== 'string' || id === '') reject('id must be a non-empty string');
-  if (typeof query !== 'string' || query === '') reject('query must be a non-empty string');
-  if (customerId !== undefined && typeof customerId !== 'string') {
-    reject('customerId must be a string when present');
-  }
-  if (!isStatus(expectedStatus)) {
+function requireNonEmptyString(value: unknown, message: string, reject: Reject): string {
+  if (typeof value !== 'string' || value === '') reject(message);
+
+  return value;
+}
+
+function optionalString(value: unknown, message: string, reject: Reject): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') reject(message);
+
+  return value;
+}
+
+function requireStringArray(value: unknown, message: string, reject: Reject): string[] {
+  if (!isStringArray(value)) reject(message);
+
+  return value;
+}
+
+function optionalStringArray(
+  value: unknown,
+  message: string,
+  reject: Reject,
+): string[] | undefined {
+  if (value === undefined) return undefined;
+
+  return requireStringArray(value, message, reject);
+}
+
+function requireStatus(value: unknown, reject: Reject): MatchStatus {
+  if (!isStatus(value)) {
     reject(`expectedStatus must be one of ${MATCH_STATUSES.join(', ')}`);
   }
-  if (!isStringArray(expected)) reject('expected must be an array of SKU strings');
-  if (expectedTop1 !== undefined && (typeof expectedTop1 !== 'string' || expectedTop1 === '')) {
-    reject('expectedTop1 must be a non-empty string when present');
-  }
-  if (expectedAlternatives !== undefined && !isStringArray(expectedAlternatives)) {
-    reject('expectedAlternatives must be an array of SKU strings when present');
-  }
-  if (!isStringArray(tags)) reject('tags must be an array of strings');
-  if (rationale !== undefined && typeof rationale !== 'string') {
-    reject('rationale must be a string when present');
-  }
 
-  const known = new Set([
-    'id',
-    'query',
-    'customerId',
-    'expectedStatus',
-    'expected',
-    'expectedTop1',
-    'expectedAlternatives',
-    'tags',
-    'rationale',
-  ]);
-  const unknown = Object.keys(row).filter((key) => !known.has(key));
-  if (unknown.length > 0) reject(`unknown field(s): ${unknown.sort().join(', ')}`);
+  return value;
+}
+
+function rejectUnknownFields(row: Record<string, unknown>, reject: Reject): void {
+  const unknown = Object.keys(row)
+    .filter((key) => !KNOWN_FIELDS.has(key))
+    .toSorted();
+
+  if (unknown.length > 0) reject(`unknown field(s): ${unknown.join(', ')}`);
+}
+
+export function parseEvalCase(value: unknown, where: string): EvalCase {
+  const reject: Reject = (reason) => {
+    throw new EvalSchemaError(`${where}: ${reason}`);
+  };
+
+  const row = asObject(value, reject);
+
+  const id = requireNonEmptyString(row.id, 'id must be a non-empty string', reject);
+  const query = requireNonEmptyString(row.query, 'query must be a non-empty string', reject);
+  const customerId = optionalString(
+    row.customerId,
+    'customerId must be a string when present',
+    reject,
+  );
+  const expectedStatus = requireStatus(row.expectedStatus, reject);
+  const expected = requireStringArray(
+    row.expected,
+    'expected must be an array of SKU strings',
+    reject,
+  );
+  const expectedTop1 =
+    row.expectedTop1 === undefined
+      ? undefined
+      : requireNonEmptyString(
+          row.expectedTop1,
+          'expectedTop1 must be a non-empty string when present',
+          reject,
+        );
+  const expectedAlternatives = optionalStringArray(
+    row.expectedAlternatives,
+    'expectedAlternatives must be an array of SKU strings when present',
+    reject,
+  );
+  const tags = requireStringArray(row.tags, 'tags must be an array of strings', reject);
+  const rationale = optionalString(
+    row.rationale,
+    'rationale must be a string when present',
+    reject,
+  );
+
+  rejectUnknownFields(row, reject);
 
   return {
-    id: id as string,
-    query: query as string,
-    ...(customerId === undefined ? {} : { customerId: customerId as string }),
-    expectedStatus: expectedStatus as MatchStatus,
-    expected: expected as string[],
-    ...(expectedTop1 === undefined ? {} : { expectedTop1: expectedTop1 as string }),
-    ...(expectedAlternatives === undefined
-      ? {}
-      : { expectedAlternatives: expectedAlternatives as string[] }),
-    tags: tags as string[],
-    ...(rationale === undefined ? {} : { rationale: rationale as string }),
+    id,
+    query,
+    ...include('customerId', customerId),
+    expectedStatus,
+    expected,
+    ...include('expectedTop1', expectedTop1),
+    ...include('expectedAlternatives', expectedAlternatives),
+    tags,
+    ...include('rationale', rationale),
   };
 }
 

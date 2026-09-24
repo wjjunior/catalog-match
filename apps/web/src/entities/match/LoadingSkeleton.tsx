@@ -35,8 +35,8 @@ function CardSkeleton() {
 // once they do; the search card above stays live while this shows.
 export function LoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-4" role="status">
-      <span className="sr-only">Matching…</span>
+    <div className="flex flex-col gap-4">
+      <output className="sr-only">Matching…</output>
 
       <div className={CARD} aria-hidden="true">
         <Skeleton className="h-6 w-48" />

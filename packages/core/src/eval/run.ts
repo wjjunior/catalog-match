@@ -25,14 +25,12 @@ import {
   statusConfusion,
 } from './metrics';
 
-/** The limit the API serves, and the one latency is reported at. docs/DESIGN.md 8.2. */
 const SERVED_LIMIT = 3;
 
 export interface EvalRunInput {
   readonly matcher: Matcher;
   readonly catalog: CatalogRepository;
   readonly cases: readonly EvalCase[];
-  /** Injected so a test can measure latency without depending on the machine it runs on. */
   readonly clock?: () => number;
 }
 
@@ -54,7 +52,6 @@ const requestFor = (entry: EvalCase, limit: number, customer: boolean): MatchReq
   limit,
 });
 
-/** Raising the limit must widen the window on one ranking, never produce a second one. */
 function agree(entry: EvalCase, served: MatchResponse, full: MatchResponse): void {
   if (served.status !== full.status) {
     throw new Error(
@@ -77,7 +74,6 @@ function agree(entry: EvalCase, served: MatchResponse, full: MatchResponse): voi
   });
 }
 
-/** Receives a Matcher and repositories; it never wires them. docs/DESIGN.md 4.2. */
 export function run({
   matcher,
   catalog,
@@ -85,8 +81,6 @@ export function run({
   clock = () => performance.now(),
 }: EvalRunInput): EvalReport {
   const validated = loadCases(cases, catalog);
-  // Wide enough for any answer: the compatible set is drawn from the active catalog, and a
-  // history answer names one catalog row per referenced order, inactive rows included.
   const fullLimit = Math.max(catalog.all().length, SERVED_LIMIT);
 
   const outcomes: CaseOutcome[] = validated.map((entry) => {

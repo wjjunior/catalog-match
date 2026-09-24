@@ -12,8 +12,6 @@ import {
   DialogTrigger,
 } from '../../shared/ui/dialog';
 
-// docs/DESIGN.md 5.5 asks for this on the page, and 12 makes it the mitigation for a reader
-// taking the number for a calibrated probability; the thresholds stay in matching/config.ts.
 export function PageHeader() {
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

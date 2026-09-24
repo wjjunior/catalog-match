@@ -131,12 +131,16 @@ export const FINISH_SURFACES = new Map<string, string>([
   ['YEL ZN', 'YELLOW ZINC'],
 ]);
 
-const DIAMETER = /^(#\d+|M\d+|\d+(?:-\d+\/\d+|\/\d+)?)(?:-([\d.]+))?/;
+const NUMBERED_DIAMETER = /^(#\d+)(?:-([\d.]+))?/;
+const METRIC_DIAMETER = /^(M\d+)(?:-([\d.]+))?/;
+const FRACTION_DIAMETER = /^(\d+(?:-\d+\/\d+|\/\d+)?)(?:-([\d.]+))?/;
 const LENGTH = /^X\s*(\d+(?:-\d+\/\d+)?(?:\/\d+)?)\s*(MM|FT|IN|")?/;
-// A standards body is a 3 or 4 letter acronym, which is what keeps the CLASS 8 of
-// HEX NUT CLASS 8 inside the type phrase where it belongs.
 const STANDARD = /\s([A-Z]{3,4}) ([A-Z]?\d[\w.]*)$/;
 const SEPARATOR = /[\d"](\s*)([xX])(\s*)\d/;
+
+function matchDiameter(head: string): RegExpExecArray | null {
+  return NUMBERED_DIAMETER.exec(head) ?? METRIC_DIAMETER.exec(head) ?? FRACTION_DIAMETER.exec(head);
+}
 
 export function normalize(description: string): string {
   return description.replace(/\s+/g, ' ').trim().toUpperCase();
@@ -181,8 +185,8 @@ export function parseDescription(description: string): Parsed | null {
   const finish = FINISH_SURFACES.get(split.finishSurface);
   if (finish === undefined) return null;
 
-  const diameter = DIAMETER.exec(split.head);
-  if (diameter === null || diameter[1] === undefined) return null;
+  const diameter = matchDiameter(split.head);
+  if (diameter?.[1] === undefined) return null;
 
   let rest = split.head.slice(diameter[0].length).trim();
 
@@ -273,7 +277,57 @@ function nested(outer: Map<string, Map<string, number>>, key: string): Map<strin
 
 // Locale-independent string ordering: localeCompare varies by system locale (e.g. Lithuanian
 // collates Y between I and J), which would reorder report rows and diff docs/data-profile.md.
-const byKey = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+function byKey(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function recordSkuRow(
+  stats: CatalogStats,
+  row: CatalogRow,
+): { parsed: Parsed; type: string } | undefined {
+  const separator = separatorForm(row.description);
+  if (separator !== null) bump(stats.separatorForms, separator);
+
+  const parsed = parseDescription(row.description);
+  const type = skuTypeCode(row.sku);
+  if (parsed === null) stats.descriptionParseFailures += 1;
+  if (type === null) stats.unrecognizedSkuTypes += 1;
+  if (parsed === null || type === null) {
+    stats.unparsedRows += 1;
+    return undefined;
+  }
+
+  if (parsed.diameter === 'M8' && type === 'WASH' && row.active) stats.m8FlatWasherActive += 1;
+
+  bump(nested(stats.typePhrasesByType, type), parsed.typePhrase);
+
+  const pitches = stats.diameterPitches.get(parsed.diameter) ?? new Set<string>();
+  if (parsed.pitch !== null) pitches.add(parsed.pitch);
+  else stats.rowsWithoutPitch += 1;
+  stats.diameterPitches.set(parsed.diameter, pitches);
+
+  const presence = stats.lengthPresenceByType.get(type) ?? { withLength: 0, withoutLength: 0 };
+  if (parsed.length === null) presence.withoutLength += 1;
+  else presence.withLength += 1;
+  stats.lengthPresenceByType.set(type, presence);
+
+  if (parsed.lengthUnit !== null) {
+    bump(stats.unitForms, parsed.lengthUnit === '' ? '(mark absent)' : parsed.lengthUnit);
+  }
+
+  bump(nested(stats.materialFinish, parsed.material), parsed.finish);
+  bump(stats.finishSurfaces, parsed.finishSurface);
+
+  if (parsed.standard !== null) {
+    stats.rowsWithStandard += 1;
+    bump(stats.standards, parsed.standard);
+    bump(nested(stats.standardByType, type), parsed.standard);
+  }
+
+  return { parsed, type };
+}
 
 export function catalogStats(raw: CatalogRow[]): CatalogStats {
   const bySku = dedupeBySku(raw);
@@ -319,45 +373,10 @@ export function catalogStats(raw: CatalogRow[]): CatalogStats {
   const lengthGroups = new Map<string, number>();
 
   for (const row of bySku) {
-    const separator = separatorForm(row.description);
-    if (separator !== null) bump(stats.separatorForms, separator);
+    const recorded = recordSkuRow(stats, row);
+    if (recorded === undefined) continue;
 
-    const parsed = parseDescription(row.description);
-    const type = skuTypeCode(row.sku);
-    if (parsed === null) stats.descriptionParseFailures += 1;
-    if (type === null) stats.unrecognizedSkuTypes += 1;
-    if (parsed === null || type === null) {
-      stats.unparsedRows += 1;
-      continue;
-    }
-
-    if (parsed.diameter === 'M8' && type === 'WASH' && row.active) stats.m8FlatWasherActive += 1;
-
-    bump(nested(stats.typePhrasesByType, type), parsed.typePhrase);
-
-    const pitches = stats.diameterPitches.get(parsed.diameter) ?? new Set<string>();
-    if (parsed.pitch !== null) pitches.add(parsed.pitch);
-    else stats.rowsWithoutPitch += 1;
-    stats.diameterPitches.set(parsed.diameter, pitches);
-
-    const presence = stats.lengthPresenceByType.get(type) ?? { withLength: 0, withoutLength: 0 };
-    if (parsed.length === null) presence.withoutLength += 1;
-    else presence.withLength += 1;
-    stats.lengthPresenceByType.set(type, presence);
-
-    if (parsed.lengthUnit !== null) {
-      bump(stats.unitForms, parsed.lengthUnit === '' ? '(mark absent)' : parsed.lengthUnit);
-    }
-
-    bump(nested(stats.materialFinish, parsed.material), parsed.finish);
-    bump(stats.finishSurfaces, parsed.finishSurface);
-
-    if (parsed.standard !== null) {
-      stats.rowsWithStandard += 1;
-      bump(stats.standards, parsed.standard);
-      bump(nested(stats.standardByType, type), parsed.standard);
-    }
-
+    const { parsed, type } = recorded;
     full.add(
       [parsed.diameter, parsed.length, type, parsed.material, parsed.finish, parsed.standard].join(
         '|',
@@ -367,8 +386,6 @@ export function catalogStats(raw: CatalogRow[]): CatalogStats {
       [parsed.diameter, parsed.length, type, parsed.material, parsed.finish].join('|'),
     );
 
-    // DESIGN's 668 groups count only rows that carry a length; over all rows it is 716,
-    // the difference being the three lengthless types across the sixteen diameters.
     if (parsed.length !== null) {
       bump(lengthGroups, [parsed.diameter, type, parsed.length].join('|'));
     }
@@ -448,7 +465,7 @@ export function historyStats(history: HistoryRow[], deduped: CatalogRow[]): Hist
     lines: history.length,
     customers: grouped.size,
     firstDate: dates[0] ?? '',
-    lastDate: dates[dates.length - 1] ?? '',
+    lastDate: dates.at(-1) ?? '',
     skusMissingFromCatalog: [...new Set(history.map((row) => row.sku))]
       .filter((sku) => !known.has(sku))
       .sort(),
@@ -741,8 +758,6 @@ export function renderReport(
   return sections.join('\n');
 }
 
-// Imported by the test file, so main must not run on import: vitest would rewrite
-// docs/data-profile.md on every run.
 function main(): void {
   const catalogRows = toCatalogRows(
     parseCsv(readFileSync(new URL('data/catalog.csv', ROOT), 'utf8')),

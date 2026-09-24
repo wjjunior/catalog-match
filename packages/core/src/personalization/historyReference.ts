@@ -18,8 +18,6 @@ export interface ReferencedLine {
 
 export type HistoryReference =
   | { form: 'needsCustomer' }
-  /** The selectors reached no past order, so `pure` names at least one and this form
-   * names none: an answer for it can only come from what the query itself states. */
   | { form: 'unresolved' }
   | { form: 'pure'; lines: readonly ReferencedLine[] }
   | {
@@ -29,12 +27,8 @@ export type HistoryReference =
       changed: readonly AttributeName[];
     };
 
-/** Diameter, pitch and type choose which orders the reference names; anything else the
- * query states is a change it asks for. docs/DESIGN.md 7.4. */
 const OVERRIDABLE = ['material', 'finish', 'standard', 'length'] as const;
 
-/** True when the query asks for something the referenced order cannot supply, which is
- * what separates an override from a reference that only names which orders it means. */
 export function statesOverride(spec: ParsedSpec): boolean {
   return OVERRIDABLE.some((attribute) => stated(spec, attribute));
 }
@@ -56,8 +50,6 @@ function compare(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
-/** Every selector the query states must hold; a query that states none names the whole
- * history, which is what `reorder` on its own asks for. */
 function selects(query: ParsedSpec, line: ParsedSpec): boolean {
   const types = query.type?.map((entry) => entry.value);
 
@@ -65,8 +57,6 @@ function selects(query: ParsedSpec, line: ParsedSpec): boolean {
     return false;
   }
 
-  // A line silent about its pitch contradicts nothing, and an inferred pitch is the parser
-  // reading a bare nominal rather than the customer naming a thread.
   if (stated(query, 'pitch') && line.pitch !== undefined && line.pitch !== query.pitch) {
     return false;
   }
@@ -74,8 +64,6 @@ function selects(query: ParsedSpec, line: ParsedSpec): boolean {
   return query.diameter === undefined || line.diameter?.nominal === query.diameter.nominal;
 }
 
-/** One entry per SKU at its latest order, most recent first. A line the parser cannot read
- * cannot be held against the query, so it is dropped rather than guessed at. */
 function select(lines: readonly HistoryLine[], query: ParsedSpec): Selected[] {
   const latest = new Map<string, Selected>();
 
@@ -95,7 +83,6 @@ function select(lines: readonly HistoryLine[], query: ParsedSpec): Selected[] {
     }
   }
 
-  // Stable, so SKUs that tie on the date keep the order the file first mentions them in.
   return [...latest.values()].sort((a, b) => compare(b.line.orderDate, a.line.orderDate));
 }
 
@@ -109,9 +96,6 @@ function referenced({ line }: Selected, rank: number, config: MatcherConfig): Re
   };
 }
 
-/** The referenced order read as a specification, minus its standard: the standard belongs
- * to the SKU the customer happened to buy, and keeping it would leave `but brass` with
- * nothing to match. Nothing here was asked for, so none of it is explicit. */
 function inherit(base: ParsedSpec, query: ParsedSpec): ParsedSpec {
   const evidence: Partial<Record<AttributeName, string>> = {};
   const provenance: Partial<Record<AttributeName, Provenance>> = {};
@@ -124,8 +108,6 @@ function inherit(base: ParsedSpec, query: ParsedSpec): ParsedSpec {
     if (quoted !== undefined) evidence[attribute] = quoted;
   }
 
-  // `selects` has already dropped a base that contradicts a stated pitch, so carrying the
-  // query's thread either restates the base or supplies one that was silent about it.
   const threaded = stated(query, 'pitch') && query.diameter !== undefined;
 
   if (threaded) {
@@ -180,8 +162,6 @@ function overwrite(merged: ParsedSpec, query: ParsedSpec): AttributeName[] {
   return changed;
 }
 
-/** `lines` are one customer's orders; `undefined` means no customer is selected, which is
- * not the same as a customer who has never ordered. docs/DESIGN.md 7.4. */
 export function resolveReference(
   lines: readonly HistoryLine[] | undefined,
   spec: ParsedSpec,

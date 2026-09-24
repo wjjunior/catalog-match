@@ -17,7 +17,7 @@ const TONES: Record<NonNullable<ChipProps['tone']>, string> = {
 
 const BASE = 'inline-flex items-baseline gap-1.5 rounded-md border px-2.5 py-1 text-left text-sm';
 
-export function Chip({ children, tone = 'neutral', onClick }: ChipProps) {
+export function Chip({ children, tone = 'neutral', onClick }: Readonly<ChipProps>) {
   if (onClick === undefined) {
     return <span className={cn(BASE, TONES[tone])}>{children}</span>;
   }

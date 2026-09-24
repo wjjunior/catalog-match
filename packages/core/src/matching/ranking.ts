@@ -60,8 +60,6 @@ function typeCredit(query: ParsedSpec, item: ParsedSpec): number {
   return best;
 }
 
-/** c_a of docs/DESIGN.md 5.4: 1 when unspecified or in exact agreement, `familyCredit`
- * scaled by the term's strength at family level, 0 for a contradiction. */
 export function attributeCredit(
   attr: RankedAttribute,
   query: ParsedSpec,

@@ -57,15 +57,14 @@ describe('ProgressBar', () => {
     render(<ProgressBar value={0.82} label="Confidence" />);
 
     const bar = screen.getByRole('progressbar', { name: 'Confidence' });
-    expect(bar.getAttribute('aria-valuenow')).toBe('82');
-    expect(bar.getAttribute('aria-valuemin')).toBe('0');
-    expect(bar.getAttribute('aria-valuemax')).toBe('100');
+    expect(bar.getAttribute('value')).toBe('82');
+    expect(bar.getAttribute('max')).toBe('100');
   });
 
   it('rounds to a whole percent so the same response always renders the same bar', () => {
     render(<ProgressBar value={0.8249} label="Confidence" />);
 
-    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('82');
+    expect(screen.getByRole('progressbar').getAttribute('value')).toBe('82');
   });
 
   it('clamps a value outside the unit interval', () => {
@@ -76,12 +75,8 @@ describe('ProgressBar', () => {
       </>,
     );
 
-    expect(screen.getByRole('progressbar', { name: 'Over' }).getAttribute('aria-valuenow')).toBe(
-      '100',
-    );
-    expect(screen.getByRole('progressbar', { name: 'Under' }).getAttribute('aria-valuenow')).toBe(
-      '0',
-    );
+    expect(screen.getByRole('progressbar', { name: 'Over' }).getAttribute('value')).toBe('100');
+    expect(screen.getByRole('progressbar', { name: 'Under' }).getAttribute('value')).toBe('0');
   });
 });
 

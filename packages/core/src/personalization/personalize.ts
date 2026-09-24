@@ -14,18 +14,14 @@ import {
 } from '../matching/explainer';
 import type { HistoryPriorResult, PriorReason } from './historyPrior';
 
-/** The attributes a profile keeps shares of and a query can contradict. The thread system
- * is not one: the diameter fixes it, so every item of C already agrees with it. */
 const SHARED = ['material', 'finish'] as const;
 
 type Shared = (typeof SHARED)[number];
 
 interface Preference {
   attribute: Shared;
-  /** The catalog spelling, so a compatible item can be tested against it. */
   value: string;
   formatted: string;
-  /** False when nothing in C carries the value, which is what leaves it unmatchable. */
   present: boolean;
   overridden: boolean;
 }
@@ -42,8 +38,6 @@ function format(attribute: Shared, value: string): string | undefined {
   return isFinish(value) ? formatFinish(value) : undefined;
 }
 
-/** A value outside its attribute's table (already a family) stands for itself, so a family
- * term compares equal to the member it names. */
 function familyOf(attribute: Shared, value: string): string {
   if (attribute === 'material') return isMaterial(value) ? materialFamilyOf(value) : value;
 
@@ -78,8 +72,6 @@ function preferenceOf(
   spec: ParsedSpec,
   candidates: readonly CatalogItem[],
 ): Preference | undefined {
-  // A history that weighed nothing leaves every share at the alpha prior, and a tie-break
-  // over that flat table would name a value the customer never expressed.
   if (profile.nEff === 0) return undefined;
 
   const value = top(profile.shares[attribute]);
@@ -95,8 +87,6 @@ function preferenceOf(
     value,
     formatted,
     present: candidates.some((item) => valueOf(item.spec, attribute) === value),
-    // A member the query names satisfies the family it belongs to, but a different exact
-    // member never satisfies another exact member, even inside the same family.
     overridden:
       stated !== undefined &&
       stated !== value &&
@@ -104,8 +94,6 @@ function preferenceOf(
   };
 }
 
-/** The query first, then what the customer bought, then what they merely tend to buy: the
- * most specific true thing about this item, not every true thing. docs/DESIGN.md 7.3. */
 function reasonFor(
   reason: PriorReason,
   preferred: readonly string[],
@@ -122,8 +110,6 @@ function reasonFor(
   return preferred.length === 0 ? undefined : preferenceReason(preferred);
 }
 
-/** Keyed by SKU, and an item the history has nothing to say about is absent rather than
- * carrying an invented preference. docs/DESIGN.md 7.3 and 7.5. */
 export function personalize(
   profile: CustomerProfile,
   spec: ParsedSpec,
@@ -138,8 +124,6 @@ export function personalize(
   const overriddenBy: AttributeName[] = preferences
     .filter((preference) => preference.overridden)
     .map((preference) => preference.attribute);
-  // A value the query overrode was never going to be matched, so it is not also reported
-  // as one the catalog could not honour.
   const unmatched = preferences.find((preference) => !preference.overridden && !preference.present);
 
   const explanations = new Map<string, PersonalizationExplanation>();

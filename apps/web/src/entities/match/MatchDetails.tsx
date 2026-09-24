@@ -34,12 +34,12 @@ export function MatchDetails({
   description,
   active,
   explanation,
-}: {
+}: Readonly<{
   sku: string;
   description: string;
   active: boolean;
   explanation: Explanation;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const { matched, unspecified, unverified } = explanation;
 

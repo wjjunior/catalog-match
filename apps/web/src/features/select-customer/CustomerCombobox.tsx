@@ -18,9 +18,9 @@ import { useCustomers } from './useCustomers';
 
 export function CustomerCombobox({
   onSelect,
-}: {
+}: Readonly<{
   onSelect: (customer: CustomerSummary | undefined) => void;
-}) {
+}>) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const customers = useCustomers(query);
@@ -45,7 +45,7 @@ export function CustomerCombobox({
               </span>
               <div
                 className={cn(
-                  'rounded-md border border-input shadow-xs [&>[data-slot=command-input-wrapper]]:border-b-0',
+                  'rounded-md border border-input shadow-xs *:data-[slot=command-input-wrapper]:border-b-0',
                   comboboxFieldFocusRing,
                 )}
               >
