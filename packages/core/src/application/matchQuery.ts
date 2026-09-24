@@ -26,6 +26,7 @@ import {
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
+  unrankedPoolNote,
   unresolvedReferenceNote,
   unverifiedResidueNote,
   withPersonalization,
@@ -119,6 +120,13 @@ function qualifierOnlyNote(spec: ParsedSpec, failed: Qualifier): Note | undefine
     message: `no ${[...held, 'item'].join(' ')} ${PREPOSITION[failed]} ${value}`,
   };
 }
+
+/** Everything the query did constrain, in probe order; on the fallback path the qualifiers
+ * are all of it, since neither a diameter nor a type was recognized. */
+const statedQualifiers = (spec: ParsedSpec): string =>
+  QUALIFIERS.map((attribute) => statedValue(spec, attribute))
+    .filter((value) => value !== undefined)
+    .join(' ');
 
 const namesNoProduct = (spec: ParsedSpec): boolean =>
   spec.diameter === undefined && (spec.type === undefined || spec.type.length === 0);
@@ -267,9 +275,9 @@ function none(
   };
 }
 
-/** docs/DESIGN.md 5.8. There is no compatible set to report: the constraints the parser
- * did find are too weak to name one, which is what `unparsed` says. They still rule out
- * what contradicts them, so token overlap only orders the pool they leave. */
+/** docs/DESIGN.md 5.8. The constraints the parser did find are too weak to name a product,
+ * which is what `unparsed` says, but they still rule out what contradicts them: the pool
+ * they leave is a compatible set and is reported as one; token overlap only orders it. */
 function unparsed(
   query: string,
   spec: ParsedSpec,
@@ -281,10 +289,23 @@ function unparsed(
   // The same tokens the baseline scores (matching/lexicalFallback.ts), so the comparison
   // of docs/DESIGN.md 10.4 stays one of parsing against scoring, not of two tokenizers.
   const tokens = normalize(query).tokens.map((token) => correct(token.text)?.word ?? token.text);
-  const meta: ExplanationMeta = { compatibleCount: 0, disambiguateBy: [] };
+  const meta: ExplanationMeta = { compatibleCount: pool.length, disambiguateBy: [] };
   const admitted = new Set(pool.map((item) => item.sku));
 
   const candidates = score(deps.index, tokens).filter((entry) => admitted.has(entry.sku));
+
+  // A synonym the catalog never writes (stainless for 18-8 SS) overlaps no description, so
+  // there is no order to serve; the pool it did constrain is the answer, not three of it.
+  if (candidates.length === 0) {
+    return {
+      status: 'unparsed',
+      compatibleCount: pool.length,
+      results: [],
+      alternatives: [],
+      notes: notesFor(spec, unrankedPoolNote(pool.length, statedQualifiers(spec))),
+    };
+  }
+
   // `score` divides by the best hit in the whole index, and an item the attributes ruled
   // out must not be what the best surviving overlap is measured against.
   const best = candidates[0]?.score ?? 1;
@@ -314,7 +335,7 @@ function unparsed(
 
   return {
     status: 'unparsed',
-    compatibleCount: 0,
+    compatibleCount: pool.length,
     results,
     alternatives: [],
     notes: notesFor(spec, undefined),
@@ -386,7 +407,6 @@ function unboundNotes(spec: ParsedSpec, unbound: Length | undefined): Note[] {
   return [unboundLengthNote(type, unbound)];
 }
 
-/** Everything the query states about attributes, once the intent has had its say. */
 function attributeAnswer(
   query: string,
   parsed: ParsedSpec,

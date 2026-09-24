@@ -5,19 +5,19 @@ import { INTENT_PHRASES, detectIntent } from './intent';
 
 describe('detecting a history reference', () => {
   it('reports no reference when the query carries no phrase', () => {
-    expect(detectIntent([])).toEqual({ isHistory: false });
+    expect(detectIntent([])).toEqual({});
   });
 
   it('reports a reference and names the phrase', () => {
-    expect(detectIntent(['reorder'])).toEqual({ isHistory: true, phrase: 'reorder' });
+    expect(detectIntent(['reorder'])).toEqual({ phrase: 'reorder' });
   });
 
   it('names the longest phrase, so the note quotes the explicit reference', () => {
-    expect(detectIntent(['same', 'last time'])).toEqual({ isHistory: true, phrase: 'last time' });
+    expect(detectIntent(['same', 'last time'])).toEqual({ phrase: 'last time' });
   });
 
   it('keeps the first of two phrases of equal length', () => {
-    expect(detectIntent(['usual', 'again'])).toEqual({ isHistory: true, phrase: 'usual' });
+    expect(detectIntent(['usual', 'again'])).toEqual({ phrase: 'usual' });
   });
 });
 
@@ -40,6 +40,6 @@ describe('the phrases the parser claims', () => {
 
     expect(intentCandidates).toEqual([phrase]);
     expect(spec.residue).toEqual([]);
-    expect(detectIntent(intentCandidates).isHistory).toBe(true);
+    expect(detectIntent(intentCandidates).phrase).toBe(phrase);
   });
 });

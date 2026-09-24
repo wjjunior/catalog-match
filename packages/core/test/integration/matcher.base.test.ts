@@ -314,13 +314,13 @@ describe('the lexical fallback', () => {
     const response = ask('plain zinc');
 
     expect(response.status).toBe('unparsed');
-    expect(response.compatibleCount).toBe(0);
+    expect(response.compatibleCount).toBe(147);
     expect(response.results).toHaveLength(3);
     expect(response.results[0]?.confidence).toBeCloseTo(core.config.lexicalCap, 10);
     expect(response.results.every((match) => match.confidence <= core.config.lexicalCap)).toBe(
       true,
     );
-    expect(response.results[0]?.explanation.compatibleCount).toBe(0);
+    expect(response.results[0]?.explanation.compatibleCount).toBe(147);
   });
 
   it('ranks what the baseline of docs/DESIGN.md 10.4 ranks', () => {
@@ -349,12 +349,18 @@ describe('the lexical fallback', () => {
     expect(response.results).toEqual([]);
   });
 
-  it('answers nothing when no token of the query reaches the catalog', () => {
+  it('names the pool it could not narrow when no token reaches the catalog', () => {
     const response = ask('blue widget');
 
     expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(core.catalog.active().length);
     expect(response.results).toEqual([]);
     expect(response.notes).toEqual([
+      {
+        code: 'unrankedPool',
+        message:
+          'the query leaves 916 items compatible and nothing ranks them; name a diameter or a type',
+      },
       { code: 'unverifiedResidue', message: 'not verifiable: blue, widget' },
     ]);
   });

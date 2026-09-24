@@ -8,13 +8,6 @@ export interface PosteriorDistribution {
   readonly pNull: number;
 }
 
-/** q_i without a customer: docs/DESIGN.md 5.5. */
-export function uniformPrior(C: readonly CatalogItem[]): number[] {
-  if (C.length === 0) return [];
-  const share = 1 / C.length;
-  return C.map(() => share);
-}
-
 /** p_i of docs/DESIGN.md 5.5 over H = C ∪ {null}. `s` and `q` are indexed by position in
  * `C`; an empty C leaves all the mass on null. */
 export function posterior(

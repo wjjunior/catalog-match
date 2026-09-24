@@ -84,6 +84,83 @@ describe('the lexical fallback and the attributes the parser did recognize', () 
   });
 });
 
+/** The catalog spells stainless as `18-8 SS` and galvanised as `HDG`, so a query naming
+ * only the family term overlaps no description at all and token overlap orders nothing. */
+describe('a recognized term the catalog never writes', () => {
+  it('answers stainless with the size of the pool and what would narrow it', () => {
+    const response = ask('stainless');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(438);
+    expect(response.results).toEqual([]);
+    expect(response.alternatives).toEqual([]);
+    expect(response.notes).toContainEqual({
+      code: 'unrankedPool',
+      message:
+        'stainless leaves 438 items compatible and nothing ranks them; name a diameter or a type',
+    });
+  });
+
+  it('answers galvanized the same way, spelled as a rep reads it', () => {
+    const response = ask('galvanized');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(158);
+    expect(response.results).toEqual([]);
+    expect(response.notes).toContainEqual({
+      code: 'unrankedPool',
+      message:
+        'hot-dip galvanized leaves 158 items compatible and nothing ranks them; name a diameter or a type',
+    });
+  });
+
+  it('says how many are compatible where the query names no attribute at all', () => {
+    const response = ask('what do you have for mounting a bracket to concrete');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(core.catalog.active().length);
+    expect(response.notes).toContainEqual({
+      code: 'unrankedPool',
+      message:
+        'the query leaves 916 items compatible and nothing ranks them; name a diameter or a type',
+    });
+  });
+});
+
+/** The control: a term the catalog does spell is ranked by token overlap as before, so the
+ * fix is the missing answer and not the whole path. */
+describe('a recognized term the catalog does write', () => {
+  it('keeps the three brass items the overlap ranks', () => {
+    const response = ask('brass');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(154);
+    expect(skus(response)).toEqual([
+      'PXLOCK1212BRZC0253',
+      'PXLOCK346BRPL0170',
+      'PXLOCK840BRHG0397',
+    ]);
+    expect(response.results[0]?.confidence).toBeCloseTo(core.config.lexicalCap, 10);
+    expect(response.notes).toEqual([]);
+    expect(contradicting(response)).toEqual([]);
+  });
+
+  it('keeps the three zinc items the overlap ranks', () => {
+    const response = ask('zinc');
+
+    expect(response.status).toBe('unparsed');
+    expect(response.compatibleCount).toBe(162);
+    expect(skus(response)).toEqual([
+      'PXLOCK1212BRZC0253',
+      'PXLOCK1414ALZC0863',
+      'PXLOCK3412STZC0904',
+    ]);
+    expect(response.results[0]?.confidence).toBeCloseTo(core.config.lexicalCap, 10);
+    expect(response.notes).toEqual([]);
+    expect(contradicting(response)).toEqual([]);
+  });
+});
+
 describe('the baseline of docs/DESIGN.md 10.4 scores unfiltered', () => {
   const query = 'brass CLASS 8';
 

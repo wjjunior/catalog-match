@@ -27,5 +27,3 @@ export const DIAMETERS = [
   { nominal: '#8', system: 'number', pitch: '32', mm: 4.1656 },
   { nominal: '#10', system: 'number', pitch: '24', mm: 4.826 },
 ] as const satisfies readonly DiameterSpec[];
-
-export type KnownDiameterNominal = (typeof DIAMETERS)[number]['nominal'];

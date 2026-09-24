@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ITEMS } from '../../test/fixtures/items';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
 import type { ParsedSpec } from '../domain/spec';
+import type { MatcherConfig } from './config';
 import { DEFAULT_MATCHER_CONFIG } from './config';
 import {
   alternatives,
@@ -11,6 +12,7 @@ import {
   disambiguateBy,
   failedConstraint,
 } from './compatibility';
+import { explainAlternative } from './explainer';
 
 const CONFIG = DEFAULT_MATCHER_CONFIG;
 
@@ -406,6 +408,46 @@ describe('alternatives', () => {
     const forward = alternatives(spec, ITEMS, CONFIG).map((a) => a.item.catalogId);
     const reversed = alternatives(spec, [...ITEMS].reverse(), CONFIG).map((a) => a.item.catalogId);
     expect(reversed).toEqual(forward);
+  });
+
+  describe('a backoff order that reaches dropLength without approximateLength', () => {
+    const DROP_ONLY: MatcherConfig = { ...CONFIG, backoffOrder: ['dropLength'] };
+
+    const spec = query({
+      diameter: M8,
+      type: [{ value: 'socket_head_cap_screw', strength: 1 }],
+      length: { value: 45, unit: 'mm', mm: 45 },
+      evidence: { diameter: 'M8', length: '45mm', type: 'SHCS' },
+      provenance: { diameter: 'explicit', length: 'explicit', type: 'explicit' },
+    });
+
+    it('records the dropped length as relaxed', () => {
+      const found = alternatives(spec, ITEMS, DROP_ONLY);
+
+      expect(found).toHaveLength(8);
+      expect(found[0]?.relaxed).toEqual(['length']);
+      expect(found[0]?.closeness).toBeCloseTo(2 / 3, 10);
+    });
+
+    it('leaves no length chip in the explanation of a dropped length', () => {
+      const found = alternatives(spec, ITEMS, DROP_ONLY);
+      const first = found[0];
+      if (first === undefined) throw new Error('expected an alternative');
+
+      const explanation = explainAlternative(spec, first.item, first.relaxed, first.closeness);
+
+      expect(explanation.matched.map((entry) => entry.attr)).not.toContain('length');
+      expect(explanation.unspecified).not.toContain('length');
+    });
+
+    it('records the relaxation once when approximateLength already did', () => {
+      const ladder: MatcherConfig = {
+        ...CONFIG,
+        backoffOrder: ['approximateLength', 'dropLength'],
+      };
+
+      expect(alternatives(spec, ITEMS, ladder)[0]?.relaxed).toEqual(['length']);
+    });
   });
 });
 

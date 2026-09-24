@@ -17,7 +17,8 @@ export type NoteCode =
   | 'customerRequired'
   | 'historyReference'
   | 'unverifiedResidue'
-  | 'unboundLength';
+  | 'unboundLength'
+  | 'unrankedPool';
 
 export type ConfidenceLabel = 'High' | 'Medium' | 'Low';
 

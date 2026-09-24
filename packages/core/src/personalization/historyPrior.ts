@@ -1,7 +1,6 @@
 import type { Material, MaterialFamily } from '../domain/attributes';
 import { MATERIAL_FAMILY, MATERIALS } from '../domain/attributes';
 import type { CatalogItem, CustomerProfile, Purchase } from '../domain/catalog';
-import type { HistoryPrior } from '../domain/contracts';
 import type { ParsedSpec } from '../domain/spec';
 import type { MatcherConfig } from '../matching/config';
 
@@ -149,14 +148,5 @@ export function historyPrior(
   return {
     q: new Map(entries.map((e) => [e.sku, lambda * h(e.weight) + (1 - lambda) * share])),
     reasons: new Map(entries.map((e) => [e.sku, e.reason])),
-  };
-}
-
-export function createHistoryPrior(config: MatcherConfig): HistoryPrior {
-  return {
-    prior: (candidates, spec, profile) => {
-      const { q } = historyPrior(profile, spec, candidates, config);
-      return candidates.map((item) => q.get(item.sku) ?? 0);
-    },
   };
 }

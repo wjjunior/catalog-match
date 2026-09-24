@@ -16,6 +16,7 @@ export const NOTE_CODES = [
   'historyReference',
   'unverifiedResidue',
   'unboundLength',
+  'unrankedPool',
 ] as const;
 
 export type NoteCode = (typeof NOTE_CODES)[number];

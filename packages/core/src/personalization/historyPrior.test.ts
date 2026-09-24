@@ -9,11 +9,10 @@ import type { CatalogItem, CustomerProfile } from '../domain/catalog';
 import type { ParsedSpec } from '../domain/spec';
 import { compatibleSet } from '../matching/compatibility';
 import { DEFAULT_MATCHER_CONFIG as config } from '../matching/config';
-import { posterior } from '../matching/posterior';
 import { descriptionParser } from '../parsing/descriptionParser';
 import { queryParser } from '../parsing/queryParser';
 import { buildProfile } from './customerProfile';
-import { createHistoryPrior, historyPrior } from './historyPrior';
+import { historyPrior } from './historyPrior';
 
 function item(sku: string, description: string, active = true): CatalogItem {
   return { catalogId: sku, sku, description, active, spec: descriptionParser.parse(description) };
@@ -227,27 +226,6 @@ describe('determinism', () => {
     expect(historyPrior(profile, BRASS_NUT, TWIN_NUTS, config)).toEqual(
       historyPrior(profile, BRASS_NUT, TWIN_NUTS, config),
     );
-  });
-});
-
-describe('the HistoryPrior contract', () => {
-  const profile = profileOf({ repeats: { N1: 1 } });
-
-  it('returns q aligned with the candidates it was given', () => {
-    const aligned = createHistoryPrior(config).prior(TWIN_NUTS, BRASS_NUT, profile);
-
-    expect(aligned).toEqual([0.625, 0.375]);
-  });
-
-  it('falls back to the uniform distribution without a profile', () => {
-    expect(createHistoryPrior(config).prior(TWIN_NUTS, BRASS_NUT, undefined)).toEqual([0.5, 0.5]);
-  });
-
-  it('feeds the posterior', () => {
-    const q = createHistoryPrior(config).prior(TWIN_NUTS, BRASS_NUT, profile);
-    const { p } = posterior(TWIN_NUTS, [1, 1], q, 0, config);
-
-    expect((p.get('N1') ?? 0) > (p.get('N2') ?? 0)).toBe(true);
   });
 });
 

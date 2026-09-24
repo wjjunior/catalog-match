@@ -142,8 +142,6 @@ export class LexicalOnlyMatcher {
         active: item.active,
         confidence: this.config.lexicalCap * entry.score,
         explanation: explainMatch(parsed, item, meta),
-        // Token overlap is all the evidence there is, and the baseline knows no customer,
-        // so the prior is flat.
         components: { compatibility: entry.score, prior: 1 },
       },
     ];

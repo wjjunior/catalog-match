@@ -161,7 +161,7 @@ Hexagonal core and FSD-lite web, both enforced by lint rules rather than by fold
 
 ```text
 packages/core/src
-  domain/            Diameter, Length, ProductType, Material, Finish, ParsedSpec, MatchStatus, Match, Explanation; contracts.ts (DescriptionParser, QueryParser, HistoryPrior)
+  domain/            Diameter, Length, ProductType, Material, Finish, ParsedSpec, MatchStatus, Match, Explanation; contracts.ts (DescriptionParser, QueryParser)
   parsing/           normalize.ts, units.ts, lexicon.ts, fuzzy.ts, descriptionParser.ts, queryParser.ts
   matching/          compatibility.ts (set C, status, backoff), ranking.ts, posterior.ts, explainer.ts, lexicalFallback.ts, config.ts
   personalization/   customerProfile.ts, historyPrior.ts, intent.ts, historyReference.ts
@@ -254,7 +254,7 @@ Status is decided by C and by the parse, before any number is computed:
 | ambiguous | C has two or more items | Top 3 of C by posterior; size of C and the attributes that vary inside C; personalization reorders C |
 | none | C is empty (unknown diameter or type, length or standard not in catalog, contradictory combination) | No confidence; the failed constraint named; up to 3 alternatives from backoff (section 5.6), each with the relaxed constraint stated |
 | history | Intent detector fires (section 7.4) | History-derived candidates, or a prompt to select a customer |
-| unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none |
+| unparsed | Neither diameter nor type recognized | Lexical fallback over the items the recognized attributes admit, confidence capped at 0.4, status shown; an empty pool falls through to none, and a pool no token of the query can order is reported by its size rather than sampled |
 
 This is what makes "explicit attributes always win" a structural guarantee rather than a weighting: nothing outside C is ever ranked with C, and personalization only sees C.
 
@@ -316,7 +316,7 @@ Every match returns: the status; matched attributes with query value, item value
 
 ## 5.8 Lexical fallback and baseline
 
-When the parser finds neither a diameter nor a type, the attributes it did recognize still constrain: the candidates are the compatible set C, and token overlap over normalized description tokens (an in-repo BM25-lite) only orders them, with confidence capped at 0.4 for the best item the pool admits and status unparsed. When those attributes admit nothing, there is no honest lexical answer and the query falls through to the backoff of section 5.6: status none, the failed constraint named, alternatives carrying closeness rather than a confidence. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4); the baseline scores the whole active catalog unfiltered, because what it exists to measure is what pure lexical matching achieves.
+When the parser finds neither a diameter nor a type, the attributes it did recognize still constrain: the candidates are the compatible set C, and token overlap over normalized description tokens (an in-repo BM25-lite) only orders them, with confidence capped at 0.4 for the best item the pool admits and status unparsed. When those attributes admit nothing, there is no honest lexical answer and the query falls through to the backoff of section 5.6: status none, the failed constraint named, alternatives carrying closeness rather than a confidence. When they admit a pool but no token of the query reaches any description inside it — a material or finish the catalog never spells, stainless for 18-8 SS or HDG for hot-dip galvanized — there is nothing to order: no results are returned, and the answer states the size of the pool and the attribute that would narrow it. Three arbitrary items out of hundreds equally compatible would be precisely the ranking this status exists to refuse. The same component, run alone over every golden query, is the baseline that the parse-and-score hypothesis is measured against (section 10.4); the baseline scores the whole active catalog unfiltered, because what it exists to measure is what pure lexical matching achieves.
 
 # 6. Behavior across the challenge's edge cases
 

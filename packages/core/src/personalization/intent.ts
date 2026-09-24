@@ -12,7 +12,6 @@ export const INTENT_PHRASES: readonly string[] = [
 ];
 
 export interface Intent {
-  isHistory: boolean;
   phrase?: string;
 }
 
@@ -25,5 +24,5 @@ export function detectIntent(intentCandidates: readonly string[]): Intent {
     undefined,
   );
 
-  return phrase === undefined ? { isHistory: false } : { isHistory: true, phrase };
+  return phrase === undefined ? {} : { phrase };
 }

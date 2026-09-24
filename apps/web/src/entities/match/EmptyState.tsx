@@ -20,7 +20,9 @@ export function EmptyState({ response }: { response: MatchResponse }) {
     >
       <PackageX className="size-10 text-muted-foreground" aria-hidden="true" />
       <h2 id="empty-state" className="m-0 text-lg font-semibold tracking-tight">
-        No compatible items
+        {/* The fallback can leave a large compatible set with nothing to order it, and
+            calling that "no compatible items" would contradict the note below. */}
+        {response.compatibleCount > 0 ? 'Nothing to rank' : 'No compatible items'}
       </h2>
       <div role="status" className="flex max-w-prose flex-col gap-1">
         {explanationLines(response).map((line, index) => (

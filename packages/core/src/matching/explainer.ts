@@ -24,6 +24,7 @@ import type {
   Weighted,
 } from '../domain/spec';
 import { ATTRIBUTE_NAMES } from '../domain/spec';
+import { sameLength } from './compatibility';
 
 const MATERIAL_NAMES: Readonly<Record<Material | MaterialFamily, string>> = {
   steel: 'steel',
@@ -130,9 +131,8 @@ function has(spec: ParsedSpec, attr: AttributeName): boolean {
   }
 }
 
-/** Describes agreement; it never decides it. Items outside C never reach the explainer,
- * so where this and `compatibility` could differ, C has already had the last word.
- * A contradiction (different family) returns `undefined`: not agreement, so not matched. */
+/** A contradiction returns `undefined`: not agreement, so not matched. C cannot be relied
+ * on to have ruled one out, because `explainAlternative` runs precisely where C is empty. */
 function agreement(
   attr: AttributeName,
   query: ParsedSpec,
@@ -143,21 +143,25 @@ function agreement(
     case 'pitch':
       return undefined;
 
-    case 'diameter':
-      if (query.diameter === undefined || item.diameter === undefined) return undefined;
+    case 'diameter': {
+      const q = query.diameter;
+      const i = item.diameter;
+      if (q === undefined || i === undefined) return undefined;
+      if (q.system !== i.system || q.nominal !== i.nominal) return undefined;
       return {
-        query: formatDiameter(query.diameter, query.pitch),
-        item: formatDiameter(item.diameter, item.pitch),
+        query: formatDiameter(q, query.pitch),
+        item: formatDiameter(i, item.pitch),
         partial: false,
       };
+    }
 
-    case 'length':
-      if (query.length === undefined || item.length === undefined) return undefined;
-      return {
-        query: formatLength(query.length),
-        item: formatLength(item.length),
-        partial: false,
-      };
+    case 'length': {
+      const q = query.length;
+      const i = item.length;
+      if (q === undefined || i === undefined) return undefined;
+      if (!sameLength(q.mm, i.mm)) return undefined;
+      return { query: formatLength(q), item: formatLength(i), partial: false };
+    }
 
     case 'type': {
       const itemType = item.type?.[0]?.value;
@@ -385,6 +389,18 @@ export function unboundLengthNote(type: ProductType, length: Length): Note {
   return note(
     'unboundLength',
     `${article(named)} ${named} carries no length; ${formatLength(length)} ignored`,
+  );
+}
+
+/** The pool is real and the count is the only thing the query did achieve; the ask is
+ * what `unparsed` says is missing, so it is the same on every query that lands here. */
+export function unrankedPoolNote(count: number, stated: string): Note {
+  const pool = count === 1 ? '1 item' : `${String(count)} items`;
+  const what = stated === '' ? 'the query' : stated;
+
+  return note(
+    'unrankedPool',
+    `${what} leaves ${pool} compatible and nothing ranks them; name a diameter or a type`,
   );
 }
 

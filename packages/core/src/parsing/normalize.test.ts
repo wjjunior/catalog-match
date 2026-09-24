@@ -322,14 +322,10 @@ interface NumberedPhrase {
 
 const NUMBERED_PHRASES: readonly NumberedPhrase[] = [
   { tokens: ['qty', '100'], number: '100', word: 'qty', label: 'qty 100' },
-  { tokens: ['qty', '5'], number: '5', word: 'qty', label: 'qty 5' },
-  { tokens: ['100', 'pcs'], number: '100', word: 'pcs', label: '100 pcs' },
-  { tokens: ['100', 'pieces'], number: '100', word: 'pieces', label: '100 pieces' },
   { tokens: ['5', 'ea'], number: '5', word: 'ea', label: '5 ea' },
-  { tokens: ['5', 'each'], number: '5', word: 'each', label: '5 each' },
 ];
 
-const BARE_WORDS = ['qty', 'pcs', 'pieces', 'ea', 'each'] as const;
+const BARE_WORDS = ['qty', 'each'] as const;
 
 // The whole of `QUANTITY_WORDS` is `pcs pc pieces piece ea each qty`: two adverbs that say
 // how a count is spread, and five nouns that name one. Restated from the word list itself,
@@ -341,10 +337,10 @@ const QUANTITY_RUNS: readonly (readonly string[])[] = [
   ...BARE_WORDS.map((word) => [word]),
 ];
 
-// Where a person actually puts a quantity: in front of the request, at the end of it, or
-// right after the item is named. Every other index is contrived, and gets the weaker
-// assertion further down rather than a demand that a dimension survive it.
-const PLACEMENTS = ['leading', 'trailing', 'afterProduct'] as const;
+// Where a person actually puts a quantity: at the end of the request, or right after the
+// item is named. Every other index is contrived, and gets the weaker assertion further down
+// rather than a demand that a dimension survive it.
+const PLACEMENTS = ['trailing', 'afterProduct'] as const;
 
 type Placement = (typeof PLACEMENTS)[number];
 
@@ -354,7 +350,6 @@ function assemble(
   phrase: readonly string[],
   placement: Placement,
 ): string {
-  if (placement === 'leading') return [...phrase, ...base, ...standard].join(' ');
   if (placement === 'trailing') return [...base, ...standard, ...phrase].join(' ');
 
   const afterType = base.indexOf('bhcs') + 1;
@@ -558,7 +553,6 @@ const SHORTHAND_RUNS: readonly Shorthand[] = [
   { tokens: ['x', '2', 'pieces'], number: '2', counts: true, label: 'x 2 pieces' },
   { tokens: ['x', '2', 'piece'], number: '2', counts: true, label: 'x 2 piece' },
   { tokens: ['x', '100', 'qty'], number: '100', counts: true, label: 'x 100 qty' },
-  { tokens: ['x', 'qty', '100'], number: '100', counts: true, label: 'x qty 100' },
   { tokens: ['x', '100', 'each'], number: '100', counts: false, label: 'x 100 each' },
   { tokens: ['x', '5', 'ea'], number: '5', counts: false, label: 'x 5 ea' },
 ];

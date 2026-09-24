@@ -78,6 +78,10 @@ function preferenceOf(
   spec: ParsedSpec,
   candidates: readonly CatalogItem[],
 ): Preference | undefined {
+  // A history that weighed nothing leaves every share at the alpha prior, and a tie-break
+  // over that flat table would name a value the customer never expressed.
+  if (profile.nEff === 0) return undefined;
+
   const value = top(profile.shares[attribute]);
   if (value === undefined) return undefined;
 

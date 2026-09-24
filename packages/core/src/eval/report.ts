@@ -117,7 +117,8 @@ function comparison(report: EvalReport, baseline: BaselineComparison): string[] 
 }
 
 function section({ name, report, baseline }: EvalSection): string {
-  const { retrieval, setRecovery, status, constraints, personalization, calibration } = report;
+  const { retrieval, setRecovery, alternativeRecovery, status } = report;
+  const { constraints, personalization, calibration } = report;
 
   return [
     `## ${name}`,
@@ -145,6 +146,10 @@ function section({ name, report, baseline }: EvalSection): string {
         ['Exact-set rate', rate(setRecovery.exactSetRate)],
       ],
     ),
+    '',
+    `### Recovery of the labeled alternatives (${plural(alternativeRecovery.cases)})`,
+    '',
+    table(['metric', 'value'], [['Alternative recall', rate(alternativeRecovery.recall)]]),
     '',
     `### Status correctness (${plural(status.cases)})`,
     '',
@@ -174,8 +179,6 @@ function section({ name, report, baseline }: EvalSection): string {
     table(
       ['metric', 'value', 'cases'],
       [
-        // Its own denominator too: a personalized case whose label names no single intended
-        // SKU cannot be scored by any answer, so it is out of both rates rather than a miss.
         ['Hit@1 with the customer', rate(personalization.hit1), String(personalization.hit1Cases)],
         [
           'Hit@1 without the customer',
@@ -225,6 +228,7 @@ export interface JsonSection {
   cases: number;
   retrieval: { cases: number; hit1: number; hit3: number; mrr: number };
   setRecovery: { cases: number; precision: number; recall: number; exactSetRate: number };
+  alternativeRecovery: { cases: number; recall: number };
   status: { cases: number; accuracy: number; matrix: StatusMatrix };
   constraints: { cases: number; violations: number };
   personalization: {
@@ -261,6 +265,10 @@ export function toJson(sections: readonly EvalSection[]): JsonSummary {
         precision: round(report.setRecovery.precision),
         recall: round(report.setRecovery.recall),
         exactSetRate: round(report.setRecovery.exactSetRate),
+      },
+      alternativeRecovery: {
+        cases: report.alternativeRecovery.cases,
+        recall: round(report.alternativeRecovery.recall),
       },
       status: {
         cases: report.status.cases,

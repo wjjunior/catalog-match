@@ -49,6 +49,9 @@ describe('a run over the real data', () => {
 
     expect(section?.retrieval.cases).toBe(48);
     expect(section?.setRecovery.cases).toBe(30);
+    // The one golden case that labels the alternatives it expects. The label is thin
+    // evidence, which is why the denominator is published beside the rate.
+    expect(section?.alternativeRecovery.cases).toBe(1);
     expect(section?.status.cases).toBe(78);
     expect(section?.personalization.cases).toBe(21);
     expect(section?.calibration.cases).toBe(43);

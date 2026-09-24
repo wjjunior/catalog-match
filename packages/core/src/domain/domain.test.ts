@@ -13,8 +13,8 @@ import {
   PRODUCT_TYPES,
   STANDARDS,
 } from './attributes';
-import type { CatalogItem, CustomerProfile, HistoryLine } from './catalog';
-import type { DescriptionParser, HistoryPrior, QueryParser } from './contracts';
+import type { CatalogItem, HistoryLine } from './catalog';
+import type { DescriptionParser, QueryParser } from './contracts';
 import { DIAMETERS } from './diameters';
 import type { Explanation, MatchRequest, MatchResponse } from './match';
 import { MATCH_STATUSES, NOTE_CODES } from './match';
@@ -249,25 +249,6 @@ const historyLine = {
   quantity: 50,
 } satisfies HistoryLine;
 
-const customerProfile = {
-  customerId: 'CUST-001',
-  customerName: 'Midwest Industrial Supply',
-  nEff: 10.4,
-  lambda: 0.67,
-  referenceDate: '2026-04-25',
-  shares: {
-    material: { steel: 0.82 },
-    finish: { zinc: 0.51 },
-    threadSystem: { imperial: 0.6 },
-  },
-  repeats: { PXROD126STZC0002: 1 },
-  purchases: {
-    PXROD126STZC0002: { count: 2, lastOrderDate: '2026-04-15', spec: parsedSpec },
-  },
-  discontinued: ['PXNUT16888PL0901'],
-  warnings: [],
-} satisfies CustomerProfile;
-
 const explanation = {
   matched: [
     { attr: 'diameter', query: 'M8', item: 'M8', provenance: 'explicit' },
@@ -348,10 +329,6 @@ const matcher: Matcher = { match: () => matchResponse };
 
 const descriptionParser: DescriptionParser = { parse: () => parsedSpec };
 const queryParser: QueryParser = { parse: () => parsedSpec };
-const historyPrior: HistoryPrior = {
-  prior: (candidates) => candidates.map(() => 1 / candidates.length),
-};
-
 describe('contract shapes', () => {
   it('lets the ports and the inner-ring contracts be implemented', () => {
     expect(catalogRepository.bySku(catalogItem.sku)).toBe(catalogItem);
@@ -359,7 +336,6 @@ describe('contract shapes', () => {
     expect(matcher.match(matchRequest).status).toBe('ambiguous');
     expect(descriptionParser.parse(catalogItem.description).residue).toEqual(['nylon']);
     expect(queryParser.parse(matchRequest.query).diameter?.nominal).toBe('M8');
-    expect(historyPrior.prior([catalogItem], parsedSpec, customerProfile)).toEqual([1]);
   });
 
   it('keeps the compatible count of a response and its explanations in step', () => {
