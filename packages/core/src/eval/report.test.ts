@@ -65,6 +65,11 @@ describe('the markdown report', () => {
     expect(markdown).toContain('Calibration (1 case)');
   });
 
+  it('reports the labeled alternatives on their own denominator, not on the whole set', () => {
+    expect(markdown).toContain('Recovery of the labeled alternatives (0 cases)');
+    expect(markdown).toContain('| Alternative recall | 0.000 |');
+  });
+
   it('gives the margin its own denominator, since it is averaged over fewer cases', () => {
     expect(markdown).toContain('| Mean top-1 to top-2 margin |');
     expect(markdown).toMatch(/\| Mean top-1 to top-2 margin \| [0-9.]+ \| 0 \|/);

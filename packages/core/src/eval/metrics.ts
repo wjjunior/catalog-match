@@ -89,6 +89,27 @@ export function setRecovery(outcomes: readonly CaseOutcome[]): SetRecoveryMetric
   };
 }
 
+export interface AlternativeRecoveryMetrics {
+  cases: number;
+  recall: number;
+}
+
+/** Its own denominator: most cases name no alternatives, and scoring them would report the
+ * silence of the label as a failure of the backoff. Read off the raised limit, like the
+ * other set metrics, so the served window cannot truncate a recall. */
+export function alternativeRecovery(outcomes: readonly CaseOutcome[]): AlternativeRecoveryMetrics {
+  const recalls = outcomes.flatMap((outcome) => {
+    const expected = outcome.entry.expectedAlternatives;
+    if (expected === undefined || expected.length === 0) return [];
+
+    const offered = new Set(outcome.full.alternatives.map((alternative) => alternative.sku));
+
+    return [rate(expected.filter((sku) => offered.has(sku)).length, expected.length)];
+  });
+
+  return { cases: recalls.length, recall: mean(recalls) };
+}
+
 export type StatusMatrix = Readonly<Record<MatchStatus, Readonly<Record<MatchStatus, number>>>>;
 
 export interface StatusConfusion {

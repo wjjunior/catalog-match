@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalog, caseOf, outcomeOf } from '../../test/eval/fixtures';
+import type { Alternative } from '../domain/match';
 import type { CaseOutcome } from './metrics';
 import {
+  alternativeRecovery,
   calibration,
   constraintPreservation,
   latency,
@@ -106,6 +108,70 @@ describe('recovery of the compatible set', () => {
       recall: 0,
       exactSetRate: 0,
     });
+  });
+});
+
+describe('recovery of the labeled alternatives', () => {
+  const alternativeOf = (sku: string): Alternative => ({
+    sku,
+    catalogId: sku,
+    description: sku,
+    active: true,
+    closeness: 0.5,
+    relaxed: ['length'],
+    explanation: {
+      matched: [],
+      unspecified: [],
+      unverified: [],
+      compatibleCount: 0,
+      disambiguateBy: [],
+    },
+  });
+
+  const none = (
+    id: string,
+    expectedAlternatives: string[] | undefined,
+    offered: readonly string[],
+  ): CaseOutcome => {
+    const outcome = outcomeOf(
+      caseOf({
+        id,
+        expectedStatus: 'none',
+        expected: [],
+        ...(expectedAlternatives === undefined ? {} : { expectedAlternatives }),
+      }),
+      [],
+      { status: 'none' },
+    );
+
+    return { ...outcome, full: { ...outcome.full, alternatives: offered.map(alternativeOf) } };
+  };
+
+  it('averages recall per case over the cases that carry the label', () => {
+    const outcomes = [
+      none('n-1', ['SS', 'BO'], ['SS', 'BO']),
+      none('n-2', ['SS', 'BO'], ['SS']),
+      none('n-3', ['SS'], ['NUT']),
+    ];
+
+    expect(alternativeRecovery(outcomes)).toEqual({
+      cases: 3,
+      recall: expect.closeTo((1 + 1 / 2 + 0) / 3, 10),
+    });
+  });
+
+  it('keeps its own denominator: a case with no label is not a miss', () => {
+    const outcomes = [
+      none('n-1', ['SS'], ['SS']),
+      none('n-2', undefined, ['BO']),
+      none('n-3', [], ['BO']),
+    ];
+
+    expect(alternativeRecovery(outcomes)).toEqual({ cases: 1, recall: 1 });
+  });
+
+  it('reports no cases rather than a perfect score when nothing is labeled', () => {
+    expect(alternativeRecovery([none('n-1', undefined, [])])).toEqual({ cases: 0, recall: 0 });
   });
 });
 

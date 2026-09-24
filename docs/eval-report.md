@@ -31,6 +31,12 @@ itself rather than against any label. See `docs/eval/golden-rationale.md`.
 | Set recall | 0.983 |
 | Exact-set rate | 0.967 |
 
+### Recovery of the labeled alternatives (1 case)
+
+| metric | value |
+|---|---|
+| Alternative recall | 1.000 |
+
 ### Status correctness (78 cases)
 
 Accuracy 0.987.

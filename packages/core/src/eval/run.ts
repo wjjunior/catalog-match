@@ -4,6 +4,7 @@ import type { Matcher } from '../ports/matcher';
 import type { EvalCase } from './loader';
 import { loadCases } from './loader';
 import type {
+  AlternativeRecoveryMetrics,
   CalibrationMetrics,
   CaseOutcome,
   ConstraintPreservation,
@@ -14,6 +15,7 @@ import type {
   StatusConfusion,
 } from './metrics';
 import {
+  alternativeRecovery,
   calibration,
   constraintPreservation,
   latency,
@@ -38,6 +40,7 @@ export interface EvalReport {
   cases: number;
   retrieval: RetrievalMetrics;
   setRecovery: SetRecoveryMetrics;
+  alternativeRecovery: AlternativeRecoveryMetrics;
   status: StatusConfusion;
   constraints: ConstraintPreservation;
   personalization: PersonalizationMetrics;
@@ -109,6 +112,7 @@ export function run({
     cases: outcomes.length,
     retrieval: retrieval(outcomes),
     setRecovery: setRecovery(outcomes),
+    alternativeRecovery: alternativeRecovery(outcomes),
     status: statusConfusion(outcomes),
     constraints: constraintPreservation(outcomes, catalog),
     personalization: personalization(outcomes),
