@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AlternativeCard } from '../../src/entities/match/AlternativeCard';
 import { MatchCard } from '../../src/entities/match/MatchCard';
-import { PersonalizationNote } from '../../src/entities/match/PersonalizationNote';
+import { CustomerOrderHistory } from '../../src/entities/match/CustomerOrderHistory';
 import { alternative, explanation, match } from './fixtures';
 
 describe('MatchCard', () => {
@@ -28,7 +28,7 @@ describe('MatchCard', () => {
     render(<MatchCard match={match({ confidence: 0.82, label: 'High' })} />);
 
     expect(
-      screen.getByRole('progressbar', { name: 'confidence' }).getAttribute('aria-valuenow'),
+      screen.getByRole('progressbar', { name: 'Match confidence' }).getAttribute('aria-valuenow'),
     ).toBe('82');
     expect(screen.getByText('82%')).toBeDefined();
     expect(screen.getByText('High')).toBeDefined();
@@ -38,10 +38,10 @@ describe('MatchCard', () => {
     render(<MatchCard match={match({ label: undefined })} />);
 
     expect(screen.queryByText('High')).toBeNull();
-    expect(screen.getByRole('progressbar', { name: 'confidence' })).toBeDefined();
+    expect(screen.getByRole('progressbar', { name: 'Match confidence' })).toBeDefined();
   });
 
-  it('renders the explanation chips', () => {
+  it('reads the matched attributes in business terms', () => {
     render(
       <MatchCard
         match={match({
@@ -87,11 +87,11 @@ describe('AlternativeCard', () => {
     render(<AlternativeCard alternative={alternative({ closeness: 0.67, relaxed: ['length'] })} />);
 
     expect(
-      screen.getByRole('progressbar', { name: 'closeness' }).getAttribute('aria-valuenow'),
+      screen.getByRole('progressbar', { name: 'Closeness' }).getAttribute('aria-valuenow'),
     ).toBe('67');
     expect(screen.getByText('67%')).toBeDefined();
     expect(screen.getByText('relaxed: length')).toBeDefined();
-    expect(screen.queryByRole('progressbar', { name: 'confidence' })).toBeNull();
+    expect(screen.queryByRole('progressbar', { name: 'Match confidence' })).toBeNull();
   });
 
   it('lists every relaxed constraint', () => {
@@ -101,10 +101,10 @@ describe('AlternativeCard', () => {
   });
 });
 
-describe('PersonalizationNote', () => {
+describe('CustomerOrderHistory', () => {
   it('renders the reason core wrote', () => {
     render(
-      <PersonalizationNote
+      <CustomerOrderHistory
         personalization={{ reason: 'history prefers steel yellow zinc', prior: 0.41 }}
       />,
     );
@@ -113,14 +113,14 @@ describe('PersonalizationNote', () => {
   });
 
   it('shows the prior as a percentage', () => {
-    render(<PersonalizationNote personalization={{ reason: 'because', prior: 0.41 }} />);
+    render(<CustomerOrderHistory personalization={{ reason: 'because', prior: 0.41 }} />);
 
     expect(screen.getByText('41%')).toBeDefined();
   });
 
   it('names the attributes the query overrode history with', () => {
     render(
-      <PersonalizationNote
+      <CustomerOrderHistory
         personalization={{ reason: 'because', prior: 0.2, overriddenBy: ['material', 'finish'] }}
       />,
     );
@@ -129,7 +129,7 @@ describe('PersonalizationNote', () => {
   });
 
   it('says nothing about overrides when there are none', () => {
-    render(<PersonalizationNote personalization={{ reason: 'because', prior: 0.2 }} />);
+    render(<CustomerOrderHistory personalization={{ reason: 'because', prior: 0.2 }} />);
 
     expect(screen.queryByText(/overridden/)).toBeNull();
   });

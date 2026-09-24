@@ -1,55 +1,74 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 import { AlternativeCard } from '../../entities/match/AlternativeCard';
+import { EmptyState } from '../../entities/match/EmptyState';
+import { LoadingSkeleton } from '../../entities/match/LoadingSkeleton';
 import { MatchCard } from '../../entities/match/MatchCard';
-import { isHeadlineNote, StatusLine } from '../../entities/match/StatusLine';
+import { MatchSummary } from '../../entities/match/MatchSummary';
+import { isHeadlineNote } from '../../entities/match/StatusLine';
 import { ExampleChips } from '../../features/match-query/ExampleChips';
 import { QueryForm } from '../../features/match-query/QueryForm';
 import { useMatchQuery } from '../../features/match-query/useMatchQuery';
 import { CustomerCombobox } from '../../features/select-customer/CustomerCombobox';
 import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
+import { Alert, AlertDescription, AlertTitle } from '../../shared/ui/alert';
+import { Button } from '../../shared/ui/Button';
 
-function Results({ response }: { response: MatchResponse }) {
+// An alternative only ever comes back alongside an empty `results`, so this is the one
+// place it can appear; a compatible set never carries one of its own.
+function Alternatives({ alternatives }: { alternatives: MatchResponse['alternatives'] }) {
+  if (alternatives.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
+      <h2
+        className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        id="alternatives"
+      >
+        Alternatives
+      </h2>
+      <div className="flex flex-col gap-3">
+        {alternatives.map((option) => (
+          <AlternativeCard key={option.sku} alternative={option} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Results({ response, customerName }: { response: MatchResponse; customerName?: string }) {
+  if (response.results.length === 0) {
+    return (
+      <>
+        <EmptyState response={response} />
+        <Alternatives alternatives={response.alternatives} />
+      </>
+    );
+  }
+
   // The status line already speaks for the notes it promotes; the rest belong in the list.
   const notes = response.notes.filter((entry) => !isHeadlineNote(entry.code));
 
   return (
     <>
-      <StatusLine response={response} />
+      <MatchSummary response={response} customerName={customerName} />
 
-      {response.results.length > 0 && (
-        <section className="flex flex-col gap-2.5" aria-labelledby="matches">
-          <h2
-            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            id="matches"
-          >
-            Matches
-          </h2>
-          <div className="flex flex-col gap-3">
-            {response.results.map((result) => (
-              <MatchCard key={result.sku} match={result} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {response.alternatives.length > 0 && (
-        <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
-          <h2
-            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            id="alternatives"
-          >
-            Alternatives
-          </h2>
-          <div className="flex flex-col gap-3">
-            {response.alternatives.map((option) => (
-              <AlternativeCard key={option.sku} alternative={option} />
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="flex flex-col gap-2.5" aria-labelledby="matches">
+        <h2
+          className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          id="matches"
+        >
+          Matches
+        </h2>
+        <div className="flex flex-col gap-3">
+          {response.results.map((result) => (
+            <MatchCard key={result.sku} match={result} />
+          ))}
+        </div>
+      </section>
 
       {notes.length > 0 && (
         <ul
@@ -65,53 +84,44 @@ function Results({ response }: { response: MatchResponse }) {
   );
 }
 
-/** docs/DESIGN.md 5.5 asks for this on the page, and 12 makes it the mitigation for a
- * reader taking the number for a calibrated probability. The thresholds themselves stay in
- * matching/config.ts; naming them here would be a second home for a tunable. */
-function ConfidenceSemantics() {
-  return (
-    <aside
-      className="mt-8 border-t border-border pt-4 text-sm leading-normal text-muted-foreground"
-      role="note"
-      aria-label="what confidence means"
-    >
-      <strong>Confidence</strong> is the model&rsquo;s estimate that this SKU is the intended one,
-      given the query, the selected customer and an explicit set of assumptions. It is not a
-      measured frequency, and it is comparable within one answer rather than across answers. High,
-      Medium and Low are bands of that estimate, attached after the calibration measurement rather
-      than promised before it. An alternative carries <strong>closeness</strong> instead, because it
-      is not the thing that was asked for.
-    </aside>
-  );
-}
-
 export function ResultsPanel() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<CustomerSummary>();
+  // The customer the answer was asked for, which a later selection must not rewrite.
+  const [askedFor, setAskedFor] = useState<string>();
   const { state, run } = useMatchQuery();
 
-  return (
-    <main className="mx-auto flex max-w-[44rem] flex-col gap-5">
-      <h1 className="text-3xl tracking-tight">Catalog Match</h1>
+  function ask(text: string) {
+    setAskedFor(selected?.customerName);
+    run(text, selected?.customerId);
+  }
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr] sm:items-start">
+  // Re-asks the same query with whichever customer is selected now, same as any other
+  // submission; `run` aborts anything still pending, so this is safe to click right away.
+  function retry() {
+    ask(query);
+  }
+
+  return (
+    <main className="flex flex-col gap-5">
+      <section className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
         <QueryForm
           value={query}
           onChange={setQuery}
           onSubmit={() => {
-            run(query, selected?.customerId);
+            ask(query);
           }}
           busy={state.phase === 'loading'}
+          customerField={<CustomerCombobox onSelect={setSelected} />}
         />
-        <CustomerCombobox onSelect={setSelected} />
-      </div>
 
-      <ExampleChips
-        onPick={(picked) => {
-          setQuery(picked);
-          run(picked, selected?.customerId);
-        }}
-      />
+        <ExampleChips
+          onPick={(picked) => {
+            setQuery(picked);
+            ask(picked);
+          }}
+        />
+      </section>
 
       <div className="flex flex-col gap-4">
         {state.phase === 'idle' && (
@@ -119,20 +129,21 @@ export function ResultsPanel() {
             Type a fastener description, or pick an example query.
           </p>
         )}
-        {state.phase === 'loading' && (
-          <p className="m-0 text-muted-foreground" role="status">
-            Matching…
-          </p>
-        )}
+        {state.phase === 'loading' && <LoadingSkeleton />}
         {state.phase === 'failed' && (
-          <p className="m-0 rounded-lg bg-warn-surface px-3.5 py-2.5 text-warn" role="alert">
-            {state.message}
-          </p>
+          <Alert variant="destructive">
+            <AlertCircle aria-hidden="true" />
+            <AlertTitle>Match failed</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <p className="m-0">{state.message}</p>
+              <Button variant="quiet" onClick={retry}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
-        {state.phase === 'ready' && <Results response={state.response} />}
+        {state.phase === 'ready' && <Results response={state.response} customerName={askedFor} />}
       </div>
-
-      <ConfidenceSemantics />
     </main>
   );
 }

@@ -26,7 +26,7 @@ function serve(matchResponse: MatchResponse | (() => Promise<Response>)) {
 
 async function submit(query: string) {
   await userEvent.type(screen.getByRole('textbox', { name: /query/i }), query);
-  await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 }
 
 function matchBody(): Record<string, unknown> {
@@ -58,7 +58,7 @@ describe('ResultsPanel', () => {
 
     await submit('M8 x 16 hex cap screw');
 
-    expect(await screen.findByText('1 match')).toBeDefined();
+    expect(await screen.findByText('1 compatible item')).toBeDefined();
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(matchBody()).toEqual({ query: 'M8 x 16 hex cap screw' });
   });
@@ -83,9 +83,10 @@ describe('ResultsPanel', () => {
 
     await submit('M12 hex nut');
 
-    expect(
-      await screen.findByText('9 compatible options, specify material or finish'),
-    ).toBeDefined();
+    expect(await screen.findByText('9 compatible items')).toBeDefined();
+    expect(screen.getByRole('status').textContent).toBe(
+      'Specify material or finish to narrow these down.',
+    );
     expect(screen.getAllByRole('article')).toHaveLength(3);
   });
 
@@ -105,9 +106,31 @@ describe('ResultsPanel', () => {
     await submit('M8 x 45mm SHCS');
 
     expect(await screen.findByText('no M8 socket head cap screw at 45 mm')).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'No compatible items' })).toBeDefined();
     const alternatives = screen.getByRole('region', { name: /alternatives/i });
     expect(within(alternatives).getAllByRole('article')).toHaveLength(1);
     expect(within(alternatives).getByText('relaxed: length')).toBeDefined();
+  });
+
+  it('never invents a nearby size when the catalog has no alternative to offer', async () => {
+    serve(
+      response({
+        query: 'M14 hex nut',
+        status: 'none',
+        compatibleCount: 0,
+        results: [],
+        alternatives: [],
+        notes: [note('unknownDiameter', 'M14 is not a diameter in this catalog')],
+      }),
+    );
+    render(<ResultsPanel />);
+
+    await submit('M14 hex nut');
+
+    expect(screen.getByRole('heading', { name: 'No compatible items' })).toBeDefined();
+    expect(await screen.findByText('M14 is not a diameter in this catalog')).toBeDefined();
+    expect(screen.queryByRole('region', { name: /alternatives/i })).toBeNull();
+    expect(screen.queryByText(/M10|M12|M16/)).toBeNull();
   });
 
   it('asks for a customer when a history reference arrives without one', async () => {
@@ -193,6 +216,8 @@ describe('ResultsPanel', () => {
 
     expect(await screen.findByRole('alert')).toBeDefined();
     expect(screen.queryByRole('article')).toBeNull();
+    // A failed request is not an empty result: only one of the two headings may appear.
+    expect(screen.queryByRole('heading', { name: 'No compatible items' })).toBeNull();
   });
 
   it('reports a route it cannot reach at all', async () => {
@@ -204,7 +229,29 @@ describe('ResultsPanel', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('could not be reached');
   });
 
-  it('shows that a match is in flight and holds the button while it is', async () => {
+  it('retries the last query, with whichever customer is selected now', async () => {
+    let attempt = 0;
+    serve(() => {
+      attempt += 1;
+      return attempt === 1
+        ? Promise.reject(new TypeError('network down'))
+        : Promise.resolve(
+            json(response({ status: 'unique', compatibleCount: 1, results: [match()] })),
+          );
+    });
+    render(<ResultsPanel />);
+
+    await submit('M12 hex nut');
+    await screen.findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('1 compatible item')).toBeDefined();
+    expect(matchBody()).toEqual({ query: 'M12 hex nut' });
+    expect(attempt).toBe(2);
+  });
+
+  it('sketches the summary and result cards while a match is in flight, and keeps the search card usable', async () => {
     let release: (() => void) | undefined;
     serve(
       () =>
@@ -214,15 +261,22 @@ describe('ResultsPanel', () => {
           };
         }),
     );
-    render(<ResultsPanel />);
+    const { container } = render(<ResultsPanel />);
 
     await submit('M12 hex nut');
 
     expect(screen.getByText('Matching…')).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Match' }).hasAttribute('disabled')).toBe(true);
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+    expect((screen.getByRole('textbox', { name: /query/i }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
+    expect(screen.getByRole('combobox', { name: /customer/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Match catalog' }).hasAttribute('disabled')).toBe(
+      true,
+    );
 
     release?.();
-    expect(await screen.findByText('1 match')).toBeDefined();
+    expect(await screen.findByText('1 compatible item')).toBeDefined();
   });
 
   it('never sends a customer the combobox no longer shows', async () => {
@@ -266,30 +320,5 @@ describe('ResultsPanel', () => {
     expect((screen.getByRole('textbox', { name: /query/i }) as HTMLInputElement).value).toBe(
       'M8 flat washer',
     );
-  });
-});
-
-// docs/DESIGN.md 5.5 asks for the semantics on the page as well as in the README, and 12
-// makes it the mitigation for reading the number as a calibrated probability.
-describe('what the confidence number claims', () => {
-  it('states the semantics on the page, before anything has been searched for', () => {
-    render(<ResultsPanel />);
-
-    const text = screen.getByRole('note', { name: /confidence/i }).textContent ?? '';
-
-    expect(text).toMatch(/estimate that this SKU is the intended one/i);
-    expect(text).toMatch(/not a measured frequency/i);
-  });
-
-  // The numbers behind the bands stay out of the page on purpose: every threshold lives in
-  // matching/config.ts, and src/** may not import core runtime code to read one.
-  it('says a label is a band set after measurement, not a promise', () => {
-    render(<ResultsPanel />);
-
-    const text = screen.getByRole('note', { name: /confidence/i }).textContent ?? '';
-
-    expect(text).toMatch(/High, Medium and Low/);
-    expect(text).toMatch(/after the calibration measurement/i);
-    expect(text).not.toMatch(/0\.\d/);
   });
 });

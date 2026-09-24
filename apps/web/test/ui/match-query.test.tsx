@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -36,7 +36,7 @@ describe('QueryForm', () => {
     const onSubmit = vi.fn();
     render(<QueryForm value="M12 hex nut" onChange={vi.fn()} onSubmit={onSubmit} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
@@ -48,7 +48,9 @@ describe('QueryForm', () => {
     await userEvent.type(screen.getByRole('textbox', { name: /query/i }), '{Enter}');
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Match' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Match catalog' }).hasAttribute('disabled')).toBe(
+      true,
+    );
   });
 
   it('refuses a blank query submitted around the button as well', () => {
@@ -65,23 +67,42 @@ describe('QueryForm', () => {
   it('holds the button while a match is in flight', () => {
     render(<QueryForm value="M12 hex nut" onChange={vi.fn()} onSubmit={vi.fn()} busy />);
 
-    expect(screen.getByRole('button', { name: 'Match' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Match catalog' }).hasAttribute('disabled')).toBe(
+      true,
+    );
   });
 });
 
 describe('ExampleChips', () => {
-  it('offers every example query from the challenge document', () => {
+  it('shows the first five example queries and reaches the rest through Show all', async () => {
     render(<ExampleChips onPick={vi.fn()} />);
 
-    expect(screen.getAllByRole('button')).toHaveLength(EXAMPLE_QUERIES.length);
+    for (const query of EXAMPLE_QUERIES.slice(0, 5)) {
+      expect(screen.getByRole('button', { name: query })).toBeDefined();
+    }
+    expect(screen.queryByRole('button', { name: EXAMPLE_QUERIES[5] })).toBeNull();
+    expect(screen.getByText('+28')).toBeDefined();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    const dialog = screen.getByRole('dialog');
+
+    for (const query of EXAMPLE_QUERIES) {
+      expect(within(dialog).getByRole('button', { name: query })).toBeDefined();
+    }
   });
 
-  it('hands the chosen query straight to its owner, text and all', async () => {
+  it('hands the chosen query straight to its owner and closes the dialog', async () => {
     const onPick = vi.fn();
     render(<ExampleChips onPick={onPick} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'the same washers as last time' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'the same washers as last time',
+      }),
+    );
 
     expect(onPick).toHaveBeenCalledWith('the same washers as last time');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
