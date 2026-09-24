@@ -39,6 +39,7 @@ import {
   unitMismatchNote,
   unknownDiameterNote,
   unknownTypeNote,
+  tiedSetNote,
   unrankedPoolNote,
   unverifiedResidueNote,
   withPersonalization,
@@ -850,6 +851,16 @@ describe('note builders', () => {
     );
   });
 
+  it('names the size of the set every member of which scored the same', () => {
+    expect(tiedSetNote(7)).toEqual({
+      code: 'tiedSet',
+      message: 'all 7 compatible items score the same; the order shown is by SKU',
+    });
+    expect(tiedSetNote(81).message).toBe(
+      'all 81 compatible items score the same; the order shown is by SKU',
+    );
+  });
+
   it('contains no template placeholder in any note', () => {
     const notes = [
       failedConstraintNote(
@@ -865,6 +876,7 @@ describe('note builders', () => {
       unresolvedReferenceNote('what we always get'),
       unverifiedResidueNote(['nylon']),
       unrankedPoolNote(438, 'stainless'),
+      tiedSetNote(7),
     ];
 
     for (const note of notes) {

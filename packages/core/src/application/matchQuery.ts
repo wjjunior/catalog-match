@@ -29,6 +29,7 @@ import {
   unknownDiameterNote,
   unknownTypeNote,
   unrankedPoolNote,
+  tiedSetNote,
   unresolvedReferenceNote,
   unverifiedResidueNote,
   withPersonalization,
@@ -36,7 +37,7 @@ import {
 import { bindLength } from '../matching/lengthBearing';
 import type { LexicalIndex } from '../matching/lexicalFallback';
 import { score } from '../matching/lexicalFallback';
-import { labelFor, posterior } from '../matching/posterior';
+import { labelFor, posterior, tied } from '../matching/posterior';
 import { compatibility } from '../matching/ranking';
 import { correct } from '../parsing/fuzzy';
 import { normalize } from '../parsing/normalize';
@@ -246,12 +247,18 @@ function ranked(
   const near =
     room <= 0 ? [] : nearMisses(spec, items, config, new Set(compatible.map((item) => item.sku)));
 
+  // Measured over all of C, so the note reads the same at every limit the caller asks for.
+  const tie =
+    status === 'ambiguous' && compatible.length > 1 && tied([...p.values()], config.tieTolerance)
+      ? [tiedSetNote(compatible.length)]
+      : [];
+
   return {
     status,
     compatibleCount: compatible.length,
     results,
     alternatives: offered(spec, near, room),
-    notes: notesFor(spec, undefined),
+    notes: [...notesFor(spec, undefined), ...tie],
   };
 }
 

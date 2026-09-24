@@ -14,19 +14,26 @@ const UNREACHABLE = 'the match service could not be reached';
 
 export function useMatchQuery(): {
   state: MatchQueryState;
-  run: (query: string, customerId?: string) => void;
+  run: (query: string, customerId?: string, limit?: number) => void;
 } {
   const [state, setState] = useState<MatchQueryState>({ phase: 'idle' });
   const pending = useRef<AbortController | null>(null);
 
   // A superseded request is aborted, so a slow answer can never replace a newer one.
-  const run = useCallback((query: string, customerId?: string) => {
+  const run = useCallback((query: string, customerId?: string, limit?: number) => {
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
     setState({ phase: 'loading' });
 
-    postMatch(customerId === undefined ? { query } : { query, customerId }, controller.signal)
+    postMatch(
+      {
+        query,
+        ...(customerId === undefined ? {} : { customerId }),
+        ...(limit === undefined ? {} : { limit }),
+      },
+      controller.signal,
+    )
       .then((response) => {
         if (!controller.signal.aborted) setState({ phase: 'ready', response });
       })

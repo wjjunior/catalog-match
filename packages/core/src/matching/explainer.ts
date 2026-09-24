@@ -406,6 +406,13 @@ export function unrankedPoolNote(count: number, stated: string): Note {
   );
 }
 
+export function tiedSetNote(count: number): Note {
+  return note(
+    'tiedSet',
+    `all ${String(count)} compatible items score the same; the order shown is by SKU`,
+  );
+}
+
 export function discontinuedNote(sku: string): Note {
   return note('discontinued', `previously ordered ${sku} is discontinued; showing closest active`);
 }

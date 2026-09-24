@@ -35,6 +35,7 @@ export interface MatcherConfig {
   readonly labels: LabelThresholds;
   readonly backoffOrder: readonly BackoffStep[];
   readonly lengthTolerance: number;
+  readonly tieTolerance: number;
   readonly lexicalCap: number;
   readonly lexicalUniqueGap: number;
   readonly historyConfidence: number;
@@ -65,6 +66,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   },
   backoffOrder: BACKOFF_STEPS,
   lengthTolerance: 0.25,
+  tieTolerance: 1e-9,
   lexicalCap: 0.4,
   lexicalUniqueGap: 0.01,
   historyConfidence: 0.7,

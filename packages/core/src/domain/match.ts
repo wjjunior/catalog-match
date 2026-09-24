@@ -15,6 +15,7 @@ export const NOTE_CODES = [
   'unverifiedResidue',
   'unboundLength',
   'unrankedPool',
+  'tiedSet',
 ] as const;
 
 export type NoteCode = (typeof NOTE_CODES)[number];
