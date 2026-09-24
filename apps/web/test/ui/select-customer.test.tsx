@@ -69,22 +69,37 @@ describe('CustomerCombobox', () => {
     });
   });
 
-  it('walks the list with the arrow keys', async () => {
-    render(<CustomerCombobox onSelect={vi.fn()} />);
+  it('opens with the first customer the route returned already active', async () => {
+    const onSelect = vi.fn();
+    render(<CustomerCombobox onSelect={onSelect} />);
     const input = screen.getByRole('combobox', { name: /customer/i });
 
     await userEvent.click(input);
     await screen.findAllByRole('option');
+    await userEvent.keyboard('{Enter}');
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'CUST-001' }) as unknown as CustomerSummary,
+    );
+    expect((input as HTMLInputElement).value).toBe('Midwest Industrial Supply');
+  });
+
+  it('walks the list with the arrow keys', async () => {
+    render(<CustomerCombobox onSelect={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('combobox', { name: /customer/i }));
+    const options = await screen.findAllByRole('option');
+    const active = () =>
+      options.findIndex((option) => option.getAttribute('aria-selected') === 'true');
 
     await userEvent.keyboard('{ArrowDown}');
-    const first = screen.getAllByRole('option')[0];
-    expect(input.getAttribute('aria-activedescendant')).toBe(first?.id);
+    const moved = active();
 
     await userEvent.keyboard('{ArrowDown}');
-    expect(input.getAttribute('aria-activedescendant')).toBe(screen.getAllByRole('option')[1]?.id);
+    expect(active()).toBe(moved + 1);
 
     await userEvent.keyboard('{ArrowUp}');
-    expect(input.getAttribute('aria-activedescendant')).toBe(first?.id);
+    expect(active()).toBe(moved);
   });
 
   it('selects the active customer with Enter and closes the list', async () => {
@@ -134,7 +149,7 @@ describe('CustomerCombobox', () => {
 
     await userEvent.click(input);
     await screen.findAllByRole('option');
-    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await userEvent.keyboard('{Enter}');
     expect(onSelect).toHaveBeenLastCalledWith(
       expect.objectContaining({ customerId: 'CUST-001' }) as unknown as CustomerSummary,
     );
