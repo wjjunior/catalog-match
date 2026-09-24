@@ -25,7 +25,9 @@ function counted(response: MatchResponse): string {
     : `Specify ${list(disambiguateBy)} to narrow these down.`;
 }
 
-function statusText(response: MatchResponse): string {
+// Exported so the empty-state card can fall back to it when a response carries no note at
+// all; the note itself, when there is one, is what that card renders instead.
+export function statusText(response: MatchResponse): string {
   const headline = response.notes.find((entry) => isHeadlineNote(entry.code));
   if (headline !== undefined) return headline.message;
 

@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 import { AlternativeCard } from '../../entities/match/AlternativeCard';
+import { EmptyState } from '../../entities/match/EmptyState';
+import { LoadingSkeleton } from '../../entities/match/LoadingSkeleton';
 import { MatchCard } from '../../entities/match/MatchCard';
 import { MatchSummary } from '../../entities/match/MatchSummary';
 import { isHeadlineNote } from '../../entities/match/StatusLine';
@@ -11,8 +14,41 @@ import { QueryForm } from '../../features/match-query/QueryForm';
 import { useMatchQuery } from '../../features/match-query/useMatchQuery';
 import { CustomerCombobox } from '../../features/select-customer/CustomerCombobox';
 import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
+import { Alert, AlertDescription, AlertTitle } from '../../shared/ui/alert';
+import { Button } from '../../shared/ui/Button';
+
+// An alternative only ever comes back alongside an empty `results`, so this is the one
+// place it can appear; a compatible set never carries one of its own.
+function Alternatives({ alternatives }: { alternatives: MatchResponse['alternatives'] }) {
+  if (alternatives.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
+      <h2
+        className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        id="alternatives"
+      >
+        Alternatives
+      </h2>
+      <div className="flex flex-col gap-3">
+        {alternatives.map((option) => (
+          <AlternativeCard key={option.sku} alternative={option} />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function Results({ response, customerName }: { response: MatchResponse; customerName?: string }) {
+  if (response.results.length === 0) {
+    return (
+      <>
+        <EmptyState response={response} />
+        <Alternatives alternatives={response.alternatives} />
+      </>
+    );
+  }
+
   // The status line already speaks for the notes it promotes; the rest belong in the list.
   const notes = response.notes.filter((entry) => !isHeadlineNote(entry.code));
 
@@ -20,37 +56,19 @@ function Results({ response, customerName }: { response: MatchResponse; customer
     <>
       <MatchSummary response={response} customerName={customerName} />
 
-      {response.results.length > 0 && (
-        <section className="flex flex-col gap-2.5" aria-labelledby="matches">
-          <h2
-            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            id="matches"
-          >
-            Matches
-          </h2>
-          <div className="flex flex-col gap-3">
-            {response.results.map((result) => (
-              <MatchCard key={result.sku} match={result} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {response.alternatives.length > 0 && (
-        <section className="flex flex-col gap-2.5" aria-labelledby="alternatives">
-          <h2
-            className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            id="alternatives"
-          >
-            Alternatives
-          </h2>
-          <div className="flex flex-col gap-3">
-            {response.alternatives.map((option) => (
-              <AlternativeCard key={option.sku} alternative={option} />
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="flex flex-col gap-2.5" aria-labelledby="matches">
+        <h2
+          className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          id="matches"
+        >
+          Matches
+        </h2>
+        <div className="flex flex-col gap-3">
+          {response.results.map((result) => (
+            <MatchCard key={result.sku} match={result} />
+          ))}
+        </div>
+      </section>
 
       {notes.length > 0 && (
         <ul
@@ -76,6 +94,12 @@ export function ResultsPanel() {
   function ask(text: string) {
     setAskedFor(selected?.customerName);
     run(text, selected?.customerId);
+  }
+
+  // Re-asks the same query with whichever customer is selected now, same as any other
+  // submission; `run` aborts anything still pending, so this is safe to click right away.
+  function retry() {
+    ask(query);
   }
 
   return (
@@ -105,15 +129,18 @@ export function ResultsPanel() {
             Type a fastener description, or pick an example query.
           </p>
         )}
-        {state.phase === 'loading' && (
-          <p className="m-0 text-muted-foreground" role="status">
-            Matching…
-          </p>
-        )}
+        {state.phase === 'loading' && <LoadingSkeleton />}
         {state.phase === 'failed' && (
-          <p className="m-0 rounded-lg bg-warn-surface px-3.5 py-2.5 text-warn" role="alert">
-            {state.message}
-          </p>
+          <Alert variant="destructive">
+            <AlertCircle aria-hidden="true" />
+            <AlertTitle>Match failed</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <p className="m-0">{state.message}</p>
+              <Button variant="quiet" onClick={retry}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
         {state.phase === 'ready' && <Results response={state.response} customerName={askedFor} />}
       </div>
