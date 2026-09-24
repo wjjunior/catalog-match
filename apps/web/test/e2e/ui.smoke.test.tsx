@@ -51,10 +51,23 @@ describe('the page against the real core', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
 
     expect(await screen.findByText('no M8 socket head cap screw at 45 mm')).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'No compatible items' })).toBeDefined();
 
     const alternatives = await screen.findByRole('region', { name: 'Alternatives' });
 
     expect(within(alternatives).getAllByRole('article')).toHaveLength(3);
     expect(screen.queryByRole('region', { name: 'Matches' })).toBeNull();
+  });
+
+  it('answers a diameter the catalog does not carry with no invented alternative', async () => {
+    render(<HomePage />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: /query/i }), 'M14 hex nut');
+    await userEvent.click(screen.getByRole('button', { name: 'Match catalog' }));
+
+    expect(screen.getByRole('heading', { name: 'No compatible items' })).toBeDefined();
+    expect(await screen.findByText('M14 is not a diameter in this catalog')).toBeDefined();
+    expect(screen.queryByRole('region', { name: 'Alternatives' })).toBeNull();
+    expect(screen.queryByText(/M10|M12|M16/)).toBeNull();
   });
 });
