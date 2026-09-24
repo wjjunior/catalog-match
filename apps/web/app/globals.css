@@ -13,9 +13,9 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted-surface);
+  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent-surface);
+  --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
@@ -43,9 +43,9 @@
   --primary-foreground: #ffffff;
   --secondary: #eef1f6;
   --secondary-foreground: #16181d;
-  --muted-surface: #eef1f6; /* was --muted */
+  --muted: #eef1f6;
   --muted-foreground: #5b6472;
-  --accent-surface: #eef1f6; /* was --accent */
+  --accent: #eef1f6;
   --accent-foreground: #16181d;
   --destructive: #b3261e;
   --border: #d8dee7;
@@ -55,14 +55,6 @@
   --ok-surface: #e2f5ec;
   --warn: #8a5300;
   --warn-surface: #fdf0dc;
-
-  /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
-     block together with the last stylesheet. */
-  --muted: #5b6472;
-  --surface: #ffffff;
-  --chip: #eef1f6;
-  --accent: #1f4fd8;
-  --accent-contrast: #ffffff;
 }
 
 /* The app has no theme toggle and follows the OS, so the values swap here. The `.dark`
@@ -80,9 +72,9 @@
     --primary-foreground: #10131a;
     --secondary: #262b35;
     --secondary-foreground: #f2f4f7;
-    --muted-surface: #262b35; /* was --muted */
+    --muted: #262b35;
     --muted-foreground: #9aa4b2;
-    --accent-surface: #262b35; /* was --accent */
+    --accent: #262b35;
     --accent-foreground: #f2f4f7;
     --destructive: #e5716a;
     --border: #333947;
@@ -92,14 +84,6 @@
     --ok-surface: #16302a;
     --warn: #e5b169;
     --warn-surface: #33281a;
-
-    /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
-       block together with the last stylesheet. */
-    --muted: #9aa4b2;
-    --surface: #1e2129;
-    --chip: #262b35;
-    --accent: #6f95ff;
-    --accent-contrast: #10131a;
   }
 }
 
@@ -115,9 +99,9 @@
   --primary-foreground: #10131a;
   --secondary: #262b35;
   --secondary-foreground: #f2f4f7;
-  --muted-surface: #262b35; /* was --muted */
+  --muted: #262b35;
   --muted-foreground: #9aa4b2;
-  --accent-surface: #262b35; /* was --accent */
+  --accent: #262b35;
   --accent-foreground: #f2f4f7;
   --destructive: #e5716a;
   --border: #333947;
@@ -127,14 +111,6 @@
   --ok-surface: #16302a;
   --warn: #e5b169;
   --warn-surface: #33281a;
-
-  /* Legacy tokens the remaining .module.css files still read. Task 7 deletes this
-     block together with the last stylesheet. */
-  --muted: #9aa4b2;
-  --surface: #1e2129;
-  --chip: #262b35;
-  --accent: #6f95ff;
-  --accent-contrast: #10131a;
 }
 
 @layer base {
