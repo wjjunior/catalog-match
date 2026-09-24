@@ -76,7 +76,6 @@ describe('the example set', () => {
     expect(response.status).toBe('unique');
     expect(response.compatibleCount).toBe(1);
     expect(skus(response)).toEqual([sku]);
-    expect(response.alternatives).toEqual([]);
   });
 
   it.each(Object.entries(AMBIGUOUS))('answers %s with %i compatible SKUs', (query, count) => {
@@ -87,6 +86,70 @@ describe('the example set', () => {
     expect(response.results).toHaveLength(Math.min(3, count));
     expect(response.results[0]?.explanation.compatibleCount).toBe(count);
     expect(response.results[0]?.explanation.disambiguateBy.length).toBeGreaterThan(0);
+  });
+
+  it.each([...Object.keys(UNIQUE), ...Object.keys(AMBIGUOUS)])(
+    'never fills %s past three cards, and never with a compatible item',
+    (query) => {
+      const response = ask(query);
+      const compatible = new Set(skus(response));
+
+      expect(response.results.length + response.alternatives.length).toBeLessThanOrEqual(3);
+      expect(response.alternatives.filter((option) => compatible.has(option.sku))).toEqual([]);
+      expect(response.alternatives.filter((option) => option.relaxed.length === 0)).toEqual([]);
+      expect(response.alternatives.filter((option) => 'confidence' in option)).toEqual([]);
+    },
+  );
+
+  it('follows a unique match with the two nearest near misses', () => {
+    const response = ask('M16 threaded rod 60mm');
+
+    expect(response.status).toBe('unique');
+    expect(response.results).toHaveLength(1);
+    expect(response.alternatives).toHaveLength(2);
+    for (const option of response.alternatives) {
+      expect(option.relaxed).toEqual(['length']);
+      expect(option.closeness).toBeLessThan(1);
+      expect(option.explanation.closeness).toBe(option.closeness);
+    }
+  });
+
+  it('fills a two-item compatible set to three', () => {
+    const response = ask('M8 x 16mm socket head cap screw');
+
+    expect(response.status).toBe('ambiguous');
+    expect(response.compatibleCount).toBe(2);
+    expect(response.results).toHaveLength(2);
+    expect(response.alternatives).toHaveLength(1);
+    expect(response.alternatives[0]?.relaxed).toEqual(['length']);
+  });
+
+  /** Diameter and type are never relaxed, so a query that states nothing else has no
+   * near miss to offer and the panel stays short of three. docs/DESIGN.md 5.3. */
+  it('offers nothing where the query left the backoff no step to take', () => {
+    const response = ask('M4 hex nut');
+
+    expect(response.status).toBe('ambiguous');
+    expect(response.compatibleCount).toBe(2);
+    expect(response.alternatives).toEqual([]);
+  });
+
+  it('leaves a compatible set of three or more alone', () => {
+    const response = ask('M8 flat washer');
+
+    expect(response.status).toBe('ambiguous');
+    expect(response.results).toHaveLength(3);
+    expect(response.alternatives).toEqual([]);
+  });
+
+  it('keeps a near miss out of the results it follows', () => {
+    const response = ask('M8 flat washer DIN 912');
+    const ranked = new Set(skus(response));
+
+    expect(response.status).toBe('unique');
+    expect(response.alternatives.length).toBeGreaterThan(0);
+    expect(response.alternatives.some((option) => ranked.has(option.sku))).toBe(false);
+    expect(response.alternatives.every((option) => option.relaxed.includes('standard'))).toBe(true);
   });
 
   it('answers a history reference without a customer with the prompt', () => {
@@ -250,18 +313,23 @@ describe('docs/DESIGN.md 6, without a customer', () => {
 /** What the response quotes back is what the rep typed, by design: an abbreviation and
  * its expansion cannot agree on the evidence. Everything the quoting does not touch must
  * be identical. */
+const unquoted = <T extends { explanation: MatchResponse['results'][number]['explanation'] }>(
+  card: T,
+): unknown => ({
+  ...card,
+  explanation: {
+    ...card.explanation,
+    matched: card.explanation.matched.map((attr) => ({ ...attr, query: undefined })),
+  },
+});
+
 const withoutQuoting = (response: MatchResponse): unknown => ({
   ...response,
   query: undefined,
   timingsMs: undefined,
   parsed: { ...response.parsed, evidence: undefined },
-  results: response.results.map((match) => ({
-    ...match,
-    explanation: {
-      ...match.explanation,
-      matched: match.explanation.matched.map((attr) => ({ ...attr, query: undefined })),
-    },
-  })),
+  results: response.results.map(unquoted),
+  alternatives: response.alternatives.map(unquoted),
 });
 
 describe('abbreviations', () => {
