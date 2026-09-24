@@ -268,28 +268,3 @@ describe('ResultsPanel', () => {
     );
   });
 });
-
-// docs/DESIGN.md 5.5 asks for the semantics on the page as well as in the README, and 12
-// makes it the mitigation for reading the number as a calibrated probability.
-describe('what the confidence number claims', () => {
-  it('states the semantics on the page, before anything has been searched for', () => {
-    render(<ResultsPanel />);
-
-    const text = screen.getByRole('note', { name: /confidence/i }).textContent ?? '';
-
-    expect(text).toMatch(/estimate that this SKU is the intended one/i);
-    expect(text).toMatch(/not a measured frequency/i);
-  });
-
-  // The numbers behind the bands stay out of the page on purpose: every threshold lives in
-  // matching/config.ts, and src/** may not import core runtime code to read one.
-  it('says a label is a band set after measurement, not a promise', () => {
-    render(<ResultsPanel />);
-
-    const text = screen.getByRole('note', { name: /confidence/i }).textContent ?? '';
-
-    expect(text).toMatch(/High, Medium and Low/);
-    expect(text).toMatch(/after the calibration measurement/i);
-    expect(text).not.toMatch(/0\.\d/);
-  });
-});

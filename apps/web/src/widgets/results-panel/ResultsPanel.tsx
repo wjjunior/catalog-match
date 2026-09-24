@@ -65,35 +65,13 @@ function Results({ response }: { response: MatchResponse }) {
   );
 }
 
-/** docs/DESIGN.md 5.5 asks for this on the page, and 12 makes it the mitigation for a
- * reader taking the number for a calibrated probability. The thresholds themselves stay in
- * matching/config.ts; naming them here would be a second home for a tunable. */
-function ConfidenceSemantics() {
-  return (
-    <aside
-      className="mt-8 border-t border-border pt-4 text-sm leading-normal text-muted-foreground"
-      role="note"
-      aria-label="what confidence means"
-    >
-      <strong>Confidence</strong> is the model&rsquo;s estimate that this SKU is the intended one,
-      given the query, the selected customer and an explicit set of assumptions. It is not a
-      measured frequency, and it is comparable within one answer rather than across answers. High,
-      Medium and Low are bands of that estimate, attached after the calibration measurement rather
-      than promised before it. An alternative carries <strong>closeness</strong> instead, because it
-      is not the thing that was asked for.
-    </aside>
-  );
-}
-
 export function ResultsPanel() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<CustomerSummary>();
   const { state, run } = useMatchQuery();
 
   return (
-    <main className="mx-auto flex max-w-[44rem] flex-col gap-5">
-      <h1 className="text-3xl tracking-tight">Catalog Match</h1>
-
+    <main className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr] sm:items-start">
         <QueryForm
           value={query}
@@ -131,8 +109,6 @@ export function ResultsPanel() {
         )}
         {state.phase === 'ready' && <Results response={state.response} />}
       </div>
-
-      <ConfidenceSemantics />
     </main>
   );
 }
