@@ -26,7 +26,7 @@ export function PageHeader() {
 
       <Dialog>
         <DialogTrigger asChild>
-          <Button variant="quiet" className="shrink-0 gap-1.5">
+          <Button variant="quiet" className="shrink-0 self-start gap-1.5">
             <HelpCircle className="size-4" aria-hidden="true" />
             How it works
           </Button>
