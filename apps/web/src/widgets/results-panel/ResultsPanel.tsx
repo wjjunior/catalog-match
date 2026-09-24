@@ -4,20 +4,21 @@ import { useState } from 'react';
 
 import { AlternativeCard } from '../../entities/match/AlternativeCard';
 import { MatchCard } from '../../entities/match/MatchCard';
-import { isHeadlineNote, StatusLine } from '../../entities/match/StatusLine';
+import { MatchSummary } from '../../entities/match/MatchSummary';
+import { isHeadlineNote } from '../../entities/match/StatusLine';
 import { ExampleChips } from '../../features/match-query/ExampleChips';
 import { QueryForm } from '../../features/match-query/QueryForm';
 import { useMatchQuery } from '../../features/match-query/useMatchQuery';
 import { CustomerCombobox } from '../../features/select-customer/CustomerCombobox';
 import type { CustomerSummary, MatchResponse } from '../../shared/api/client';
 
-function Results({ response }: { response: MatchResponse }) {
+function Results({ response, customerName }: { response: MatchResponse; customerName?: string }) {
   // The status line already speaks for the notes it promotes; the rest belong in the list.
   const notes = response.notes.filter((entry) => !isHeadlineNote(entry.code));
 
   return (
     <>
-      <StatusLine response={response} />
+      <MatchSummary response={response} customerName={customerName} />
 
       {response.results.length > 0 && (
         <section className="flex flex-col gap-2.5" aria-labelledby="matches">
@@ -68,7 +69,14 @@ function Results({ response }: { response: MatchResponse }) {
 export function ResultsPanel() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<CustomerSummary>();
+  // The customer the answer was asked for, which a later selection must not rewrite.
+  const [askedFor, setAskedFor] = useState<string>();
   const { state, run } = useMatchQuery();
+
+  function ask(text: string) {
+    setAskedFor(selected?.customerName);
+    run(text, selected?.customerId);
+  }
 
   return (
     <main className="flex flex-col gap-5">
@@ -77,7 +85,7 @@ export function ResultsPanel() {
           value={query}
           onChange={setQuery}
           onSubmit={() => {
-            run(query, selected?.customerId);
+            ask(query);
           }}
           busy={state.phase === 'loading'}
           customerField={<CustomerCombobox onSelect={setSelected} />}
@@ -86,7 +94,7 @@ export function ResultsPanel() {
         <ExampleChips
           onPick={(picked) => {
             setQuery(picked);
-            run(picked, selected?.customerId);
+            ask(picked);
           }}
         />
       </section>
@@ -107,7 +115,7 @@ export function ResultsPanel() {
             {state.message}
           </p>
         )}
-        {state.phase === 'ready' && <Results response={state.response} />}
+        {state.phase === 'ready' && <Results response={state.response} customerName={askedFor} />}
       </div>
     </main>
   );

@@ -58,7 +58,7 @@ describe('ResultsPanel', () => {
 
     await submit('M8 x 16 hex cap screw');
 
-    expect(await screen.findByText('1 match')).toBeDefined();
+    expect(await screen.findByText('1 compatible item')).toBeDefined();
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(matchBody()).toEqual({ query: 'M8 x 16 hex cap screw' });
   });
@@ -83,9 +83,10 @@ describe('ResultsPanel', () => {
 
     await submit('M12 hex nut');
 
-    expect(
-      await screen.findByText('9 compatible options, specify material or finish'),
-    ).toBeDefined();
+    expect(await screen.findByText('9 compatible items')).toBeDefined();
+    expect(screen.getByRole('status').textContent).toBe(
+      'Specify material or finish to narrow these down.',
+    );
     expect(screen.getAllByRole('article')).toHaveLength(3);
   });
 
@@ -224,7 +225,7 @@ describe('ResultsPanel', () => {
     );
 
     release?.();
-    expect(await screen.findByText('1 match')).toBeDefined();
+    expect(await screen.findByText('1 compatible item')).toBeDefined();
   });
 
   it('never sends a customer the combobox no longer shows', async () => {

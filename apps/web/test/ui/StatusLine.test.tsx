@@ -10,8 +10,10 @@ function lineFor(...args: Parameters<typeof response>) {
 }
 
 describe('StatusLine', () => {
-  it('counts a unique match', () => {
-    expect(lineFor({ status: 'unique', compatibleCount: 1, results: [match()] })).toBe('1 match');
+  it('says a unique match is the only one', () => {
+    expect(lineFor({ status: 'unique', compatibleCount: 1, results: [match()] })).toBe(
+      'Exactly one catalog item satisfies this query.',
+    );
   });
 
   it('names the attributes that would break a tie', () => {
@@ -21,7 +23,7 @@ describe('StatusLine', () => {
         compatibleCount: 7,
         results: [match({ explanation: explanation({ disambiguateBy: ['material', 'finish'] }) })],
       }),
-    ).toBe('7 compatible options, specify material or finish');
+    ).toBe('Specify material or finish to narrow these down.');
   });
 
   it('joins three attributes without an Oxford comma, as the core banner does', () => {
@@ -35,12 +37,12 @@ describe('StatusLine', () => {
           }),
         ],
       }),
-    ).toBe('9 compatible options, specify material, finish or standard');
+    ).toBe('Specify material, finish or standard to narrow these down.');
   });
 
-  it('states the count alone when nothing distinguishes the options', () => {
+  it('says so when nothing would distinguish the options', () => {
     expect(lineFor({ status: 'ambiguous', compatibleCount: 9, results: [match()] })).toBe(
-      '9 compatible options',
+      'No further attribute would separate these options.',
     );
   });
 

@@ -16,12 +16,13 @@ function list(items: readonly string[]): string {
 }
 
 function counted(response: MatchResponse): string {
-  if (response.compatibleCount === 1) return '1 match';
+  if (response.compatibleCount === 1) return 'Exactly one catalog item satisfies this query.';
 
-  const banner = `${response.compatibleCount} compatible options`;
   const disambiguateBy = response.results[0]?.explanation.disambiguateBy ?? [];
 
-  return disambiguateBy.length === 0 ? banner : `${banner}, specify ${list(disambiguateBy)}`;
+  return disambiguateBy.length === 0
+    ? 'No further attribute would separate these options.'
+    : `Specify ${list(disambiguateBy)} to narrow these down.`;
 }
 
 function statusText(response: MatchResponse): string {
@@ -47,9 +48,14 @@ function statusText(response: MatchResponse): string {
   return counted(response);
 }
 
-export function StatusLine({ response }: { response: MatchResponse }) {
+// `lead` is false when the summary states the count above this line, which then reads as
+// the sentence under a headline rather than as the headline itself.
+export function StatusLine({ response, lead = true }: { response: MatchResponse; lead?: boolean }) {
   return (
-    <p className="text-lg font-semibold text-foreground" role="status">
+    <p
+      className={lead ? 'text-lg font-semibold text-foreground' : 'text-sm text-muted-foreground'}
+      role="status"
+    >
       {statusText(response)}
     </p>
   );
