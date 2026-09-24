@@ -1,5 +1,3 @@
-import styles from './ProgressBar.module.css';
-
 interface ProgressBarProps {
   /** A fraction in the unit interval; the bar reports whole percents. */
   value: number;
@@ -11,14 +9,15 @@ export function ProgressBar({ value, label }: ProgressBarProps) {
 
   return (
     <div
-      className={styles.track}
+      className="h-2 overflow-hidden rounded-full bg-secondary"
       role="progressbar"
       aria-label={label}
       aria-valuenow={percent}
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <div className={styles.fill} style={{ width: `${percent}%` }} />
+      {/* The only inline style in apps/web: a runtime percentage cannot be a utility class. */}
+      <div className="h-full rounded-[inherit] bg-primary" style={{ width: `${percent}%` }} />
     </div>
   );
 }
