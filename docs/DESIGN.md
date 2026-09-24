@@ -161,7 +161,7 @@ Hexagonal core and FSD-lite web, both enforced by lint rules rather than by fold
 
 ```text
 packages/core/src
-  domain/            Diameter, Length, ProductType, Material, Finish, ParsedSpec, MatchStatus, Match, Explanation; contracts.ts (DescriptionParser, QueryParser, HistoryPrior)
+  domain/            Diameter, Length, ProductType, Material, Finish, ParsedSpec, MatchStatus, Match, Explanation; contracts.ts (DescriptionParser, QueryParser)
   parsing/           normalize.ts, units.ts, lexicon.ts, fuzzy.ts, descriptionParser.ts, queryParser.ts
   matching/          compatibility.ts (set C, status, backoff), ranking.ts, posterior.ts, explainer.ts, lexicalFallback.ts, config.ts
   personalization/   customerProfile.ts, historyPrior.ts, intent.ts, historyReference.ts

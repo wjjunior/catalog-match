@@ -19,7 +19,6 @@ export { InMemoryOrderHistoryRepository } from './adapters/memory/inMemoryOrderH
 
 export {
   buildProfile,
-  createHistoryPrior,
   detectIntent,
   historyPrior,
   INTENT_PHRASES,
