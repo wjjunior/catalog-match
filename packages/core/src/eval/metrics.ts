@@ -224,19 +224,17 @@ export function constraintPreservation(
 
 function brokenBy(id: string, response: MatchResponse, catalog: CatalogRepository): Offender[] {
   const found: Offender[] = [];
-  {
-    const query = response.parsed;
-    const stated = ATTRIBUTE_NAMES.filter((name) => STATED.has(query.provenance[name]));
+  const query = response.parsed;
+  const stated = ATTRIBUTE_NAMES.filter((name) => STATED.has(query.provenance[name]));
 
-    for (const match of response.results) {
-      const item = catalog.bySku(match.sku);
-      const broken =
-        item === undefined
-          ? undefined
-          : stated.find((attribute) => contradicts(attribute, query, item.spec));
+  for (const match of response.results) {
+    const item = catalog.bySku(match.sku);
+    const broken =
+      item === undefined
+        ? undefined
+        : stated.find((attribute) => contradicts(attribute, query, item.spec));
 
-      if (broken !== undefined) found.push({ id, sku: match.sku, attribute: broken });
-    }
+    if (broken !== undefined) found.push({ id, sku: match.sku, attribute: broken });
   }
 
   return found;
