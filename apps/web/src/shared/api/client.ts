@@ -18,7 +18,8 @@ export type NoteCode =
   | 'historyReference'
   | 'unverifiedResidue'
   | 'unboundLength'
-  | 'unrankedPool';
+  | 'unrankedPool'
+  | 'tiedSet';
 
 export type ConfidenceLabel = 'High' | 'Medium' | 'Low';
 

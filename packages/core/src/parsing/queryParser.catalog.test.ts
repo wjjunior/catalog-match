@@ -145,6 +145,7 @@ describe('an unclaimed word between the diameter and a number', () => {
       });
       expect(core.matchQuery({ query }).notes.map((n) => n.message)).toEqual([
         'not verifiable: grade, 8',
+        'all 5 compatible items score the same; the order shown is by SKU',
       ]);
     },
   );

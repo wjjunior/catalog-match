@@ -138,7 +138,12 @@ describe('a length stated on a type that carries one', () => {
 
     expect(response.status).toBe('ambiguous');
     expect(skus(response)).toEqual(['PXHEX860A2PL0680', 'PXTAP860BRPL0369']);
-    expect(response.notes).toEqual([]);
+    expect(response.notes).toEqual([
+      {
+        code: 'tiedSet',
+        message: 'all 2 compatible items score the same; the order shown is by SKU',
+      },
+    ]);
   });
 
   it('still binds when the query names no type at all', () => {
@@ -146,6 +151,11 @@ describe('a length stated on a type that carries one', () => {
 
     expect(response.parsed.type).toBeUndefined();
     expect(response.compatibleCount).toBe(5);
-    expect(response.notes).toEqual([]);
+    expect(response.notes).toEqual([
+      {
+        code: 'tiedSet',
+        message: 'all 5 compatible items score the same; the order shown is by SKU',
+      },
+    ]);
   });
 });

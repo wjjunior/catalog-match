@@ -106,6 +106,7 @@ const noteCode = literalsOf<NoteCode>({
   unverifiedResidue: true,
   unboundLength: true,
   unrankedPool: true,
+  tiedSet: true,
 });
 
 const confidenceLabel = literalsOf<ConfidenceLabel>({ High: true, Medium: true, Low: true });

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CatalogItem } from '../domain/catalog';
 import { DEFAULT_MATCHER_CONFIG } from './config';
-import { labelFor, posterior } from './posterior';
+import { labelFor, posterior, tied } from './posterior';
 
 const config = DEFAULT_MATCHER_CONFIG;
 
@@ -291,5 +291,29 @@ describe('posterior: properties (docs/DESIGN.md 5.5)', () => {
       }),
       { numRuns: NUM_RUNS },
     );
+  });
+});
+
+describe('tied', () => {
+  it('holds for a set with one member and for a set that shares one value', () => {
+    expect(tied([0.14], config.tieTolerance)).toBe(true);
+    expect(tied([0.14, 0.14, 0.14], config.tieTolerance)).toBe(true);
+  });
+
+  it('holds across the rounding two equal divisions need not agree on', () => {
+    const seven = posterior(items(7), ones(7), uniform(7), 0, config);
+
+    expect(new Set(seven.p.values()).size).toBeGreaterThanOrEqual(1);
+    expect(tied([...seven.p.values()], config.tieTolerance)).toBe(true);
+    expect(tied([0.1, 0.1 + 1e-17], config.tieTolerance)).toBe(true);
+  });
+
+  it('fails as soon as one member differs by more than the tolerance', () => {
+    expect(tied([0.14, 0.14, 0.13], config.tieTolerance)).toBe(false);
+    expect(tied([0.1, 0.1 + 1e-6], config.tieTolerance)).toBe(false);
+  });
+
+  it('scales with the values, so a large set of small values is not tied by default', () => {
+    expect(tied([1e-6, 2e-6], config.tieTolerance)).toBe(false);
   });
 });

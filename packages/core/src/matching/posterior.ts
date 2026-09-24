@@ -40,6 +40,14 @@ export function posterior(
   };
 }
 
+/** Whether one value is shared by the whole set. The tolerance is relative because these
+ * are quotients that agree mathematically without agreeing bit for bit. */
+export function tied(values: readonly number[], tolerance: number): boolean {
+  const highest = Math.max(...values);
+
+  return values.every((value) => highest - value <= tolerance * highest);
+}
+
 export interface ConfidenceLabelling {
   readonly label: ConfidenceLabel;
   readonly provisional: boolean;
