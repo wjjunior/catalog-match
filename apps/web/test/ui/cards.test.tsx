@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AlternativeCard } from '../../src/entities/match/AlternativeCard';
 import { MatchCard } from '../../src/entities/match/MatchCard';
-import { PersonalizationNote } from '../../src/entities/match/PersonalizationNote';
+import { CustomerOrderHistory } from '../../src/entities/match/CustomerOrderHistory';
 import { alternative, explanation, match } from './fixtures';
 
 describe('MatchCard', () => {
@@ -101,10 +101,10 @@ describe('AlternativeCard', () => {
   });
 });
 
-describe('PersonalizationNote', () => {
+describe('CustomerOrderHistory', () => {
   it('renders the reason core wrote', () => {
     render(
-      <PersonalizationNote
+      <CustomerOrderHistory
         personalization={{ reason: 'history prefers steel yellow zinc', prior: 0.41 }}
       />,
     );
@@ -113,14 +113,14 @@ describe('PersonalizationNote', () => {
   });
 
   it('shows the prior as a percentage', () => {
-    render(<PersonalizationNote personalization={{ reason: 'because', prior: 0.41 }} />);
+    render(<CustomerOrderHistory personalization={{ reason: 'because', prior: 0.41 }} />);
 
     expect(screen.getByText('41%')).toBeDefined();
   });
 
   it('names the attributes the query overrode history with', () => {
     render(
-      <PersonalizationNote
+      <CustomerOrderHistory
         personalization={{ reason: 'because', prior: 0.2, overriddenBy: ['material', 'finish'] }}
       />,
     );
@@ -129,7 +129,7 @@ describe('PersonalizationNote', () => {
   });
 
   it('says nothing about overrides when there are none', () => {
-    render(<PersonalizationNote personalization={{ reason: 'because', prior: 0.2 }} />);
+    render(<CustomerOrderHistory personalization={{ reason: 'because', prior: 0.2 }} />);
 
     expect(screen.queryByText(/overridden/)).toBeNull();
   });

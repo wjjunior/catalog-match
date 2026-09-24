@@ -3,7 +3,7 @@ import { Badge } from '../../shared/ui/Badge';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 
 import { AttributeChips } from './AttributeChips';
-import { PersonalizationNote } from './PersonalizationNote';
+import { CustomerOrderHistory } from './CustomerOrderHistory';
 
 export function MatchCard({ match }: { match: Match }) {
   const { explanation } = match;
@@ -31,7 +31,7 @@ export function MatchCard({ match }: { match: Match }) {
       <AttributeChips explanation={explanation} />
 
       {explanation.personalization !== undefined && (
-        <PersonalizationNote personalization={explanation.personalization} />
+        <CustomerOrderHistory personalization={explanation.personalization} />
       )}
     </article>
   );

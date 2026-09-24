@@ -1,6 +1,10 @@
+import { History } from 'lucide-react';
+
 import type { PersonalizationExplanation } from '../../shared/api/client';
 
-export function PersonalizationNote({
+// `reason` is a sentence core composed; the quantity and the date inside it are not
+// separate fields, so the browser renders it whole rather than taking it apart.
+export function CustomerOrderHistory({
   personalization,
 }: {
   personalization: PersonalizationExplanation;
@@ -8,7 +12,11 @@ export function PersonalizationNote({
   const { reason, prior, overriddenBy } = personalization;
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5 rounded-r-md border-l-[3px] border-primary bg-secondary px-3 py-2">
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5 rounded-lg border border-primary/30 bg-secondary px-3 py-2.5">
+      <span className="flex flex-[1_1_100%] items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <History className="size-3.5" aria-hidden="true" />
+        Customer order history
+      </span>
       <p className="flex-[1_1_100%] text-sm text-foreground">{reason}</p>
       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         prior
