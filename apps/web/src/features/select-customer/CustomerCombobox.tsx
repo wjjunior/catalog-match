@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { CustomerOption } from '../../entities/customer/CustomerOption';
 import type { CustomerSummary } from '../../shared/api/client';
@@ -11,6 +11,7 @@ import {
   CommandList,
 } from '../../shared/ui/command';
 import { Label } from '../../shared/ui/label';
+import { comboboxFieldFocusRing, cn } from '../../shared/lib/utils';
 import { Popover, PopoverAnchor, PopoverContent } from '../../shared/ui/popover';
 
 import { useCustomers } from './useCustomers';
@@ -23,6 +24,7 @@ export function CustomerCombobox({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const customers = useCustomers(query);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   function choose(customer: CustomerSummary) {
     setQuery(customer.customerName);
@@ -36,12 +38,17 @@ export function CustomerCombobox({
     <Command shouldFilter={false} label="Customer" className="overflow-visible bg-transparent">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
-          <div className="flex items-end gap-2">
+          <div ref={anchorRef} className="flex items-end gap-2">
             <Label className="flex flex-1 flex-col items-stretch gap-1.5 font-normal">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Customer
               </span>
-              <div className="rounded-md border border-input shadow-xs has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-[3px] has-[input:focus-visible]:ring-ring/50 [&>[data-slot=command-input-wrapper]]:border-b-0">
+              <div
+                className={cn(
+                  'rounded-md border border-input shadow-xs [&>[data-slot=command-input-wrapper]]:border-b-0',
+                  comboboxFieldFocusRing,
+                )}
+              >
                 <CommandInput
                   placeholder="Any customer"
                   className="h-9 select-text"
@@ -87,6 +94,13 @@ export function CustomerCombobox({
           }}
           onMouseDown={(event) => {
             event.preventDefault();
+          }}
+          // PopoverAnchor isn't a PopoverTrigger, so Radix doesn't exempt it here; without
+          // this, clicking the already-focused field dismisses the list for good.
+          onInteractOutside={(event) => {
+            if (anchorRef.current?.contains(event.target as Node)) {
+              event.preventDefault();
+            }
           }}
         >
           <CommandList label="Customer">

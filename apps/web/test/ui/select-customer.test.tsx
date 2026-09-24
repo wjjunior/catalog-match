@@ -187,6 +187,18 @@ describe('CustomerCombobox', () => {
     expect((input as HTMLInputElement).value).toBe('');
   });
 
+  it('keeps the list open when the already-focused field is clicked again', async () => {
+    render(<CustomerCombobox onSelect={vi.fn()} />);
+    const input = screen.getByRole('combobox', { name: /customer/i });
+
+    await userEvent.click(input);
+    await screen.findAllByRole('option');
+
+    await userEvent.click(input);
+
+    expect(await screen.findAllByRole('option')).toHaveLength(3);
+  });
+
   it('says so when no customer matches the filter', async () => {
     serve([]);
     render(<CustomerCombobox onSelect={vi.fn()} />);

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { cn } from '../lib/utils';
+import { cn, focusRing } from '../lib/utils';
 
 interface ChipProps {
   children: ReactNode;
@@ -26,11 +26,7 @@ export function Chip({ children, tone = 'neutral', onClick }: ChipProps) {
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        BASE,
-        TONES[tone],
-        'cursor-pointer hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-      )}
+      className={cn(BASE, TONES[tone], 'cursor-pointer hover:border-border', focusRing)}
     >
       {children}
     </button>
